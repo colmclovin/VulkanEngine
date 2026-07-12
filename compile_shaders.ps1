@@ -11,10 +11,10 @@ if (-not $glslc) {
 }
 
 # Create output directory if it doesn't exist
-$shaderDir = "shaders"
+$shaderDir = "Shaders"
 if (-not (Test-Path $shaderDir)) {
 	New-Item -ItemType Directory -Path $shaderDir | Out-Null
-	Write-Host "Created shaders directory" -ForegroundColor Green
+	Write-Host "Created Shaders directory" -ForegroundColor Green
 }
 
 # Compile vertex shader

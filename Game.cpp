@@ -93,7 +93,7 @@ void Game::Update(float deltaTime) {
 }
 
 void Game::Render() {
-	Renderer2D::BeginScene(*m_Camera);
+	Renderer2D::BeginScene(*m_Camera2D);
 
 	RenderGrid();
 	RenderWorld();
@@ -104,7 +104,8 @@ void Game::Render() {
 
 void Game::Shutdown() {
 	m_World.reset();
-	m_Camera.reset();
+	m_Camera2D.reset();
+	m_Camera3D.reset();
 	Renderer2D::Shutdown();
 }
 
@@ -113,16 +114,16 @@ void Game::HandleInput(float deltaTime) {
 
 	// Camera movement (WASD)
 	if (glfwGetKey(m_Window, GLFW_KEY_W) == GLFW_PRESS) {
-		m_Camera->Move(glm::vec2(0.0f, -cameraSpeed));
+		m_Camera2D->Move(glm::vec2(0.0f, -cameraSpeed));
 	}
 	if (glfwGetKey(m_Window, GLFW_KEY_S) == GLFW_PRESS) {
-		m_Camera->Move(glm::vec2(0.0f, cameraSpeed));
+		m_Camera2D->Move(glm::vec2(0.0f, cameraSpeed));
 	}
 	if (glfwGetKey(m_Window, GLFW_KEY_A) == GLFW_PRESS) {
-		m_Camera->Move(glm::vec2(-cameraSpeed, 0.0f));
+		m_Camera2D->Move(glm::vec2(-cameraSpeed, 0.0f));
 	}
 	if (glfwGetKey(m_Window, GLFW_KEY_D) == GLFW_PRESS) {
-		m_Camera->Move(glm::vec2(cameraSpeed, 0.0f));
+		m_Camera2D->Move(glm::vec2(cameraSpeed, 0.0f));
 	}
 
 	// Building selection (number keys)
@@ -144,7 +145,7 @@ void Game::OnMouseButton(int button, int action, int mods) {
 	if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
 		// Place building
 		if (m_IsPlacingBuilding) {
-			glm::vec2 worldPos = m_Camera->ScreenToWorld(m_MousePos);
+			glm::vec2 worldPos = m_Camera2D->ScreenToWorld(m_MousePos);
 			glm::ivec2 gridPos = m_World->WorldToGrid(worldPos);
 
 			auto entity = m_World->CreateBuilding(m_SelectedBuilding, gridPos.x, gridPos.y);
@@ -167,14 +168,14 @@ void Game::OnMouseMove(double xpos, double ypos) {
 
 	if (m_IsPanning) {
 		glm::vec2 delta = newMousePos - m_MousePos;
-		m_Camera->Move(glm::vec2(-delta.x, -delta.y) / m_Camera->GetZoom());
+		m_Camera2D->Move(glm::vec2(-delta.x, -delta.y) / m_Camera2D->GetZoom());
 	}
 
 	m_MousePos = newMousePos;
 }
 
 void Game::OnScroll(double xoffset, double yoffset) {
-	m_Camera->Zoom(static_cast<float>(yoffset) * 0.1f);
+	m_Camera2D->Zoom(static_cast<float>(yoffset) * 0.1f);
 }
 
 void Game::RenderWorld() {

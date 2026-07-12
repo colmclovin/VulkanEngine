@@ -11,12 +11,12 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 REM Create shaders directory if it doesn't exist
-if not exist "shaders" mkdir shaders
+if not exist "Shaders" mkdir Shaders
 
 REM Compile vertex shader
-if exist "shaders\triangle.vert" (
+if exist "Shaders\triangle.vert" (
 	echo Compiling vertex shader...
-	glslc shaders\triangle.vert -o shaders\vert.spv
+	glslc Shaders\triangle.vert -o Shaders\vert.spv
 	if %ERRORLEVEL% EQU 0 (
 		echo   Vertex shader compiled successfully
 	) else (
@@ -28,9 +28,9 @@ if exist "shaders\triangle.vert" (
 )
 
 REM Compile fragment shader
-if exist "shaders\triangle.frag" (
+if exist "Shaders\triangle.frag" (
 	echo Compiling fragment shader...
-	glslc shaders\triangle.frag -o shaders\frag.spv
+	glslc Shaders\triangle.frag -o Shaders\frag.spv
 	if %ERRORLEVEL% EQU 0 (
 		echo   Fragment shader compiled successfully
 	) else (

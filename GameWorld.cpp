@@ -136,8 +136,8 @@ entt::entity GameWorld::CreateResourceNode(ItemType resourceType, int gridX, int
 	auto entity = m_Registry.create();
 
 	GridPosition gridPos;
-	gridPos.x = gridX;
-	gridPos.y = gridY;
+	gridPos.x = gridX + 0.5f;
+	gridPos.y = gridY + 0.5f;
 	m_Registry.emplace<GridPosition>(entity, gridPos);
 
 	glm::vec2 worldPos = GridToWorld(gridX, gridY);
@@ -229,7 +229,11 @@ void GameWorld::UpdateMining(float deltaTime) {
 }
 
 glm::vec2 GameWorld::GridToWorld(int gridX, int gridY) const {
-	return glm::vec2(gridX * m_TileSize, gridY * m_TileSize);
+	// Center the object in the grid cell by adding half tile size
+	return glm::vec2(
+		gridX * m_TileSize + m_TileSize * 0.5f, 
+		gridY * m_TileSize + m_TileSize * 0.5f
+	);
 }
 
 glm::ivec2 GameWorld::WorldToGrid(const glm::vec2& worldPos) const {

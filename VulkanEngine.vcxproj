@@ -111,14 +111,14 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>Default</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>C:\Users\Colton\Desktop\Projects\CppLearning\External\glfw-3.4\glfw-3.4\include;C:\Users\Colton\Desktop\Projects\CppLearning\External\glfw-3.4\glfw-3.4\src;C:\VulkanSDK\1.4.350.0\Include;C:\Users\Colton\Desktop\Projects\CppLearning\External;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\External\glfw-3.4\glfw-3.4\include;$(ProjectDir)..\External\glfw-3.4\glfw-3.4\src;C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)..\External;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <AdditionalDependencies>glfw3.lib
 ;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:\Users\Colton\Desktop\Projects\CppLearning\External\glfw-3.4\glfw-3.4\build\src\Debug;C:\VulkanSDK\1.4.350.0\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\External\glfw-3.4\glfw-3.4\build\src\Debug;C:\VulkanSDK\1.4.350.0\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>

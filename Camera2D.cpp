@@ -52,7 +52,7 @@ glm::vec2 Camera2D::ScreenToWorld(const glm::vec2& screenPos) const {
 	// Convert screen coordinates to NDC (-1 to 1)
 	glm::vec2 ndc;
 	ndc.x = (2.0f * screenPos.x) / m_ViewportWidth - 1.0f;
-	ndc.y = 1.0f - (2.0f * screenPos.y) / m_ViewportHeight;
+	ndc.y = (2.0f * screenPos.y) / m_ViewportHeight - 1.0f;
 
 	// Convert NDC to world space
 	glm::vec4 worldPos = glm::inverse(m_ViewProjectionMatrix) * glm::vec4(ndc, 0.0f, 1.0f);
