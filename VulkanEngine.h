@@ -9,7 +9,7 @@
 #include <memory>
 
 // Forward declaration
-class Game;
+
 
 class VulkanEngine {
 public:
@@ -17,7 +17,7 @@ public:
 
 	// Public accessors for Game integration
 	GLFWwindow* GetWindow() { return window; }
-	Game* GetGame() { return m_Game.get(); }
+	//Game* GetGame() { return m_Game.get(); }
 
 	// Static callbacks for GLFW
 	static void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods);
@@ -114,7 +114,7 @@ private:
 	const uint32_t HEIGHT = 720;
 
 	// Game instance
-	std::unique_ptr<Game> m_Game;
+	//std::unique_ptr<Game> m_Game;
 
 	// Vulkan objects
 	VkInstance instance = VK_NULL_HANDLE;

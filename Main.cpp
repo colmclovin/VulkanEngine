@@ -1,17 +1,38 @@
-#include "VulkanEngine.h"
-#include "Game.h"
+// Main entry point for the Factorio-like 3D game
+// This is a minimal main.cpp that uses the new architecture
+
+#include "GameApp.h"
 #include <iostream>
-#include <stdexcept>
 
 int main() {
-    VulkanEngine engine;
+	std::cout << "========================================" << std::endl;
+	std::cout << "  Factorio-Like 3D Game Engine" << std::endl;
+	std::cout << "========================================" << std::endl;
 
-    try {
-        engine.run();
-    } catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        return EXIT_FAILURE;
-    }
+	try {
+		GameApp game;
+		game.Run();
 
-    return EXIT_SUCCESS;
+		std::cout << "Exiting normally" << std::endl;
+		return 0;
+
+	} catch (const std::exception& e) {
+		std::cerr << "FATAL ERROR: " << e.what() << std::endl;
+		return -1;
+	}
 }
+
+/*
+ * CONTROLS:
+ * 
+ * WASD    - Move camera target (pan)
+ * Q/E     - Rotate camera around target
+ * R/F     - Zoom in/out
+ * ESC     - Quit
+ * 
+ * TODO: Add mouse controls
+ * - Middle mouse drag for panning
+ * - Scroll wheel for zoom
+ * - Right click for rotation
+ * - Left click for building placement
+ */

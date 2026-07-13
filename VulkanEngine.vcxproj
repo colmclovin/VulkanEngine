@@ -111,18 +111,22 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>Default</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\External\glfw-3.4\glfw-3.4\include;$(ProjectDir)..\External\glfw-3.4\glfw-3.4\src;C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)..\External;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\External\glfw-3.4\glfw-3.4\include;$(ProjectDir)..\External\glfw-3.4\glfw-3.4\src;C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)..\External;$(ProjectDir)..\External\Assimp\include\;$(ProjectDir)..\External\Assimp\build\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>glfw3.lib
-;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <AdditionalLibraryDirectories>$(ProjectDir)..\External\glfw-3.4\glfw-3.4\build\src\Debug;C:\VulkanSDK\1.4.350.0\Lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>glfw3.lib;assimp-vc143-mtd.lib;vulkan-1.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\External\glfw-3.4\glfw-3.4\build\src\Debug;C:\VulkanSDK\1.4.350.0\Lib;$(ProjectDir)..\External\Assimp\build\lib\Debug;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
     <Manifest>
       <EnableSegmentHeap>true</EnableSegmentHeap>
     </Manifest>
+    <PostBuildEvent>
+      <Message>
+      </Message>
+      <Command>xcopy /y /d "$(SolutionDir)..\External\Assimp\build\bin\Debug\*.dll" "$(OutDir)"</Command>
+    </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -143,30 +147,38 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Camera2D.cpp" />
-    <ClCompile Include="Game.cpp" />
-    <ClCompile Include="GameWorld.cpp" />
-    <ClCompile Include="Main.cpp" />
-    <ClCompile Include="Renderer2D.cpp" />
-    <ClCompile Include="VulkanEngine.cpp" />
+    <ClCompile Include="GameApp.cpp" />
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="MeshRenderer.cpp" />
+    <ClCompile Include="ModelLoader.cpp" />
+    <ClCompile Include="RenderSystem.cpp" />
+    <ClCompile Include="ResourceManager.cpp" />
+    <ClCompile Include="UIRenderer.cpp" />
+    <ClCompile Include="VulkanContext.cpp" />
     <ClCompile Include="Camera3D.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Camera2D.h" />
     <ClInclude Include="Components.h" />
     <ClInclude Include="EnttWrapper.h" />
-    <ClInclude Include="Game.h" />
-    <ClInclude Include="GameWorld.h" />
-    <ClInclude Include="Renderer2D.h" />
+    <ClInclude Include="GameApp.h" />
+    <ClInclude Include="Mesh.h" />
+    <ClInclude Include="MeshRenderer.h" />
+    <ClInclude Include="ModelLoader.h" />
+    <ClInclude Include="RenderSystem.h" />
+    <ClInclude Include="ResourceManager.h" />
+    <ClInclude Include="UIRenderer.h" />
+    <ClInclude Include="Vertex.h" />
+    <ClInclude Include="VulkanContext.h" />
     <ClInclude Include="VulkanEngine.h" />
     <ClInclude Include="Camera3D.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="compile_shaders.bat" />
     <None Include="compile_shaders.ps1" />
-    <None Include="SETUP_LIBRARIES.md" />
-    <None Include="Shaders\triangle.frag" />
-    <None Include="Shaders\triangle.vert" />
+    <None Include="Shaders\mesh_3d.frag" />
+    <None Include="Shaders\mesh_3d.vert" />
+    <None Include="Shaders\ui_sprite.frag" />
+    <None Include="Shaders\ui_sprite.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
