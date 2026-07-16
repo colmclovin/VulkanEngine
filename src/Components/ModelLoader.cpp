@@ -3,12 +3,12 @@
 #define WIN32_LEAN_AND_MEAN
 
 #include "ModelLoader.h"
+#include "Mesh.h"
+#include <assimp/postprocess.h>
+#include <assimp/scene.h>
+#include <assimp/Importer.hpp>
 #include <iostream>
 #include <string>
-#include "Mesh.h"
-#include <assimp/Importer.hpp>
-#include <assimp/scene.h>
-#include <assimp/postprocess.h>
 
 Mesh ModelLoader::LoadModel(const std::string &filepath) {
     Mesh mesh;
@@ -40,8 +40,8 @@ Mesh ModelLoader::LoadModel(const std::string &filepath) {
     // In a real application, you'd loop through all meshes
     if (scene->mNumMeshes > 0) {
         ProcessMesh(scene->mMeshes[0], mesh);
-        std::cout << "  Vertices: " << mesh.vertices.size() << std::endl;
-        std::cout << "  Indices: " << mesh.indices.size() << std::endl;
+        std::cout << "  Vertices: " << mesh.Vertices.size() << std::endl;
+        std::cout << "  Indices: " << mesh.Indices.size() << std::endl;
     }
 
     return mesh;
@@ -87,7 +87,7 @@ void ModelLoader::ProcessMesh(aiMesh *aiMeshData, Mesh &outMesh) {
         // Default white color (you can later get this from materials)
         vertex.color = glm::vec3(1.0f, 1.0f, 1.0f);
 
-        outMesh.vertices.push_back(vertex);
+        outMesh.Vertices.push_back(vertex);
     }
 
     // Load indices
@@ -96,7 +96,7 @@ void ModelLoader::ProcessMesh(aiMesh *aiMeshData, Mesh &outMesh) {
         aiFace face = aiMeshData->mFaces[i];
         // Each face should have 3 indices (since we triangulated)
         for (unsigned int j = 0; j < face.mNumIndices; j++) {
-            outMesh.indices.push_back(face.mIndices[j]);
+            outMesh.Indices.push_back(face.mIndices[j]);
         }
     }
 };

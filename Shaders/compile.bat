@@ -16,7 +16,7 @@ if not exist "Shaders" mkdir Shaders
 REM Compile vertex shader
 if exist "Shaders\ui_sprite.vert" (
 	echo Compiling vertex shader...
-	glslc Shaders\ui_sprite.vert -o Shaders\ui_sprite_vert.spv
+	glslc Shaders\triangle.vert -o Shaders\vert.spv
 	if %ERRORLEVEL% EQU 0 (
 		echo   Vertex shader compiled successfully
 	) else (
@@ -24,13 +24,13 @@ if exist "Shaders\ui_sprite.vert" (
 		exit /b 1
 	)
 ) else (
-	echo WARNING: ui_sprite.vert not found
+	echo WARNING: triangle.vert not found
 )
 
 REM Compile fragment shader
 if exist "Shaders\ui_sprite.frag" (
 	echo Compiling fragment shader...
-	glslc Shaders\ui_sprite.frag -o Shaders\ui_sprite_frag.spv
+	glslc Shaders\triangle.frag -o Shaders\frag.spv
 	if %ERRORLEVEL% EQU 0 (
 		echo   Fragment shader compiled successfully
 	) else (
@@ -38,7 +38,7 @@ if exist "Shaders\ui_sprite.frag" (
 		exit /b 1
 	)
 ) else (
-	echo WARNING: ui_sprite.frag not found
+	echo WARNING: triangle.frag not found
 )
 
 echo.

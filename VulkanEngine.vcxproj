@@ -147,38 +147,30 @@
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="GameApp.cpp" />
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="MeshRenderer.cpp" />
-    <ClCompile Include="ModelLoader.cpp" />
-    <ClCompile Include="RenderSystem.cpp" />
-    <ClCompile Include="ResourceManager.cpp" />
-    <ClCompile Include="UIRenderer.cpp" />
-    <ClCompile Include="VulkanContext.cpp" />
-    <ClCompile Include="Camera3D.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Components.h" />
-    <ClInclude Include="EnttWrapper.h" />
-    <ClInclude Include="GameApp.h" />
-    <ClInclude Include="Mesh.h" />
-    <ClInclude Include="MeshRenderer.h" />
-    <ClInclude Include="ModelLoader.h" />
-    <ClInclude Include="RenderSystem.h" />
-    <ClInclude Include="ResourceManager.h" />
-    <ClInclude Include="UIRenderer.h" />
-    <ClInclude Include="Vertex.h" />
-    <ClInclude Include="VulkanContext.h" />
-    <ClInclude Include="VulkanEngine.h" />
-    <ClInclude Include="Camera3D.h" />
-  </ItemGroup>
-  <ItemGroup>
     <None Include="compile_shaders.bat" />
     <None Include="compile_shaders.ps1" />
-    <None Include="Shaders\mesh_3d.frag" />
-    <None Include="Shaders\mesh_3d.vert" />
-    <None Include="Shaders\ui_sprite.frag" />
-    <None Include="Shaders\ui_sprite.vert" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\Components\ModelLoader.cpp" />
+    <ClCompile Include="src\Game\Camera3D.cpp" />
+    <ClCompile Include="src\Game\Game.cpp" />
+    <ClCompile Include="src\Main.cpp" />
+    <ClCompile Include="src\Engine\VulkanEngine.cpp" />
+    <ClCompile Include="src\Renderer\MeshRenderer.cpp" />
+    <ClCompile Include="src\Renderer\QuadRenderer.cpp" />
+    <ClCompile Include="src\Renderer\RenderSystem.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\Components\Components.h" />
+    <ClInclude Include="src\Components\Mesh.h" />
+    <ClInclude Include="src\Components\ModelLoader.h" />
+    <ClInclude Include="src\Components\Vertex.h" />
+    <ClInclude Include="src\Engine\VulkanEngine.h" />
+    <ClInclude Include="src\Game\Camera3D.h" />
+    <ClInclude Include="src\Game\Game.h" />
+    <ClInclude Include="src\Renderer\MeshRenderer.h" />
+    <ClInclude Include="src\Renderer\QuadRenderer.h" />
+    <ClInclude Include="src\Renderer\RenderSystem.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

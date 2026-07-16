@@ -1,21 +1,14 @@
 #pragma once
 
-// Protect against Windows macros - MUST BE BEFORE ANY INCLUDES
-#ifndef NOMINMAX
-#define NOMINMAX
-#endif
-#ifndef WIN32_LEAN_AND_MEAN
-#define WIN32_LEAN_AND_MEAN
-#endif
-
 #include "Vertex.h"
-#include <vulkan/vulkan.h>
 #include <vector>
 
-class Mesh{
+
+class Mesh {
+
 public:
-    std::vector<Vertex> vertices;
-    std::vector<uint32_t> indices;
+    std::vector<Vertex> Vertices;
+    std::vector<uint32_t> Indices;
 
     VkBuffer vertexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;
@@ -24,17 +17,16 @@ public:
 
     static Mesh CreateTriangle() {
         Mesh mesh;
-        mesh.vertices = {
+        mesh.Vertices = {
             { { 0.0f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.5f, 1.0f } },
             { { 0.5f, 0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } },
             { { -0.5f, 0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f }, { 1.5f, 1.5f } }
         };
-        mesh.indices = { 0, 1, 2 };
+        mesh.Indices = { 0, 1, 2 };
 
         return mesh;
     }
-
-   void Cleanup(VkDevice device) {
+    void Cleanup(VkDevice device) {
         if (indexBuffer != VK_NULL_HANDLE) {
             vkDestroyBuffer(device, indexBuffer, nullptr);
             vkFreeMemory(device, indexBufferMemory, nullptr);
@@ -43,5 +35,7 @@ public:
             vkDestroyBuffer(device, vertexBuffer, nullptr);
             vkFreeMemory(device, vertexBufferMemory, nullptr);
         }
-   }
+    }
+
+
 };
