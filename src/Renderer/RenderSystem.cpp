@@ -16,7 +16,7 @@ void RenderSystem::Init() {
     m_QuadRenderer = std::make_unique<QuadRenderer>(m_Engine);
     m_QuadRenderer->Init();
 
-
+    m_initialized = true;
     std::cout << "RenderSystem initialized with all subsystems" << std::endl;
 }
 
@@ -35,9 +35,13 @@ void RenderSystem::RenderFrame(entt::registry &registry){//, const Camera3D &cam
 }
 
 void RenderSystem::Shutdown() {
+	if (!m_initialized) {
+		return;
+	}
     if (m_QuadRenderer) {
         m_QuadRenderer->Shutdown();
         m_QuadRenderer.reset();
     }
+    m_initialized = false;
     std::cout << "RenderSystem shut down" << std::endl;
 }

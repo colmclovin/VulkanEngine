@@ -34,5 +34,6 @@ private:
         alignas(16) glm::mat4 transform; // Position, rotation, scale in screen space
         alignas(16) glm::vec4 color; // Sprite tint color
     };
+	bool m_initialized = false;
     
 };

@@ -41,10 +41,14 @@ void VulkanEngine::Shutdown() {
 
     CleanupSwapChain();
 
+    vkDestroyRenderPass(m_Device, m_RenderPass, nullptr);  // NEW
+
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        vkDestroySemaphore(m_Device, m_RenderFinishedSemaphores[i], nullptr);
         vkDestroySemaphore(m_Device, m_ImageAvailableSemaphores[i], nullptr);
         vkDestroyFence(m_Device, m_InFlightFences[i], nullptr);
+    }
+    for (auto semaphore : m_RenderFinishedSemaphores) {   // CHANGED
+        vkDestroySemaphore(m_Device, semaphore, nullptr);
     }
 
     vkDestroyCommandPool(m_Device, m_CommandPool, nullptr);
@@ -59,6 +63,11 @@ void VulkanEngine::Shutdown() {
 
     glfwDestroyWindow(m_Window);
     glfwTerminate();
+
+    m_Device = VK_NULL_HANDLE;      // NEW — makes the guard actually work
+    m_Instance = VK_NULL_HANDLE;
+    m_Window = nullptr;
+
 
     std::cout << "VulkanEngine shut down" << std::endl;
 }
@@ -132,7 +141,7 @@ void VulkanEngine::EndFrame() {
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &m_CommandBuffers[m_CurrentFrame];
 
-    VkSemaphore signalSemaphores[] = { m_RenderFinishedSemaphores[m_CurrentFrame] };
+    VkSemaphore signalSemaphores[] = { m_RenderFinishedSemaphores[m_CurrentImageIndex] };  // CHANGED
     submitInfo.signalSemaphoreCount = 1;
     submitInfo.pSignalSemaphores = signalSemaphores;
 
@@ -465,9 +474,23 @@ void VulkanEngine::CreateSwapChain() {
 void VulkanEngine::RecreateSwapChain() {
     vkDeviceWaitIdle(m_Device);
     CleanupSwapChain();
+
+    for (auto semaphore : m_RenderFinishedSemaphores) {              // NEW
+        vkDestroySemaphore(m_Device, semaphore, nullptr);
+    }
+
     CreateSwapChain();
     CreateImageViews();
     CreateFramebuffers();
+
+    m_RenderFinishedSemaphores.resize(m_SwapChainImages.size());     // NEW
+    VkSemaphoreCreateInfo semaphoreInfo{};
+    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    for (size_t i = 0; i < m_SwapChainImages.size(); i++) {
+        if (vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create sync objects");
+        }
+    }
 }
 
 void VulkanEngine::CleanupSwapChain() {
@@ -597,7 +620,7 @@ void VulkanEngine::CreateCommandBuffers() {
 
 void VulkanEngine::CreateSyncObjects() {
     m_ImageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-    m_RenderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    m_RenderFinishedSemaphores.resize(m_SwapChainImages.size());
     m_InFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
 
     VkSemaphoreCreateInfo semaphoreInfo{};
@@ -609,12 +632,18 @@ void VulkanEngine::CreateSyncObjects() {
 
     for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         if (vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_ImageAvailableSemaphores[i]) != VK_SUCCESS ||
-            vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]) != VK_SUCCESS ||
             vkCreateFence(m_Device, &fenceInfo, nullptr, &m_InFlightFences[i]) != VK_SUCCESS) {
             throw std::runtime_error("Failed to create sync objects");
         }
     }
+
+    for (size_t i = 0; i < m_SwapChainImages.size(); i++) {          // NEW loop
+        if (vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_RenderFinishedSemaphores[i]) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create sync objects");
+        }
+    }
 }
+
 
 bool VulkanEngine::CheckValidationLayerSupport() {
     uint32_t layerCount;

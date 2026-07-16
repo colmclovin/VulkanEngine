@@ -30,5 +30,5 @@ private:
     //std::unique_ptr<ResourceManager> m_ResourceManager;
     //std::unique_ptr<MeshRenderer> m_MeshRenderer;
     std::unique_ptr<QuadRenderer> m_QuadRenderer;
-
+    bool m_initialized = false;
 };

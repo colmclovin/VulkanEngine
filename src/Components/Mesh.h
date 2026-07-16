@@ -27,6 +27,7 @@ public:
         return mesh;
     }
     void Cleanup(VkDevice device) {
+        vkDeviceWaitIdle(device);
         if (indexBuffer != VK_NULL_HANDLE) {
             vkDestroyBuffer(device, indexBuffer, nullptr);
             vkFreeMemory(device, indexBufferMemory, nullptr);

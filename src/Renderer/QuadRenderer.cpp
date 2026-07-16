@@ -19,7 +19,7 @@ void QuadRenderer::Init() {
     std::cout << "Initializing Quad Renderer..." << std::endl;
     CreateQuad();
     CreatePipeline();
-
+    m_initialized = true;
     std::cout << "Quad Renderer initialized" << std::endl;
 }
 
@@ -309,7 +309,10 @@ void QuadRenderer::CreatePipeline() {
 
 void QuadRenderer::Shutdown() {
     VkDevice device = m_Engine->GetDevice();
-
+	if (!m_initialized) {
+		return;
+	}
+    vkDeviceWaitIdle(device);
     // Cleanup quad mesh
     if (m_QuadMesh) {
         if (m_QuadMesh->vertexBuffer != VK_NULL_HANDLE) {
@@ -331,6 +334,6 @@ void QuadRenderer::Shutdown() {
     if (m_PipelineLayout != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
     }
-
+    m_initialized = false;
     std::cout << "Quad Renderer shut down" << std::endl;
 }

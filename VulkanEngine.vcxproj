@@ -111,7 +111,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>Default</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\External\glfw-3.4\glfw-3.4\include;$(ProjectDir)..\External\glfw-3.4\glfw-3.4\src;C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)..\External;$(ProjectDir)..\External\Assimp\include\;$(ProjectDir)..\External\Assimp\build\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\External\glfw-3.4\glfw-3.4\include;$(ProjectDir)..\External\glfw-3.4\glfw-3.4\src;C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)..\External;$(ProjectDir)..\External\Assimp\include\;$(ProjectDir)..\External\Assimp\build\include;$(ProjectDir)..\External\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -168,6 +168,7 @@
     <ClInclude Include="src\Engine\VulkanEngine.h" />
     <ClInclude Include="src\Game\Camera3D.h" />
     <ClInclude Include="src\Game\Game.h" />
+    <ClInclude Include="src\Helpers\ImGuiVulkanUtil.h" />
     <ClInclude Include="src\Renderer\MeshRenderer.h" />
     <ClInclude Include="src\Renderer\QuadRenderer.h" />
     <ClInclude Include="src\Renderer\RenderSystem.h" />

@@ -46,6 +46,7 @@ void Game::Init() {
 
     LoadResources();
     CreateInitialEntities();
+    m_Initialized = true;
     std::cout << "=== Game Initialized ===" << std::endl;
 }
 
@@ -60,7 +61,7 @@ void Game::CreateInitialEntities() {
     // Create initial game entities and components here
     std::cout << "Creating initial entities..." << std::endl;
 
-    
+        
         auto entity = m_Registry->create();
 
         auto &sprite = m_Registry->emplace<SpriteComponent>(entity);
@@ -137,6 +138,10 @@ void Game::Render() {
 }
 void Game::Shutdown() {
     std::cout << "=== Shutting Down Game ===" << std::endl;
+	if (!m_Initialized) {
+		std::cout << "Game was not initialized, skipping shutdown." << std::endl;
+		return;
+	}   
     if (m_Registry) {
         m_Registry->clear();
         m_Registry.reset();
@@ -149,5 +154,6 @@ void Game::Shutdown() {
         m_VulkanEngine->Shutdown();
         m_VulkanEngine.reset();
     }
+    m_Initialized = false;
     std::cout << "=== Game Shut Down ===" << std::endl;
 }
