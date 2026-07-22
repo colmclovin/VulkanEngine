@@ -27,68 +27,10 @@ void QuadRenderer::Render(entt::registry &registry) {
     if (!m_QuadMesh) {
         return;
     }
+    m_QuadMesh->UploadToGPU(m_Engine);
 
-    // Upload quad mesh to GPU if not already done
-    if (!m_QuadUploaded && m_QuadMesh->vertexBuffer == VK_NULL_HANDLE) {
-        VkDeviceSize vertexBufferSize = sizeof(m_QuadMesh->Vertices[0]) * m_QuadMesh->Vertices.size();
-        VkDeviceSize indexBufferSize = sizeof(m_QuadMesh->Indices[0]) * m_QuadMesh->Indices.size();
-
-        // Create and upload vertex buffer
-        VkBuffer vertexStagingBuffer;
-        VkDeviceMemory vertexStagingBufferMemory;
-        m_Engine->CreateBuffer(
-                vertexBufferSize,
-                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                vertexStagingBuffer,
-                vertexStagingBufferMemory);
-
-        void *data;
-        vkMapMemory(m_Engine->GetDevice(), vertexStagingBufferMemory, 0, vertexBufferSize, 0, &data);
-        memcpy(data, m_QuadMesh->Vertices.data(), vertexBufferSize);
-        vkUnmapMemory(m_Engine->GetDevice(), vertexStagingBufferMemory);
-
-        m_Engine->CreateBuffer(
-                vertexBufferSize,
-                VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                m_QuadMesh->vertexBuffer,
-                m_QuadMesh->vertexBufferMemory);
-
-        m_Engine->CopyBuffer(vertexStagingBuffer, m_QuadMesh->vertexBuffer, vertexBufferSize);
-
-        vkDestroyBuffer(m_Engine->GetDevice(), vertexStagingBuffer, nullptr);
-        vkFreeMemory(m_Engine->GetDevice(), vertexStagingBufferMemory, nullptr);
-
-        // Create and upload index buffer
-        VkBuffer indexStagingBuffer;
-        VkDeviceMemory indexStagingBufferMemory;
-        m_Engine->CreateBuffer(
-                indexBufferSize,
-                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                indexStagingBuffer,
-                indexStagingBufferMemory);
-
-        vkMapMemory(m_Engine->GetDevice(), indexStagingBufferMemory, 0, indexBufferSize, 0, &data);
-        memcpy(data, m_QuadMesh->Indices.data(), indexBufferSize);
-        vkUnmapMemory(m_Engine->GetDevice(), indexStagingBufferMemory);
-
-        m_Engine->CreateBuffer(
-                indexBufferSize,
-                VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                m_QuadMesh->indexBuffer,
-                m_QuadMesh->indexBufferMemory);
-
-        m_Engine->CopyBuffer(indexStagingBuffer, m_QuadMesh->indexBuffer, indexBufferSize);
-
-        vkDestroyBuffer(m_Engine->GetDevice(), indexStagingBuffer, nullptr);
-        vkFreeMemory(m_Engine->GetDevice(), indexStagingBufferMemory, nullptr);
-
-        m_QuadUploaded = true;
-        std::cout << "UI quad mesh uploaded to GPU" << std::endl;
-    }
+        
+    
 
     VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
 
@@ -110,6 +52,20 @@ void QuadRenderer::Render(entt::registry &registry) {
     float screenWidth = static_cast<float>(extent.width);
     float screenHeight = static_cast<float>(extent.height);
 
+    VkViewport viewport{};
+    viewport.x = 0.0f;
+    viewport.y = 0.0f;
+    viewport.width = static_cast<float>(extent.width);
+    viewport.height = static_cast<float>(extent.height);
+    viewport.minDepth = 0.0f;
+    viewport.maxDepth = 1.0f;
+    vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+
+    VkRect2D scissor{};
+    scissor.offset = { 0, 0 };
+    scissor.extent = extent;
+    vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
     // Render all sprite components, sorted by layer
     auto view = registry.view<SpriteComponent>();
 
@@ -121,15 +77,16 @@ void QuadRenderer::Render(entt::registry &registry) {
         glm::mat4 transform = glm::mat4(1.0f);
 
         // Convert screen position to normalized device coordinates
-        float ndcX = (sprite.position.x / screenWidth) * 2.0f - 1.0f;
-        float ndcY = (sprite.position.y / screenHeight) * 2.0f - 1.0f;
+        float ndcX = (sprite.transform.Position.x / screenWidth) * 2.0f - 1.0f;
+        float ndcY = (sprite.transform.Position.y / screenHeight) * 2.0f - 1.0f;
 
         transform = glm::translate(transform, glm::vec3(ndcX, ndcY, 0.0f));
-        transform = glm::rotate(transform, sprite.rotation, glm::vec3(0.0f, 0.0f, 1.0f));
-
+        transform = transform * glm::mat4_cast(sprite.transform.Rotation);   // was glm::rotate(transform, angle, axis)
+        
         // Scale to screen size
-        float scaleX = sprite.size.x / screenWidth * 2.0f;
-        float scaleY = sprite.size.y / screenHeight * 2.0f;
+        float scaleX = sprite.transform.Scale.x / screenWidth * 2.0f;
+        float scaleY = sprite.transform.Scale.y / screenHeight * 2.0f;
+
         transform = glm::scale(transform, glm::vec3(scaleX, scaleY, 1.0f));
 
         SpritePushConstants pushConstants{};
@@ -230,24 +187,22 @@ void QuadRenderer::CreatePipeline() {
     inputAssembly.primitiveRestartEnable = VK_FALSE;
 
     VkExtent2D extent = m_Engine->GetSwapChainExtent();
-    VkViewport viewport{};
-    viewport.x = 0.0f;
-    viewport.y = 0.0f;
-    viewport.width = static_cast<float>(extent.width);
-    viewport.height = static_cast<float>(extent.height);
-    viewport.minDepth = 0.0f;
-    viewport.maxDepth = 1.0f;
-
-    VkRect2D scissor{};
-    scissor.offset = { 0, 0 };
-    scissor.extent = extent;
-
+   
     VkPipelineViewportStateCreateInfo viewportState{};
     viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
     viewportState.viewportCount = 1;
-    viewportState.pViewports = &viewport;
     viewportState.scissorCount = 1;
-    viewportState.pScissors = &scissor;
+
+    VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = 2;
+    dynamicState.pDynamicStates = dynamicStates;
+
+    //VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    
 
     VkPipelineRasterizationStateCreateInfo rasterizer{};
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
@@ -281,9 +236,25 @@ void QuadRenderer::CreatePipeline() {
     colorBlending.logicOpEnable = VK_FALSE;
     colorBlending.attachmentCount = 1;
     colorBlending.pAttachments = &colorBlendAttachment;
+    
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_FALSE;
+    depthStencil.depthWriteEnable = VK_FALSE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_ALWAYS;   // unused since testing is off, but set for completeness
+
+	m_SwapChainImageFormat = m_Engine->GetSwapChainFormat();
+
+
+    VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
+    pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    pipelineRenderingInfo.colorAttachmentCount = 1;
+    pipelineRenderingInfo.pColorAttachmentFormats = &m_SwapChainImageFormat;
+    pipelineRenderingInfo.depthAttachmentFormat = m_Engine->GetDepthFormat();
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.pNext = &pipelineRenderingInfo;
     pipelineInfo.stageCount = 2;
     pipelineInfo.pStages = shaderStages;
     pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -293,8 +264,10 @@ void QuadRenderer::CreatePipeline() {
     pipelineInfo.pMultisampleState = &multisampling;
     pipelineInfo.pColorBlendState = &colorBlending;
     pipelineInfo.layout = m_PipelineLayout;
-    pipelineInfo.renderPass = m_Engine->GetRenderPass();
+    pipelineInfo.renderPass = VK_NULL_HANDLE;   // dynamic rendering
     pipelineInfo.subpass = 0;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.pDepthStencilState = &depthStencil;
 
     if (vkCreateGraphicsPipelines(m_Engine->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create Quad Renderer graphics pipeline");
@@ -315,14 +288,7 @@ void QuadRenderer::Shutdown() {
     vkDeviceWaitIdle(device);
     // Cleanup quad mesh
     if (m_QuadMesh) {
-        if (m_QuadMesh->vertexBuffer != VK_NULL_HANDLE) {
-            vkDestroyBuffer(device, m_QuadMesh->vertexBuffer, nullptr);
-            vkFreeMemory(device, m_QuadMesh->vertexBufferMemory, nullptr);
-        }
-        if (m_QuadMesh->indexBuffer != VK_NULL_HANDLE) {
-            vkDestroyBuffer(device, m_QuadMesh->indexBuffer, nullptr);
-            vkFreeMemory(device, m_QuadMesh->indexBufferMemory, nullptr);
-        }
+        m_QuadMesh->DestroyGPUResources(device);
         delete m_QuadMesh;
         m_QuadMesh = nullptr;
     }

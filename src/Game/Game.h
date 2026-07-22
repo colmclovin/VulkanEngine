@@ -22,7 +22,7 @@ private:
     // Core systems
     std::unique_ptr<VulkanEngine> m_VulkanEngine;
     std::unique_ptr<RenderSystem> m_RenderSystem;
-    //std::unique_ptr<Camera3D> m_Camera;
+    std::unique_ptr<Camera3D> m_Camera;
     std::unique_ptr<entt::registry> m_Registry;
     
 

@@ -30,11 +30,13 @@ public:
     VkExtent2D GetSwapChainExtent() const { return m_SwapChainExtent; }
     VkFormat GetSwapChainFormat() const { return m_SwapChainImageFormat; }
     GLFWwindow *GetWindow() const { return m_Window; }
-
+    uint32_t GetGraphicsQueueFamily() { return FindQueueFamilies(m_PhysicalDevice).graphicsFamily.value(); }  // NEW
     VkCommandBuffer GetCurrentCommandBuffer() const;
     uint32_t GetCurrentFrameIndex() const { return m_CurrentFrame; }
     uint32_t GetCurrentImageIndex() const { return m_CurrentImageIndex; }
     uint32_t GetSwapChainImageCount() const;
+    VkFormat GetDepthFormat() const { return m_DepthFormat; }
+    VkImageView GetDepthImageView() const { return m_DepthImageView; }
 
     // Utility functions for creating resources
     void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
@@ -56,6 +58,7 @@ private:
     GLFWwindow *m_Window = nullptr;
     uint32_t m_WindowWidth = 1280;
     uint32_t m_WindowHeight = 720;
+    bool m_FramebufferResized = false;
     //Vulkan variables
     VkInstance m_Instance = VK_NULL_HANDLE;
     VkDebugUtilsMessengerEXT m_DebugMessenger = VK_NULL_HANDLE;
@@ -87,6 +90,14 @@ private:
     uint32_t m_CurrentFrame = 0;
     uint32_t m_CurrentImageIndex = 0;
 
+    VkImage m_DepthImage = VK_NULL_HANDLE;
+    VkDeviceMemory m_DepthImageMemory = VK_NULL_HANDLE;
+    VkImageView m_DepthImageView = VK_NULL_HANDLE;
+    VkFormat m_DepthFormat = VK_FORMAT_D32_SFLOAT;
+
+
+
+
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
 
     // Validation layers
@@ -115,12 +126,14 @@ private:
     void RecreateSwapChain();
     void CleanupSwapChain();
     void CreateImageViews();
-    void CreateRenderPass();
-    void CreateFramebuffers();
     void CreateCommandPool();
     void CreateCommandBuffers();
     void CreateSyncObjects();
+    void CreateDepthResources();
 
+
+
+    //void transitionImageLayout(VkImage image, VkImageLayout oldLayout, VkImageLayout newLayout);
     // Helper structures
     struct QueueFamilyIndices {
         std::optional<uint32_t> graphicsFamily;

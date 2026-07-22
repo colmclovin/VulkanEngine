@@ -111,7 +111,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>Default</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\External\glfw-3.4\glfw-3.4\include;$(ProjectDir)..\External\glfw-3.4\glfw-3.4\src;C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)..\External;$(ProjectDir)..\External\Assimp\include\;$(ProjectDir)..\External\Assimp\build\include;$(ProjectDir)..\External\imgui;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\External\glfw-3.4\glfw-3.4\include;$(ProjectDir)..\External\glfw-3.4\glfw-3.4\src;C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)..\External;$(ProjectDir)..\External\Assimp\include\;$(ProjectDir)..\External\Assimp\build\include;$(ProjectDir)..\External\imgui;$(ProjectDir)..\External\imgui\backends;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -151,9 +151,19 @@
     <None Include="compile_shaders.ps1" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\External\imgui\backends\imgui_impl_glfw.cpp" />
+    <ClCompile Include="..\External\imgui\backends\imgui_impl_vulkan.cpp" />
+    <ClCompile Include="..\External\imgui\imgui.cpp" />
+    <ClCompile Include="..\External\imgui\imgui_demo.cpp" />
+    <ClCompile Include="..\External\imgui\imgui_draw.cpp" />
+    <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
+    <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="src\Components\Mesh.cpp" />
     <ClCompile Include="src\Components\ModelLoader.cpp" />
     <ClCompile Include="src\Game\Camera3D.cpp" />
     <ClCompile Include="src\Game\Game.cpp" />
+    <ClCompile Include="src\Helpers\DebugUI.cpp" />
+    <ClCompile Include="src\Renderer\ImGuiVulkanUtil.cpp" />
     <ClCompile Include="src\Main.cpp" />
     <ClCompile Include="src\Engine\VulkanEngine.cpp" />
     <ClCompile Include="src\Renderer\MeshRenderer.cpp" />
@@ -168,7 +178,8 @@
     <ClInclude Include="src\Engine\VulkanEngine.h" />
     <ClInclude Include="src\Game\Camera3D.h" />
     <ClInclude Include="src\Game\Game.h" />
-    <ClInclude Include="src\Helpers\ImGuiVulkanUtil.h" />
+    <ClInclude Include="src\Helpers\DebugUI.h" />
+    <ClInclude Include="src\Renderer\ImGuiVulkanUtil.h" />
     <ClInclude Include="src\Renderer\MeshRenderer.h" />
     <ClInclude Include="src\Renderer\QuadRenderer.h" />
     <ClInclude Include="src\Renderer\RenderSystem.h" />

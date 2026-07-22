@@ -4,6 +4,9 @@
 #include <iostream>
 #include <glm/glm.hpp>
 #include "../Components/Components.h"
+#include "Camera3D.h"
+#include "../Components/ModelLoader.h"
+
 Game::Game() {
 
 }
@@ -39,7 +42,10 @@ void Game::Init() {
     m_RenderSystem = std::make_unique<RenderSystem>(m_VulkanEngine.get());
     m_RenderSystem->Init();
 
-    //m_Camera = std::make_unique<Camera3D>();
+	m_Camera = std::make_unique<Camera3D>(glm::vec3(0.0f, 0.0f, 5.0f));
+    //glfwSetInputMode(m_VulkanEngine->GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+
     m_Registry = std::make_unique<entt::registry>();
 
 
@@ -65,13 +71,20 @@ void Game::CreateInitialEntities() {
         auto entity = m_Registry->create();
 
         auto &sprite = m_Registry->emplace<SpriteComponent>(entity);
-        sprite.position = glm::vec2(150.0f, 150.0f);
-        sprite.size = glm::vec2(300.0f, 600.0f);
+        sprite.transform.Position = glm::vec3(150.0f, 150.0f, 0.0f);
+        sprite.transform.Scale = glm::vec3(300.0f, 600.0f, 1.0f);
         sprite.color = glm::vec4(0.3f, 0.2f, 0.1f, 0.9f);
         sprite.layer = 0;
 
         m_Registry->emplace<NameTag>(entity, "UI Background");
     
+
+        auto meshEntity = m_Registry->create();
+        auto loadedMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Test1.glb"));
+        m_Registry->emplace<MeshComponent>(meshEntity, loadedMesh);
+        m_Registry->emplace<TransformComponent>(meshEntity); // defaults: origin, identity rotation, scale 1
+
+
 
 }
 void Game::HandleInput(float deltaTime) {
@@ -82,20 +95,11 @@ void Game::HandleInput(float deltaTime) {
     float moveSpeed = 10.0f * deltaTime;
     float rotateSpeed = 90.0f * deltaTime; // degrees per second
 
-    // WASD for camera panning
-   // glm::vec3 moveDir(0.0f);
-   // if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
-   //     moveDir.z -= 1.0f;
-   // }
-   // if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
-   //     moveDir.z += 1.0f;
-   // }
-   // if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
-   //     moveDir.x -= 1.0f;
-   // }
-   // if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
-   //     moveDir.x += 1.0f;
-   // }
+
+    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) m_Camera->ProcessKeyboard(CameraMovement::Forward, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) m_Camera->ProcessKeyboard(CameraMovement::Backward, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) m_Camera->ProcessKeyboard(CameraMovement::Left, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) m_Camera->ProcessKeyboard(CameraMovement::Right, deltaTime);
 
     //if (glm::length(moveDir) > 0.0f) {
     //    moveDir = glm::normalize(moveDir);
@@ -134,7 +138,7 @@ void Game::Update(float deltaTime) {
 }
 
 void Game::Render() {
-    m_RenderSystem->RenderFrame(*m_Registry); //*m_Camera);
+    m_RenderSystem->RenderFrame(*m_Registry, *m_Camera);
 }
 void Game::Shutdown() {
     std::cout << "=== Shutting Down Game ===" << std::endl;
@@ -142,6 +146,15 @@ void Game::Shutdown() {
 		std::cout << "Game was not initialized, skipping shutdown." << std::endl;
 		return;
 	}   
+
+    auto meshView = m_Registry->view<MeshComponent>();
+    for (auto entity : meshView) {
+        auto& meshComp = meshView.get<MeshComponent>(entity);
+        if (meshComp.mesh) {
+            meshComp.mesh->DestroyGPUResources(m_VulkanEngine->GetDevice());
+        }
+    }
+
     if (m_Registry) {
         m_Registry->clear();
         m_Registry.reset();

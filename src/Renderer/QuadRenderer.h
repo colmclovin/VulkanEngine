@@ -26,6 +26,10 @@ private:
     // Pipeline and layout
     VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
     VkPipeline m_Pipeline = VK_NULL_HANDLE;
+
+
+	VkFormat m_SwapChainImageFormat = VK_FORMAT_UNDEFINED;
+
     // Shared quad mesh for all sprites
     Mesh *m_QuadMesh = nullptr;
     bool m_QuadUploaded = false;

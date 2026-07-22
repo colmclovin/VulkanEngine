@@ -3,6 +3,7 @@
 #include "Vertex.h"
 #include <vector>
 
+class VulkanEngine;
 
 class Mesh {
 
@@ -15,28 +16,9 @@ public:
     VkBuffer indexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory indexBufferMemory = VK_NULL_HANDLE;
 
-    static Mesh CreateTriangle() {
-        Mesh mesh;
-        mesh.Vertices = {
-            { { 0.0f, -0.5f, 0.0f }, { 1.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.5f, 1.0f } },
-            { { 0.5f, 0.5f, 0.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 1.0f, 1.0f } },
-            { { -0.5f, 0.5f, 0.0f }, { 0.0f, 0.0f, 1.0f }, { 0.0f, 0.0f, 1.0f }, { 1.5f, 1.5f } }
-        };
-        mesh.Indices = { 0, 1, 2 };
-
-        return mesh;
-    }
-    void Cleanup(VkDevice device) {
-        vkDeviceWaitIdle(device);
-        if (indexBuffer != VK_NULL_HANDLE) {
-            vkDestroyBuffer(device, indexBuffer, nullptr);
-            vkFreeMemory(device, indexBufferMemory, nullptr);
-        }
-        if (vertexBuffer != VK_NULL_HANDLE) {
-            vkDestroyBuffer(device, vertexBuffer, nullptr);
-            vkFreeMemory(device, vertexBufferMemory, nullptr);
-        }
-    }
-
+    static Mesh CreateTriangle();
+    void UploadToGPU(VulkanEngine* engine);
+    void DestroyGPUResources(VkDevice device);   // NEW — see note below
+    bool IsUploaded() const { return vertexBuffer != VK_NULL_HANDLE; }
 
 };
