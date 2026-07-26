@@ -2,7 +2,8 @@
 
 #include "Vertex.h"
 #include <vector>
-
+#include "SubMesh.h"
+#include "Material.h"
 class VulkanEngine;
 
 class Mesh {
@@ -10,6 +11,8 @@ class Mesh {
 public:
     std::vector<Vertex> Vertices;
     std::vector<uint32_t> Indices;
+    std::vector<SubMesh> SubMeshes;      // NEW
+    std::vector<Material> Materials;     // NEW
 
     VkBuffer vertexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory vertexBufferMemory = VK_NULL_HANDLE;

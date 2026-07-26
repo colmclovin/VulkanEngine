@@ -23,11 +23,12 @@ void MeshRenderer::Init() {
     std::cout << "Mesh Renderer initialized" << std::endl;
 }
 
-void MeshRenderer::Render(entt::registry& registry, const Camera3D& camera) {
+void MeshRenderer::Render(entt::registry& registry, const Camera3D& camera, bool wireframe) {
     VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
 
-    if (m_Pipeline != VK_NULL_HANDLE) {
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
+    VkPipeline pipelineToUse = wireframe ? m_WireframePipeline : m_Pipeline;
+    if (pipelineToUse != VK_NULL_HANDLE) {
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineToUse);
     }
 
     VkExtent2D extent = m_Engine->GetSwapChainExtent();
@@ -38,7 +39,7 @@ void MeshRenderer::Render(entt::registry& registry, const Camera3D& camera) {
     VkRect2D scissor{ {0, 0}, extent };
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
-    glm::mat4 view = camera.GetViewMatrix();
+    glm::mat4 view = camera.GetActiveViewMatrix();
     glm::mat4 proj = camera.GetProjectionMatrix(aspect);
 
     auto view3D = registry.view<TransformComponent, MeshComponent>();
@@ -47,22 +48,47 @@ void MeshRenderer::Render(entt::registry& registry, const Camera3D& camera) {
         auto& meshComp = view3D.get<MeshComponent>(entity);
 
         if (!meshComp.mesh) continue;
-        meshComp.mesh->UploadToGPU(m_Engine);   // no-op after first call, per your Mesh::IsUploaded() guard
-
-        MeshPushConstants pushConstants{};
-        pushConstants.mvp = proj * view * transform.GetMatrix();
-
-        if (m_PipelineLayout != VK_NULL_HANDLE) {
-            vkCmdPushConstants(commandBuffer, m_PipelineLayout,
-                VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &pushConstants);
-        }
+        meshComp.mesh->UploadToGPU(m_Engine);
 
         VkBuffer vertexBuffers[] = { meshComp.mesh->vertexBuffer };
         VkDeviceSize offsets[] = { 0 };
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
         vkCmdBindIndexBuffer(commandBuffer, meshComp.mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshComp.mesh->Indices.size()), 1, 0, 0, 0);
+        glm::mat4 mvp = proj * view * transform.GetMatrix();
+
+        // --- goes right here, replacing the old single vkCmdPushConstants/vkCmdDrawIndexed pair ---
+        if (meshComp.mesh->SubMeshes.empty()) {
+            // No material/submesh data (e.g. procedural terrain) — draw the whole mesh with default white
+            MeshPushConstants pushConstants{};
+            pushConstants.mvp = mvp;
+            pushConstants.baseColor = glm::vec4(1.0f);
+
+            if (m_PipelineLayout != VK_NULL_HANDLE) {
+                vkCmdPushConstants(commandBuffer, m_PipelineLayout,
+                    VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &pushConstants);
+            }
+
+            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshComp.mesh->Indices.size()), 1, 0, 0, 0);
+        }
+        else {
+            // Has material data — draw each sub-mesh range with its own material color
+            for (const auto& sub : meshComp.mesh->SubMeshes) {
+                MeshPushConstants pushConstants{};
+                pushConstants.mvp = mvp;
+                pushConstants.baseColor = (sub.materialIndex >= 0 && sub.materialIndex < (int)meshComp.mesh->Materials.size())
+                    ? meshComp.mesh->Materials[sub.materialIndex].baseColor
+                    : glm::vec4(1.0f);
+
+                if (m_PipelineLayout != VK_NULL_HANDLE) {
+                    vkCmdPushConstants(commandBuffer, m_PipelineLayout,
+                        VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &pushConstants);
+                }
+
+                vkCmdDrawIndexed(commandBuffer, sub.indexCount, 1, sub.indexOffset, 0, 0);
+            }
+        }
+        // --- end replacement block ---
     }
 }
 
@@ -152,7 +178,7 @@ void MeshRenderer::CreatePipeline() {
     rasterizer.rasterizerDiscardEnable = VK_FALSE;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;
     rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
     rasterizer.depthBiasEnable = VK_FALSE;
 
@@ -214,14 +240,21 @@ void MeshRenderer::CreatePipeline() {
     pipelineInfo.pDynamicState = &dynamicState;
     pipelineInfo.pDepthStencilState = &depthStencil;
 
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     if (vkCreateGraphicsPipelines(m_Engine->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create Mesh Renderer graphics pipeline");
+    }
+
+    rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;   // wireframe usually looks better without backface culling
+    if (vkCreateGraphicsPipelines(m_Engine->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_WireframePipeline) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create Mesh Renderer wireframe pipeline");
     }
 
     vkDestroyShaderModule(m_Engine->GetDevice(), fragShaderModule, nullptr);
     vkDestroyShaderModule(m_Engine->GetDevice(), vertShaderModule, nullptr);
 
-    std::cout << "Mesh Renderer pipeline created successfully" << std::endl;
+    std::cout << "Mesh Renderer pipelines created successfully" << std::endl;
 
 }
 
@@ -232,9 +265,11 @@ void MeshRenderer::Shutdown() {
     }
     vkDeviceWaitIdle(device);
 
-    // Cleanup pipeline
     if (m_Pipeline != VK_NULL_HANDLE) {
         vkDestroyPipeline(device, m_Pipeline, nullptr);
+    }
+    if (m_WireframePipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(device, m_WireframePipeline, nullptr);
     }
     if (m_PipelineLayout != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);

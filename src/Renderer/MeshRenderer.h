@@ -14,7 +14,7 @@ public:
     MeshRenderer(VulkanEngine* m_Engine);
     ~MeshRenderer();
     void Init();
-    void Render(entt::registry& registry, const Camera3D& camera);
+    void Render(entt::registry& registry, const Camera3D& camera, bool wireframe);
     void Shutdown();
 private:
 
@@ -25,7 +25,8 @@ private:
     VulkanEngine* m_Engine = nullptr;
     // Pipeline and layout
     VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
-    VkPipeline m_Pipeline = VK_NULL_HANDLE;
+    VkPipeline m_Pipeline = VK_NULL_HANDLE;            // fill mode
+    VkPipeline m_WireframePipeline = VK_NULL_HANDLE;   // line mode
 
 
     VkFormat m_SwapChainImageFormat = VK_FORMAT_UNDEFINED;
@@ -36,6 +37,7 @@ private:
 
     struct MeshPushConstants {
         glm::mat4 mvp;
+        glm::vec4 baseColor;   // NEW
     };
     bool m_initialized = false;
 

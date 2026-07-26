@@ -5,7 +5,7 @@
 #include <vector>
 #include <optional>
 #include <string>
-
+#include <glm/glm.hpp>
 class VulkanEngine {
 public:
     VulkanEngine(); //constructor
@@ -37,7 +37,10 @@ public:
     uint32_t GetSwapChainImageCount() const;
     VkFormat GetDepthFormat() const { return m_DepthFormat; }
     VkImageView GetDepthImageView() const { return m_DepthImageView; }
+    
+    void SetClearColor(glm::vec4 color) { m_ClearColor = color; }
 
+    void WaitIdle() const { vkDeviceWaitIdle(m_Device); }
     // Utility functions for creating resources
     void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
                       VkMemoryPropertyFlags properties,
@@ -54,6 +57,7 @@ public:
     std::vector<char> ReadFile(const std::string &filename);
 
 private:
+    glm::vec4 m_ClearColor = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);
     //GLFW variables
     GLFWwindow *m_Window = nullptr;
     uint32_t m_WindowWidth = 1280;
@@ -73,8 +77,8 @@ private:
     std::vector<VkImage> m_SwapChainImages;
     std::vector<VkImageView> m_SwapChainImageViews;
     std::vector<VkFramebuffer> m_SwapChainFramebuffers;
-    VkFormat m_SwapChainImageFormat;
-    VkExtent2D m_SwapChainExtent;
+    VkFormat m_SwapChainImageFormat = VK_FORMAT_UNDEFINED;
+    VkExtent2D m_SwapChainExtent{};
 
     // Command buffers
     VkCommandPool m_CommandPool = VK_NULL_HANDLE;

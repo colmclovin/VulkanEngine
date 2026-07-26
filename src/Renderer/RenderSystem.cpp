@@ -5,7 +5,7 @@
 #include "../Engine/VulkanEngine.h"
 #include "../Helpers/DebugUI.h"
 #include <iostream>
-
+#include "../Components/GameSettings.h"
 RenderSystem::RenderSystem(VulkanEngine *engine) : m_Engine(engine) {
 }
 
@@ -31,16 +31,17 @@ void RenderSystem::Init() {
     std::cout << "RenderSystem initialized with all subsystems" << std::endl;
 }
 
-void RenderSystem::RenderFrame(entt::registry &registry, const Camera3D &camera) {
+void RenderSystem::RenderFrame(entt::registry& registry, Camera3D& camera, GameSettings& settings) {
+    m_Engine->SetClearColor(settings.clearColor);   // NEW
+
     // Render the frame using the quad renderer
     if (!m_Engine->BeginFrame()) {
         return; // Skip frame if swapchain needs recreation
     }
-
     m_ImGuiVulkanUtil->NewFrame();   
-    m_DebugUI->Draw(registry, this);
+    m_DebugUI->Draw(registry, this, &camera, settings);
 
-    m_MeshRenderer->Render(registry, camera);
+    m_MeshRenderer->Render(registry, camera, settings.wireframeMode);   // NEW arg
     m_QuadRenderer->Render(registry);
     m_ImGuiVulkanUtil->RenderDrawData(m_Engine->GetCurrentCommandBuffer());  
 
@@ -65,4 +66,8 @@ void RenderSystem::Shutdown() {
 
     m_initialized = false;
     std::cout << "RenderSystem shut down" << std::endl;
+}
+
+DebugUI* RenderSystem::GetDebugUI() const {
+    return m_DebugUI.get();
 }

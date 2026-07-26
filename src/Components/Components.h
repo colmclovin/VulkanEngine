@@ -5,6 +5,7 @@
 #include <string>
 #include "Mesh.h"
 
+
 struct TransformComponent
 {
     glm::vec3 Position{ 0.0f };
@@ -34,3 +35,16 @@ struct MeshComponent {
 	//std::string textureFilePath;
     std::shared_ptr<Mesh> mesh;
 };
+
+struct PlayerComponent {
+    float moveSpeed = 5.0f;
+	float runSpeed = 10.0f;
+};
+
+struct TreeComponent {
+    // marker/tag component for now — nothing needed yet, expand later
+    // (health, resource yield, etc. when you get to gameplay systems)
+};
+
+
+

@@ -1,0 +1,25 @@
+{
+    "clearColor": [
+        0.10196078568696976,
+        0.10196078568696976,
+        0.10196078568696976,
+        0.8392156958580017
+    ],
+    "freeFlyFastMoveSpeed": 7.5,
+    "freeFlyMoveSpeed": 2.5,
+    "freeFlySensitivity": 0.10000000149011612,
+    "isoDistance": 20.0,
+    "isoPitch": 45.0,
+    "isoRotateSpeed": 8.0,
+    "playerMoveSpeed": 13.08899974822998,
+    "playerRunSpeed": 10.0,
+    "terrain": {
+        "cellSize": 1.0,
+        "gridDepth": 100,
+        "gridWidth": 100,
+        "heightScale": 5.0,
+        "noiseScale": 0.008999999612569809,
+        "seed": 2222
+    },
+    "wireframeMode": false
+}

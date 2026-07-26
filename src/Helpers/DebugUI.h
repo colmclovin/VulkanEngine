@@ -1,17 +1,27 @@
+// DebugUI.h
 #pragma once
-
 #include <entt/entt.hpp>
 
 class RenderSystem;
+class Camera3D;
+struct GameSettings;
 
 class DebugUI {
 public:
-    void Draw(entt::registry& registry, RenderSystem* renderSystem);
+    void Draw(entt::registry& registry, RenderSystem* renderSystem, Camera3D* camera, GameSettings& settings);
 
 private:
-    void DrawStatsPanel();
-    void DrawEntityInspector(entt::registry& registry);
-    // add more panels as they come: DrawSceneHierarchy(), DrawMaterialEditor(), etc.
+    void DrawStats();
+    void DrawEntityList(entt::registry& registry);
+    void DrawSettingsTab(Camera3D* camera, GameSettings& settings);
 
-    bool m_ShowDemo = false;   // handy toggle to keep around for reference/debugging
+    bool m_ShowDemo = false;
+    bool m_RegenerateTerrainRequested = false;   // set true when user clicks "Regenerate"
+
+public:
+    bool ConsumeRegenerateRequest() {
+        bool r = m_RegenerateTerrainRequested;
+        m_RegenerateTerrainRequested = false;
+        return r;
+    }
 };

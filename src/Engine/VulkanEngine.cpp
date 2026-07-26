@@ -162,8 +162,9 @@ bool VulkanEngine::BeginFrame() {
     colorAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachment.clearValue.color = { { 0.1f, 0.1f, 0.1f, 1.0f } };
-
+    colorAttachment.clearValue.color = {
+        { m_ClearColor.r, m_ClearColor.g, m_ClearColor.b, m_ClearColor.a }
+    };
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea = { {0, 0}, m_SwapChainExtent };
@@ -520,6 +521,7 @@ void VulkanEngine::CreateLogicalDevice() {
     }
 
     VkPhysicalDeviceFeatures deviceFeatures{};
+    deviceFeatures.fillModeNonSolid = VK_TRUE;   // ADD THIS — required for wireframe rendering
 
     VkPhysicalDeviceDynamicRenderingFeatures deviceDynamicFeatures{};
     deviceDynamicFeatures.dynamicRendering = true;

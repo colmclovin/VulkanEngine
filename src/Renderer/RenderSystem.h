@@ -9,6 +9,8 @@ class ImGuiVulkanUtil;
 class MeshRenderer;
 class Camera3D;
 class DebugUI;
+struct GameSettings;
+
 class RenderSystem {
 
 public:
@@ -17,14 +19,13 @@ public:
     
     
     void Init();
-    void RenderFrame(entt::registry &registry, const Camera3D &camera);//, const Camera3D &camera);
-    void Shutdown();
+    void RenderFrame(entt::registry& registry, Camera3D& camera, GameSettings& settings);    void Shutdown();
 
     //ResourceManager *GetResourceManager() const { return m_ResourceManager.get(); }
     MeshRenderer *GetMeshRenderer() const { return m_MeshRenderer.get(); }
     QuadRenderer *GetQuadRenderer() const { return m_QuadRenderer.get(); }
-    
-private: 
+    DebugUI* GetDebugUI() const;
+private:
     VulkanEngine *m_Engine = nullptr;
 
     // Rendering subsystems
