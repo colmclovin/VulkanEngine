@@ -23,6 +23,7 @@ void GameSettings::SaveToFile(const std::string& path) const {
     j["isoRotateSpeed"] = isoRotateSpeed;
     j["isoDistance"] = isoDistance;
     j["isoPitch"] = isoPitch;
+    j["isoZoomSpeed"] = isoZoomSpeed;
     j["playerMoveSpeed"] = playerMoveSpeed;
 	j["playerRunSpeed"] = playerRunSpeed;
     j["terrain"] = terrain;   // uses the macro-generated conversion
@@ -53,11 +54,14 @@ GameSettings GameSettings::LoadFromFile(const std::string& path) {
         file >> j;
 
         settings.freeFlyMoveSpeed = j.value("freeFlyMoveSpeed", settings.freeFlyMoveSpeed);
+        settings.freeFlyFastMoveSpeed = j.value("freeFlyFastMoveSpeed", settings.freeFlyFastMoveSpeed);
         settings.freeFlySensitivity = j.value("freeFlySensitivity", settings.freeFlySensitivity);
         settings.isoRotateSpeed = j.value("isoRotateSpeed", settings.isoRotateSpeed);
         settings.isoDistance = j.value("isoDistance", settings.isoDistance);
         settings.isoPitch = j.value("isoPitch", settings.isoPitch);
+        settings.isoZoomSpeed = j.value("isoZoomSpeed", settings.isoZoomSpeed);
         settings.playerMoveSpeed = j.value("playerMoveSpeed", settings.playerMoveSpeed);
+        settings.playerRunSpeed = j.value("playerRunSpeed", settings.playerRunSpeed);
         if (j.contains("terrain")) settings.terrain = j.at("terrain").get<TerrainSettings>();
         settings.wireframeMode = j.value("wireframeMode", settings.wireframeMode);
         if (j.contains("clearColor")) settings.clearColor = j.at("clearColor").get<glm::vec4>();

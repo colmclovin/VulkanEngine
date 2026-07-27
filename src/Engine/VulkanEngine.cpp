@@ -85,6 +85,12 @@ void VulkanEngine::CreateWindow(const char* title) {
         auto engine = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
         engine->m_FramebufferResized = true;
         });
+
+   glfwSetScrollCallback(m_Window, [](GLFWwindow *window, double xoffset, double yoffset) {
+        auto engine = reinterpret_cast<VulkanEngine *>(glfwGetWindowUserPointer(window));
+        engine->m_ScrollDelta += static_cast<float>(yoffset);
+        std::cout << "Scroll callback: " << engine->m_ScrollDelta << std::endl;
+    });
     std::cout << "Framebuffer resized: " << m_WindowWidth << "x" << m_WindowHeight << std::endl;
 }
 
@@ -601,10 +607,18 @@ void VulkanEngine::CreateSwapChain() {
 }
 
 void VulkanEngine::RecreateSwapChain() {
+
+    int width = 0, height = 0;
+    glfwGetFramebufferSize(m_Window, &width, &height);
+    while (width == 0 || height == 0) {
+        glfwGetFramebufferSize(m_Window, &width, &height);
+        glfwWaitEvents();
+    }
+
     vkDeviceWaitIdle(m_Device);
     CleanupSwapChain();
 
-    for (auto semaphore : m_RenderFinishedSemaphores) {              // NEW
+    for (auto semaphore : m_RenderFinishedSemaphores) {             
         vkDestroySemaphore(m_Device, semaphore, nullptr);
     }
 
@@ -612,7 +626,7 @@ void VulkanEngine::RecreateSwapChain() {
     CreateImageViews();
     CreateDepthResources();
 
-    m_RenderFinishedSemaphores.resize(m_SwapChainImages.size());     // NEW
+    m_RenderFinishedSemaphores.resize(m_SwapChainImages.size());     
     VkSemaphoreCreateInfo semaphoreInfo{};
     semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
     for (size_t i = 0; i < m_SwapChainImages.size(); i++) {
@@ -888,4 +902,37 @@ void VulkanEngine::DestroyDebugUtilsMessengerEXT(VkInstance instance,
     if (func != nullptr) {
         func(instance, debugMessenger, pAllocator);
     }
+}
+
+void VulkanEngine::ToggleFullscreen()
+{
+    m_IsFullScreen = !m_IsFullScreen;
+    if (m_IsFullScreen) {
+        // Save windowed position and size
+        glfwGetWindowPos(m_Window, &m_WindowedX, &m_WindowedY);
+        glfwGetWindowSize(m_Window, &m_WindowedWidth, &m_WindowedHeight);
+
+        // Get the primary monitor's resolution
+        GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+        const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+
+        // Set the window to fullscreen
+        glfwSetWindowMonitor(m_Window, primaryMonitor, 0, 0, mode->width, mode->height, mode->refreshRate);
+    } else {
+        // Restore windowed mode
+        glfwSetWindowMonitor(m_Window, nullptr, m_WindowedX, m_WindowedY, m_WindowedWidth, m_WindowedHeight, 0);
+    }
+}
+GLFWscrollfun VulkanEngine::s_ImGuiScrollCallback = nullptr;
+
+void VulkanEngine::ChainScrollCallback() {
+    // Capture whatever ImGui just installed, then install our combined wrapper
+    s_ImGuiScrollCallback = glfwSetScrollCallback(m_Window, [](GLFWwindow *window, double xoffset, double yoffset) {
+        auto engine = reinterpret_cast<VulkanEngine *>(glfwGetWindowUserPointer(window));
+        engine->m_ScrollDelta += static_cast<float>(yoffset);
+
+        if (s_ImGuiScrollCallback) {
+            s_ImGuiScrollCallback(window, xoffset, yoffset); // forward to ImGui too
+        }
+    });
 }

@@ -50,6 +50,9 @@ void Game::Init() {
     m_RenderSystem = std::make_unique<RenderSystem>(m_VulkanEngine.get());
     m_RenderSystem->Init();
 
+     m_VulkanEngine->ChainScrollCallback(); 
+
+
 	m_Camera = std::make_unique<Camera3D>(glm::vec3(0.0f, 5.0f, 5.0f));
     //glfwSetInputMode(m_VulkanEngine->GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -146,14 +149,18 @@ void Game::HandleInput(float deltaTime) {
 }
 
 void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
-    static bool qWasDown = false, eWasDown = false;
+    static bool qWasDown = false, eWasDown = false, f11WasDown = false;
     bool qIsDown = glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS;
     bool eIsDown = glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
+    bool f11IsDown = glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS;
 
     if (qIsDown && !qWasDown) m_Camera->SnapRotateIso(false);
     if (eIsDown && !eWasDown) m_Camera->SnapRotateIso(true);
+    if (f11IsDown && !f11WasDown) m_VulkanEngine->ToggleFullscreen();
+    
     qWasDown = qIsDown;
     eWasDown = eIsDown;
+    f11WasDown = f11IsDown;
 
     glm::vec3 moveDir(0.0f);
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveDir.z += 1.0f;
@@ -162,6 +169,16 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) moveDir.x += 1.0f;
     if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) m_Camera->ProcessKeyboard(CameraMovement::Up, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) m_Camera->ProcessKeyboard(CameraMovement::Down, deltaTime);
+    // Game::HandleIsoInput
+    float scrollDelta = m_VulkanEngine->GetScrollDelta();
+    if (scrollDelta != 0.0f && !ImGui::GetIO().WantCaptureMouse) {
+        std::cout << "process iso zoom " << scrollDelta * m_Settings.isoZoomSpeed << std::endl;
+        m_Camera->ProcessIsoZoom(scrollDelta * m_Settings.isoZoomSpeed);
+    }
+    m_VulkanEngine->ResetScrollDelta();
+    
+
+
 
     if (glm::length(moveDir) > 0.0f && m_Registry->valid(m_PlayerEntity)) {
         MovePlayer(glm::normalize(moveDir), deltaTime);
@@ -254,7 +271,7 @@ void Game::Shutdown() {
 
 
     if (m_VulkanEngine) {
-        m_VulkanEngine->WaitIdle();   // NEW — block until GPU is fully done with everything, before destroying anything
+        m_VulkanEngine->WaitIdle();   
     }
 
     auto meshView = m_Registry->view<MeshComponent>();

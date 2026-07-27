@@ -9,8 +9,6 @@ enum class CameraMovement {
     Right,
     Up,
     Down,
-    RotateLeft,
-    RotateRight,
     Shift
 };
 
@@ -26,9 +24,8 @@ public:
     glm::mat4 GetViewMatrix() const;
     glm::mat4 GetProjectionMatrix(float aspectRatio, float nearPlane = 0.1f, float farPlane = 100.0f) const;
 
-    void ProcessOrbit(float deltaYaw, float deltaPitch);
-    void ProcessOrbitZoom(float deltaDistance);
-    glm::mat4 GetOrbitViewMatrix() const;
+    void ProcessIsoZoom(float deltaDistance);
+
     void SnapRotateIso(bool clockwise);            // call once per Q/E press, not per frame
     void PanIso(glm::vec3 direction, float deltaTime); // WASD ground-plane panning
     void UpdateIso(float deltaTime);                // smooth the snap animation
@@ -56,18 +53,17 @@ public:
     void SetIsoRotateSpeed(float s) { isoRotateSpeed = s; }
     void SetIsoDistance(float d) { isoDistance = d; }
     void SetIsoPitch(float p) { isoPitch = p; }
+
+
 private:
     Mode m_Mode = Mode::Isometric;   // default to gameplay camera
-    glm::vec3 target = glm::vec3(0.0f);   // the point being orbited
-    float orbitDistance = 10.0f;
-    float orbitYaw = -90.0f;
-    float orbitPitch = 20.0f;
     glm::vec3 isoTarget = glm::vec3(0.0f);      // point on the ground the camera looks at
     float isoDistance = 20.0f;
     float isoPitch = 45.0f;                      // fixed downward angle
     float isoYaw = -45.0f;                        // current snapped facing
     float isoTargetYaw = -45.0f;                   // where we're snapping toward
     float isoRotateSpeed = 8.0f;                   // degrees/sec while animating the snap
+
 	float sprintMultiplier = 2.0f;   // multiplier for free-fly speed when Shift is held    
 
     glm::vec3 position;

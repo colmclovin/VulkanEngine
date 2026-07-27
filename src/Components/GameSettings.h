@@ -22,6 +22,7 @@ struct GameSettings {
     float isoRotateSpeed = 8.0f;
     float isoDistance = 20.0f;
     float isoPitch = 45.0f;
+    float isoZoomSpeed = 1.0f;
     float playerMoveSpeed = 5.0f;
 	float playerRunSpeed = 10.0f;
     TerrainSettings terrain;

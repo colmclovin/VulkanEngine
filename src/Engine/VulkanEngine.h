@@ -19,6 +19,8 @@ public:
     bool ShouldClose() const;
     void PollEvents() const;
 
+    void ToggleFullscreen();
+    bool IsFullscreen() const { return m_IsFullScreen; }
     // Getters for device and resources
     VkInstance GetInstance() const { return m_Instance; }
     VkPhysicalDevice GetPhysicalDevice() const { return m_PhysicalDevice; }
@@ -37,9 +39,10 @@ public:
     uint32_t GetSwapChainImageCount() const;
     VkFormat GetDepthFormat() const { return m_DepthFormat; }
     VkImageView GetDepthImageView() const { return m_DepthImageView; }
-    
+    float GetScrollDelta() const { return m_ScrollDelta; }
+    void ChainScrollCallback();
     void SetClearColor(glm::vec4 color) { m_ClearColor = color; }
-
+    void ResetScrollDelta() { m_ScrollDelta = 0.0f; }
     void WaitIdle() const { vkDeviceWaitIdle(m_Device); }
     // Utility functions for creating resources
     void CreateBuffer(VkDeviceSize size, VkBufferUsageFlags usage,
@@ -62,7 +65,13 @@ private:
     GLFWwindow *m_Window = nullptr;
     uint32_t m_WindowWidth = 1280;
     uint32_t m_WindowHeight = 720;
+    int m_WindowedX = 100, m_WindowedY = 100; // remember windowed position/size to restore
+    int m_WindowedWidth = 1280, m_WindowedHeight = 720;
     bool m_FramebufferResized = false;
+    bool m_IsFullScreen = false;
+    float m_ScrollDelta = 0.0f;
+    GLFWscrollfun m_PreviousScrollCallback = nullptr;
+    static GLFWscrollfun s_ImGuiScrollCallback;
     //Vulkan variables
     VkInstance m_Instance = VK_NULL_HANDLE;
     VkDebugUtilsMessengerEXT m_DebugMessenger = VK_NULL_HANDLE;

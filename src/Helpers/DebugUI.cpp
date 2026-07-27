@@ -72,6 +72,9 @@ void DebugUI::DrawSettingsTab(Camera3D* camera, GameSettings& settings) {
         if (ImGui::SliderFloat("Pitch", &settings.isoPitch, 10.0f, 80.0f)) {
             camera->SetIsoPitch(settings.isoPitch);
         }
+        ImGui::SliderFloat("Zoom Speed", &settings.isoZoomSpeed, 0.1f, 10.0f);
+           
+        
     }
 
     if (ImGui::CollapsingHeader("Player", ImGuiTreeNodeFlags_DefaultOpen)) {

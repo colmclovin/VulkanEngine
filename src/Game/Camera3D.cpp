@@ -2,6 +2,7 @@
 #include "Camera3D.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <algorithm>
+#include <iostream>
 namespace {
     constexpr float DEFAULT_SPEED = 2.5f;
     constexpr float DEFAULT_SENSITIVITY = 0.1f;
@@ -45,8 +46,6 @@ void Camera3D::ProcessKeyboard(CameraMovement direction, float deltaTime, bool s
     case CameraMovement::Right:    position += right * velocity; break;
     case CameraMovement::Up:       position += worldUp * velocity; break;
     case CameraMovement::Down:     position -= worldUp * velocity; break;
-    case CameraMovement::RotateLeft: ProcessOrbit(rotateVelocity, 0); break;
-    case CameraMovement::RotateRight: ProcessOrbit(-rotateVelocity, 0); break;
     }
 }
 
@@ -63,25 +62,15 @@ void Camera3D::ProcessMouseMovement(float xOffset, float yOffset, bool constrain
 
     updateCameraVectors();
 }
-void Camera3D::ProcessOrbit(float deltaYaw, float deltaPitch) {
-    orbitYaw += deltaYaw;
-    orbitPitch += deltaPitch;
-    orbitPitch = std::clamp(orbitPitch, -89.0f, 89.0f);   // avoid gimbal flip at the poles
+
+
+void Camera3D::ProcessIsoZoom(float deltaDistance) {
+    isoDistance -= deltaDistance;
+    isoDistance = std::clamp(isoDistance, 1.0f, 100.0f);
+    std::cout << "orbit distance: " << isoDistance << std::endl;
 }
 
-void Camera3D::ProcessOrbitZoom(float deltaDistance) {
-    orbitDistance -= deltaDistance;
-    orbitDistance = std::clamp(orbitDistance, 1.0f, 100.0f);
-}
 
-glm::mat4 Camera3D::GetOrbitViewMatrix() const {
-    glm::vec3 orbitPos;
-    orbitPos.x = target.x + orbitDistance * cos(glm::radians(orbitPitch)) * cos(glm::radians(orbitYaw));
-    orbitPos.y = target.y + orbitDistance * sin(glm::radians(orbitPitch));
-    orbitPos.z = target.z + orbitDistance * cos(glm::radians(orbitPitch)) * sin(glm::radians(orbitYaw));
-
-    return glm::lookAt(orbitPos, target, worldUp);
-}
 void Camera3D::ProcessMouseScroll(float yOffset) {
     zoom -= yOffset;
     zoom = std::clamp(zoom, 1.0f, 45.0f);
