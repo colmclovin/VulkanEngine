@@ -4,8 +4,10 @@
 #include "../Components/Components.h"
 #include "../Game/Camera3D.h"
 #include "../Components/GameSettings.h"
+#include "../Audio/AudioEngine.h"
 
-void DebugUI::Draw(entt::registry& registry, RenderSystem* renderSystem, Camera3D* camera, GameSettings& settings) {
+void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine){
+
     if (m_ShowDemo) {
         ImGui::ShowDemoWindow(&m_ShowDemo);
     }
@@ -22,7 +24,7 @@ void DebugUI::Draw(entt::registry& registry, RenderSystem* renderSystem, Camera3
         }
 
         if (ImGui::BeginTabItem("Settings")) {
-            DrawSettingsTab(camera, settings);
+            DrawSettingsTab(camera, settings, audioEngine);
             ImGui::EndTabItem();
         }
 
@@ -52,7 +54,7 @@ void DebugUI::DrawEntityList(entt::registry& registry) {
     }
 }
 
-void DebugUI::DrawSettingsTab(Camera3D* camera, GameSettings& settings) {
+void DebugUI::DrawSettingsTab(Camera3D* camera, GameSettings& settings, AudioEngine* audioEngine) {
     if (ImGui::CollapsingHeader("Camera - Free Fly", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (ImGui::SliderFloat("Move Speed##freefly", &settings.freeFlyMoveSpeed, 0.5f, 20.0f)) {
             camera->SetMovementSpeed(settings.freeFlyMoveSpeed);
@@ -75,6 +77,11 @@ void DebugUI::DrawSettingsTab(Camera3D* camera, GameSettings& settings) {
         ImGui::SliderFloat("Zoom Speed", &settings.isoZoomSpeed, 0.1f, 10.0f);
            
         
+    }
+    if (ImGui::CollapsingHeader("Audio", ImGuiTreeNodeFlags_DefaultOpen)) {
+        if (ImGui::SliderFloat("Master Volume", &settings.masterVolume, 0.0f, 1.0f)) {
+            audioEngine->SetMasterVolume(settings.masterVolume);
+        }
     }
 
     if (ImGui::CollapsingHeader("Player", ImGuiTreeNodeFlags_DefaultOpen)) {

@@ -4,7 +4,7 @@
 class VulkanEngine;
 class QuadRenderer;
 class ImGuiVulkanUtil;
-
+class AudioEngine;
 //class ResourceManager;
 class MeshRenderer;
 class Camera3D;
@@ -19,7 +19,8 @@ public:
     
     
     void Init();
-    void RenderFrame(entt::registry& registry, Camera3D& camera, GameSettings& settings);    void Shutdown();
+    void RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine);
+    void Shutdown();
 
     //ResourceManager *GetResourceManager() const { return m_ResourceManager.get(); }
     MeshRenderer *GetMeshRenderer() const { return m_MeshRenderer.get(); }

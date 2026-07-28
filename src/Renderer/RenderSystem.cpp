@@ -3,6 +3,7 @@
 #include "MeshRenderer.h"
 #include "ImGuiVulkanUtil.h"
 #include "../Engine/VulkanEngine.h"
+#include "../Audio/AudioEngine.h"
 #include "../Helpers/DebugUI.h"
 #include <iostream>
 #include "../Components/GameSettings.h"
@@ -31,7 +32,7 @@ void RenderSystem::Init() {
     std::cout << "RenderSystem initialized with all subsystems" << std::endl;
 }
 
-void RenderSystem::RenderFrame(entt::registry& registry, Camera3D& camera, GameSettings& settings) {
+void RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine) {
     m_Engine->SetClearColor(settings.clearColor);   // NEW
 
     // Render the frame using the quad renderer
@@ -39,7 +40,7 @@ void RenderSystem::RenderFrame(entt::registry& registry, Camera3D& camera, GameS
         return; // Skip frame if swapchain needs recreation
     }
     m_ImGuiVulkanUtil->NewFrame();   
-    m_DebugUI->Draw(registry, this, &camera, settings);
+    m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine);
 
     m_MeshRenderer->Render(registry, camera, settings.wireframeMode);   // NEW arg
     m_QuadRenderer->Render(registry);

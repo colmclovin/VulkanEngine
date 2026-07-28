@@ -111,7 +111,7 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>Default</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\External\glfw-3.4\glfw-3.4\include;$(ProjectDir)..\External\glfw-3.4\glfw-3.4\src;C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)..\External;$(ProjectDir)..\External\Assimp\include\;$(ProjectDir)..\External\Assimp\build\include;$(ProjectDir)..\External\imgui;$(ProjectDir)..\External\imgui\backends;$(ProjectDir)..\External\FastNoise;$(ProjectDir)..\External\JSON;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\External\glfw-3.4\glfw-3.4\include;$(ProjectDir)..\External\glfw-3.4\glfw-3.4\src;C:\VulkanSDK\1.4.350.0\Include;$(ProjectDir)..\External;$(ProjectDir)..\External\Assimp\include\;$(ProjectDir)..\External\Assimp\build\include;$(ProjectDir)..\External\imgui;$(ProjectDir)..\External\imgui\backends;$(ProjectDir)..\External\FastNoise;$(ProjectDir)..\External\JSON;$(ProjectDir)..\External\MiniAudio;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -158,6 +158,8 @@
     <ClCompile Include="..\External\imgui\imgui_draw.cpp" />
     <ClCompile Include="..\External\imgui\imgui_tables.cpp" />
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
+    <ClCompile Include="src\Audio\AudioEngine.cpp" />
+    <ClCompile Include="src\Audio\AudioEventSystem.cpp" />
     <ClCompile Include="src\Components\GameSettings.cpp" />
     <ClCompile Include="src\Components\Mesh.cpp" />
     <ClCompile Include="src\Components\ModelLoader.cpp" />
@@ -175,6 +177,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\External\JSON\json.hpp" />
+    <ClInclude Include="src\Audio\AudioEngine.h" />
+    <ClInclude Include="src\Audio\AudioEvent.h" />
+    <ClInclude Include="src\Audio\AudioEventSystem.h" />
     <ClInclude Include="src\Components\Components.h" />
     <ClInclude Include="src\Components\GameSettings.h" />
     <ClInclude Include="src\Components\Material.h" />

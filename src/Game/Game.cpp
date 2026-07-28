@@ -47,6 +47,17 @@ void Game::Init() {
     m_VulkanEngine = std::make_unique<VulkanEngine>();
     m_VulkanEngine->Init("Vulkan Game", 1280, 720);
 
+    std::cout << "=== Initializing Audio Engine ===" << std::endl;
+    m_AudioEngine = std::make_unique<AudioEngine>();
+    m_AudioEngine->Init();
+
+    m_AudioEvents = std::make_unique<AudioEventSystem>(m_AudioEngine.get());
+    m_AudioEvents->RegisterSound(AudioEvent::TreeChopped, "Assets/Audio/Hi Seed Shaker 1.wav");
+    m_AudioEvents->RegisterSound(AudioEvent::OreCollected, "Assets/Audio/Lo Seed Shaker 1.wav");
+    m_AudioEvents->RegisterSound(AudioEvent::UIClick, "Assets/Audio/Tambourine 3.wav");
+
+    m_AudioEngine->PlayMusic("Assets/Audio/GremlinRapFin.mp3", true, 0.5f);
+
     m_RenderSystem = std::make_unique<RenderSystem>(m_VulkanEngine.get());
     m_RenderSystem->Init();
 
@@ -99,12 +110,40 @@ void Game::CreateInitialEntities() {
         // Tree
         auto treeEntity = m_Registry->create();
         auto& treeTransform = m_Registry->emplace<TransformComponent>(treeEntity);
-        treeTransform.Position = glm::vec3(5.0f, 0.0f, 5.0f);
+        treeTransform.Position = glm::vec3(5.0f, 0.0f, 0.0f);
         m_Registry->emplace<TreeComponent>(treeEntity);
 
-        auto treeMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/cartoon_lowpoly_trees_blend.glb")); // your tree asset
+        auto treeMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Tree.glb")); // your tree asset
         m_Registry->emplace<MeshComponent>(treeEntity, treeMesh);
         m_Registry->emplace<NameTag>(treeEntity, "Tree");
+        //wood
+        auto woodEntity = m_Registry->create();
+        auto &woodTransform = m_Registry->emplace<TransformComponent>(woodEntity);
+        woodTransform.Position = glm::vec3(5.0f, 0.0f, 10.0f);
+        m_Registry->emplace<TreeComponent>(woodEntity);
+
+        auto woodMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Wood.glb")); // your tree asset
+        m_Registry->emplace<MeshComponent>(woodEntity, woodMesh);
+        m_Registry->emplace<NameTag>(woodEntity, "Wood");
+        //Copper Ore
+        auto copperEntity = m_Registry->create();
+        auto &copperTransform = m_Registry->emplace<TransformComponent>(copperEntity);
+        copperTransform.Position = glm::vec3(5.0f, 0.0f, 7.0f);
+        m_Registry->emplace<TreeComponent>(copperEntity);
+
+        auto copperMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/CopperOre.glb")); // your tree asset
+        m_Registry->emplace<MeshComponent>(copperEntity, copperMesh);
+        m_Registry->emplace<NameTag>(copperEntity, "Copper");
+        //Iron ore
+        auto ironEntity = m_Registry->create();
+        auto &ironTransform = m_Registry->emplace<TransformComponent>(ironEntity);
+        ironTransform.Position = glm::vec3(5.0f, 0.0f, 12.0f);
+        m_Registry->emplace<TreeComponent>(ironEntity);
+
+        auto ironMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/IronOre.glb")); // your tree asset
+        m_Registry->emplace<MeshComponent>(ironEntity, ironMesh);
+        m_Registry->emplace<NameTag>(ironEntity, "Iron");
+
 
         
         auto terrainMesh = TerrainGenerator::GenerateHeightmapTerrain(
@@ -124,7 +163,7 @@ void Game::HandleInput(float deltaTime) {
     GLFWwindow* window = m_VulkanEngine->GetWindow();
 
     // --- Mode toggle (F2), edge-detected like your F1 UI toggle ---
-    static bool f2WasDown = false;
+    static bool f1WasDown = false, f2WasDown = false;
     bool f2IsDown = glfwGetKey(window, GLFW_KEY_F2) == GLFW_PRESS;
     if (f2IsDown && !f2WasDown) {
         bool nowIso = m_Camera->GetMode() == Camera3D::Mode::Isometric;
@@ -146,6 +185,12 @@ void Game::HandleInput(float deltaTime) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS) {
         m_IsRunning = false;
     }
+    bool f1IsDown = glfwGetKey(window, GLFW_KEY_F1) == GLFW_PRESS;
+    if (f1IsDown && !f1WasDown) {
+        m_AudioEvents->Trigger(AudioEvent::TreeChopped);
+    }
+    f1WasDown = f1IsDown;
+
 }
 
 void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
@@ -255,7 +300,7 @@ void Game::Update(float deltaTime) {
 }
 
 void Game::Render() {
-    m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings);
+    m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine);
 }
 void Game::Shutdown() {
     std::cout << "=== Shutting Down Game ===" << std::endl;
@@ -280,6 +325,10 @@ void Game::Shutdown() {
         if (meshComp.mesh) {
             meshComp.mesh->DestroyGPUResources(m_VulkanEngine->GetDevice());
         }
+    }
+    if (m_AudioEngine) {
+        m_AudioEngine->Shutdown();
+        m_AudioEngine.reset();
     }
 
     if (m_Registry) {

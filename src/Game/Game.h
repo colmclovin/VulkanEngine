@@ -2,10 +2,14 @@
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
 #include "../Components/GameSettings.h"
+#include "../Audio/AudioEngine.h"
+#include "../Audio/AudioEventSystem.h"
+
 class TerrainGenerator;
 class VulkanEngine;
 class RenderSystem;
 class Camera3D;
+class AudioEngine;
 struct GLFWwindow;
 
 
@@ -27,6 +31,8 @@ private:
     void Render();
     void Shutdown();
     // Core systems
+    std::unique_ptr<AudioEngine> m_AudioEngine;
+    std::unique_ptr<AudioEventSystem> m_AudioEvents;
     std::unique_ptr<VulkanEngine> m_VulkanEngine;
     std::unique_ptr<RenderSystem> m_RenderSystem;
     std::unique_ptr<Camera3D> m_Camera;
