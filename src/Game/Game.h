@@ -10,6 +10,7 @@ class VulkanEngine;
 class RenderSystem;
 class Camera3D;
 class AudioEngine;
+class ItemDatabase;
 struct GLFWwindow;
 
 
@@ -37,6 +38,8 @@ private:
     std::unique_ptr<RenderSystem> m_RenderSystem;
     std::unique_ptr<Camera3D> m_Camera;
     std::unique_ptr<entt::registry> m_Registry;
+
+
     entt::entity m_PlayerEntity = entt::null;
     entt::entity m_TerrainEntity = entt::null;
     GameSettings m_Settings;

@@ -10,6 +10,9 @@
 #include "../Helpers/DebugUI.h"
 #include "../Components/GameSettings.h"
 #include <imgui/imgui.h>
+
+#include "ItemDatabase.h"
+
 Game::Game() {
 
 }
@@ -42,6 +45,10 @@ void Game::Init() {
     std::cout << "=== Loading Settings ===" << std::endl;
     m_Settings = GameSettings::LoadFromFile("settings.json");
     std::cout << "=== Settings Loaded ===" << std::endl;
+
+    std::cout << "=== Registering item Database ===" << std::endl;
+    ItemDatabase::Init();
+
 
     std::cout << "=== Initializing Game ===" << std::endl;
     m_VulkanEngine = std::make_unique<VulkanEngine>();
