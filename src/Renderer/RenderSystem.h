@@ -19,7 +19,7 @@ public:
     
     
     void Init();
-    void RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine);
+    void RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity);
     void Shutdown();
 
     //ResourceManager *GetResourceManager() const { return m_ResourceManager.get(); }

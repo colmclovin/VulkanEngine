@@ -6,7 +6,7 @@
 #include "../Components/GameSettings.h"
 #include "../Audio/AudioEngine.h"
 
-void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine){
+void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine, entt::entity m_PlayerEntity) {
 
     if (m_ShowDemo) {
         ImGui::ShowDemoWindow(&m_ShowDemo);
@@ -20,6 +20,7 @@ void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3
             DrawStats();
             ImGui::Separator();
             DrawEntityList(registry);
+            DrawInventory(registry, m_PlayerEntity);
             ImGui::EndTabItem();
         }
 
@@ -36,7 +37,19 @@ void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3
 
 void DebugUI::DrawStats() {
     ImGui::Text("Frame time: %.3f ms", 1000.0f / ImGui::GetIO().Framerate);
+    ImGui::Text("Frame rate: %.3f fps", ImGui::GetIO().Framerate);
     ImGui::Checkbox("Show Demo Window", &m_ShowDemo);
+}
+void DebugUI::DrawInventory(entt::registry &registry, entt::entity player) {
+    if (!registry.valid(player) || !registry.any_of<InventoryComponent>(player)) return;
+    auto &inv = registry.get<InventoryComponent>(player);
+    ImGui::Begin("Inventory");
+    for (auto &slot : inv.slots) {
+        if (slot.item != ItemId::None) {
+            ImGui::Text("%s x%d", ItemDatabase::Get(slot.item).name.c_str(), slot.count);
+        }
+    }
+    ImGui::End();
 }
 
 void DebugUI::DrawEntityList(entt::registry& registry) {
@@ -81,6 +94,12 @@ void DebugUI::DrawSettingsTab(Camera3D* camera, GameSettings& settings, AudioEng
     if (ImGui::CollapsingHeader("Audio", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (ImGui::SliderFloat("Master Volume", &settings.masterVolume, 0.0f, 1.0f)) {
             audioEngine->SetMasterVolume(settings.masterVolume);
+        }
+        if (ImGui::SliderFloat("Music Volume", &settings.musicVolume, 0.0f, 1.0f)) {
+            audioEngine->SetMusicVolume(settings.musicVolume);
+        }
+        if (ImGui::SliderFloat("SFX Volume", &settings.sfxVolume, 0.0f, 1.0f)) {
+            audioEngine->SetSFXVolume(settings.sfxVolume);
         }
     }
 

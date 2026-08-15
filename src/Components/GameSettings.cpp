@@ -29,6 +29,9 @@ void GameSettings::SaveToFile(const std::string& path) const {
     j["terrain"] = terrain;   // uses the macro-generated conversion
     j["wireframeMode"] = wireframeMode;
     j["clearColor"] = clearColor;
+    j["MasterVolume"] = masterVolume;
+    j["MusicVolume"] = musicVolume;
+    j["SFXVolume"] = sfxVolume;
 
     std::ofstream file(path);
     if (!file.is_open()) {
@@ -62,6 +65,9 @@ GameSettings GameSettings::LoadFromFile(const std::string& path) {
         settings.isoZoomSpeed = j.value("isoZoomSpeed", settings.isoZoomSpeed);
         settings.playerMoveSpeed = j.value("playerMoveSpeed", settings.playerMoveSpeed);
         settings.playerRunSpeed = j.value("playerRunSpeed", settings.playerRunSpeed);
+        settings.masterVolume = j.value("MasterVolume", settings.masterVolume);
+        settings.musicVolume = j.value("MusicVolume", settings.musicVolume);
+        settings.sfxVolume = j.value("SFXVolume", settings.sfxVolume);
         if (j.contains("terrain")) settings.terrain = j.at("terrain").get<TerrainSettings>();
         settings.wireframeMode = j.value("wireframeMode", settings.wireframeMode);
         if (j.contains("clearColor")) settings.clearColor = j.at("clearColor").get<glm::vec4>();

@@ -10,7 +10,7 @@
 #include "../Helpers/DebugUI.h"
 #include "../Components/GameSettings.h"
 #include <imgui/imgui.h>
-
+#include "../Components/InteractionSystem.h"
 #include "ItemDatabase.h"
 
 Game::Game() {
@@ -63,7 +63,7 @@ void Game::Init() {
     m_AudioEvents->RegisterSound(AudioEvent::OreCollected, "Assets/Audio/Lo Seed Shaker 1.wav");
     m_AudioEvents->RegisterSound(AudioEvent::UIClick, "Assets/Audio/Tambourine 3.wav");
 
-    m_AudioEngine->PlayMusic("Assets/Audio/GremlinRapFin.mp3", true, 0.5f);
+    m_AudioEngine->PlayMusic("Assets/Audio/GremlinRapFin.mp3", true, m_Settings.masterVolume);
 
     m_RenderSystem = std::make_unique<RenderSystem>(m_VulkanEngine.get());
     m_RenderSystem->Init();
@@ -109,6 +109,7 @@ void Game::CreateInitialEntities() {
         m_PlayerEntity = m_Registry->create();
         m_Registry->emplace<TransformComponent>(m_PlayerEntity);
         m_Registry->emplace<PlayerComponent>(m_PlayerEntity);
+        m_Registry->emplace<InventoryComponent>(m_PlayerEntity);
 
         auto playerMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Test1.glb")); // swap for a real player model later
         m_Registry->emplace<MeshComponent>(m_PlayerEntity, playerMesh);
@@ -118,16 +119,17 @@ void Game::CreateInitialEntities() {
         auto treeEntity = m_Registry->create();
         auto& treeTransform = m_Registry->emplace<TransformComponent>(treeEntity);
         treeTransform.Position = glm::vec3(5.0f, 0.0f, 0.0f);
-        m_Registry->emplace<TreeComponent>(treeEntity);
-
         auto treeMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Tree.glb")); // your tree asset
+
+        m_Registry->emplace<HarvestableComponent>(treeEntity, HarvestableComponent{ 100.0f, 100.0f, ItemId::Wood, 1, 5 });
         m_Registry->emplace<MeshComponent>(treeEntity, treeMesh);
         m_Registry->emplace<NameTag>(treeEntity, "Tree");
+
         //wood
         auto woodEntity = m_Registry->create();
         auto &woodTransform = m_Registry->emplace<TransformComponent>(woodEntity);
         woodTransform.Position = glm::vec3(5.0f, 0.0f, 10.0f);
-        m_Registry->emplace<TreeComponent>(woodEntity);
+        m_Registry->emplace<HarvestableComponent>(woodEntity, HarvestableComponent{ 100.0f, 100.0f, ItemId::Wood, 1, 5 });
 
         auto woodMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Wood.glb")); // your tree asset
         m_Registry->emplace<MeshComponent>(woodEntity, woodMesh);
@@ -136,8 +138,8 @@ void Game::CreateInitialEntities() {
         auto copperEntity = m_Registry->create();
         auto &copperTransform = m_Registry->emplace<TransformComponent>(copperEntity);
         copperTransform.Position = glm::vec3(5.0f, 0.0f, 7.0f);
-        m_Registry->emplace<TreeComponent>(copperEntity);
-
+ 
+        m_Registry->emplace<HarvestableComponent>(copperEntity, HarvestableComponent{ 100.0f, 100.0f, ItemId::CopperOre, 1, 5 });
         auto copperMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/CopperOre.glb")); // your tree asset
         m_Registry->emplace<MeshComponent>(copperEntity, copperMesh);
         m_Registry->emplace<NameTag>(copperEntity, "Copper");
@@ -145,8 +147,7 @@ void Game::CreateInitialEntities() {
         auto ironEntity = m_Registry->create();
         auto &ironTransform = m_Registry->emplace<TransformComponent>(ironEntity);
         ironTransform.Position = glm::vec3(5.0f, 0.0f, 12.0f);
-        m_Registry->emplace<TreeComponent>(ironEntity);
-
+        m_Registry->emplace<HarvestableComponent>(ironEntity, HarvestableComponent{ 100.0f, 100.0f, ItemId::IronOre, 1, 5 });
         auto ironMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/IronOre.glb")); // your tree asset
         m_Registry->emplace<MeshComponent>(ironEntity, ironMesh);
         m_Registry->emplace<NameTag>(ironEntity, "Iron");
@@ -201,15 +202,19 @@ void Game::HandleInput(float deltaTime) {
 }
 
 void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
-    static bool qWasDown = false, eWasDown = false, f11WasDown = false;
+    static bool qWasDown = false, eWasDown = false, f11WasDown = false, interactWasDown = false;
+
     bool qIsDown = glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS;
     bool eIsDown = glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
     bool f11IsDown = glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS;
+    bool interactIsDown = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
 
     if (qIsDown && !qWasDown) m_Camera->SnapRotateIso(false);
     if (eIsDown && !eWasDown) m_Camera->SnapRotateIso(true);
     if (f11IsDown && !f11WasDown) m_VulkanEngine->ToggleFullscreen();
+    if (interactIsDown && !interactWasDown && m_Registry->valid(m_CurrentTarget)) InteractionSystem::Mine(*m_Registry, m_CurrentTarget, m_PlayerEntity, m_AudioEvents.get());
     
+    interactWasDown = interactIsDown;
     qWasDown = qIsDown;
     eWasDown = eIsDown;
     f11WasDown = f11IsDown;
@@ -289,6 +294,10 @@ void Game::Update(float deltaTime) {
     if (m_Registry->valid(m_PlayerEntity)) {
         auto& transform = m_Registry->get<TransformComponent>(m_PlayerEntity);
         m_Camera->SetIsoTarget(transform.Position);
+        entt::entity nearbyPickup = InteractionSystem::FindNearestPickup(*m_Registry, transform.Position, 1.0f); // small radius
+        if (m_Registry->valid(nearbyPickup)) {
+            InteractionSystem::CollectPickup(*m_Registry, nearbyPickup, m_PlayerEntity, m_AudioEvents.get());
+        }
     }
 
     if (m_RenderSystem->GetDebugUI()->ConsumeRegenerateRequest()) {
@@ -304,10 +313,16 @@ void Game::Update(float deltaTime) {
 
         m_Registry->replace<MeshComponent>(m_TerrainEntity, newTerrainMesh);
     }
+
+    if (m_Registry->valid(m_PlayerEntity)) {
+        auto &transform = m_Registry->get<TransformComponent>(m_PlayerEntity);
+        m_CurrentTarget = InteractionSystem::FindNearestInteractable(*m_Registry, transform.Position, 3.0f); // 3 unit range
+    }
+
 }
 
 void Game::Render() {
-    m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine);
+    m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine, m_PlayerEntity);
 }
 void Game::Shutdown() {
     std::cout << "=== Shutting Down Game ===" << std::endl;

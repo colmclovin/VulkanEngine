@@ -32,7 +32,7 @@ void RenderSystem::Init() {
     std::cout << "RenderSystem initialized with all subsystems" << std::endl;
 }
 
-void RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine) {
+void RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity) {
     m_Engine->SetClearColor(settings.clearColor);   // NEW
 
     // Render the frame using the quad renderer
@@ -40,7 +40,7 @@ void RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameS
         return; // Skip frame if swapchain needs recreation
     }
     m_ImGuiVulkanUtil->NewFrame();   
-    m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine);
+    m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine, m_PlayerEntity);
 
     m_MeshRenderer->Render(registry, camera, settings.wireframeMode);   // NEW arg
     m_QuadRenderer->Render(registry);

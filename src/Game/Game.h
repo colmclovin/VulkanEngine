@@ -42,6 +42,7 @@ private:
 
     entt::entity m_PlayerEntity = entt::null;
     entt::entity m_TerrainEntity = entt::null;
+    entt::entity m_CurrentTarget = entt::null;
     GameSettings m_Settings;
     bool m_FirstMouse = true;
     double m_LastMouseX = 0.0, m_LastMouseY = 0.0;
