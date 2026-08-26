@@ -10,7 +10,7 @@
     ],
     "freeFlyFastMoveSpeed": 7.5,
     "freeFlyMoveSpeed": 2.5,
-    "freeFlySensitivity": 0.10000000149011612,
+    "freeFlySensitivity": 0.11400000005960464,
     "isoDistance": 20.347999572753906,
     "isoPitch": 34.810001373291016,
     "isoRotateSpeed": 13.664999961853027,
@@ -18,12 +18,12 @@
     "playerMoveSpeed": 12.958999633789063,
     "playerRunSpeed": 10.0,
     "terrain": {
-        "cellSize": 1.0,
+        "cellSize": 3.0999999046325684,
         "gridDepth": 100,
         "gridWidth": 100,
-        "heightScale": 5.0,
-        "noiseScale": 0.008999999612569809,
-        "seed": 2222
+        "heightScale": 0.20000000298023224,
+        "noiseScale": 0.17499999701976776,
+        "seed": 2143
     },
     "wireframeMode": false
 }

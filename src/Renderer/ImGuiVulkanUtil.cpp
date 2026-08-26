@@ -2,7 +2,7 @@
 #include "../Engine/VulkanEngine.h"
 #include <vulkan/vulkan.h>
 #include <stdexcept>
-
+#include <iostream>
 
 ImGuiVulkanUtil::ImGuiVulkanUtil(VulkanEngine* engine) {
     m_Engine = engine;
@@ -51,6 +51,10 @@ void ImGuiVulkanUtil::NewFrame() {
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
+
+ //   ImGuiIO& io = ImGui::GetIO();
+ //  std::cout << "DisplaySize: " << io.DisplaySize.x << "," << io.DisplaySize.y
+ //       << "  MousePos: " << io.MousePos.x << "," << io.MousePos.y << std::endl;
 }
 
 void ImGuiVulkanUtil::RenderDrawData(VkCommandBuffer commandBuffer) {

@@ -4,13 +4,16 @@
 #include "../Components/GameSettings.h"
 #include "../Audio/AudioEngine.h"
 #include "../Audio/AudioEventSystem.h"
+#include "ItemDatabase.h"
 
 class TerrainGenerator;
 class VulkanEngine;
 class RenderSystem;
 class Camera3D;
 class AudioEngine;
-class ItemDatabase;
+
+class PlaceableDatabase;
+class PlacementSystem;
 struct GLFWwindow;
 
 
@@ -38,7 +41,8 @@ private:
     std::unique_ptr<RenderSystem> m_RenderSystem;
     std::unique_ptr<Camera3D> m_Camera;
     std::unique_ptr<entt::registry> m_Registry;
-
+    std::unique_ptr<PlacementSystem> m_PlacementSystem;
+    ItemId m_SelectedItem = ItemId::None;   // whatever "hotbar slot" logic you build later selects this
 
     entt::entity m_PlayerEntity = entt::null;
     entt::entity m_TerrainEntity = entt::null;

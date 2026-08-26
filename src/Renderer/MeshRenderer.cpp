@@ -62,8 +62,12 @@ void MeshRenderer::Render(entt::registry& registry, const Camera3D& camera, bool
             // No material/submesh data (e.g. procedural terrain) — draw the whole mesh with default white
             MeshPushConstants pushConstants{};
             pushConstants.mvp = mvp;
-            pushConstants.baseColor = glm::vec4(1.0f);
-
+            bool isGhost = registry.any_of<GhostComponent>(entity);
+            // ... when building pushConstants.baseColor for each submesh:
+                pushConstants.baseColor = glm::vec4(1.0f);
+                if (isGhost) {
+                    pushConstants.baseColor.a = 0.4f;   // requires blending enabled on this pipeline — see note below
+                }
             if (m_PipelineLayout != VK_NULL_HANDLE) {
                 vkCmdPushConstants(commandBuffer, m_PipelineLayout,
                     VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &pushConstants);
@@ -191,7 +195,7 @@ void MeshRenderer::CreatePipeline() {
     VkPipelineColorBlendAttachmentState colorBlendAttachment{};
     colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
         VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
+    colorBlendAttachment.blendEnable = VK_TRUE;
     colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
     colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;

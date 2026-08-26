@@ -37,18 +37,19 @@ void RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameS
 
     // Render the frame using the quad renderer
     if (!m_Engine->BeginFrame()) {
+        ImGui::EndFrame();
         return; // Skip frame if swapchain needs recreation
     }
-    m_ImGuiVulkanUtil->NewFrame();   
+    
+    
+    m_ImGuiVulkanUtil->NewFrame();                              // MOVED — now always runs against up-to-date window state
     m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine, m_PlayerEntity);
 
-    m_MeshRenderer->Render(registry, camera, settings.wireframeMode);   // NEW arg
+    m_MeshRenderer->Render(registry, camera, settings.wireframeMode);
     m_QuadRenderer->Render(registry);
-    m_ImGuiVulkanUtil->RenderDrawData(m_Engine->GetCurrentCommandBuffer());  
 
-
+    m_ImGuiVulkanUtil->RenderDrawData(m_Engine->GetCurrentCommandBuffer());
     m_Engine->EndFrame();
-
 }
 
 void RenderSystem::Shutdown() {

@@ -13,6 +13,7 @@ public:
 
     private:
     void DrawStats();
+    void DrawCrafting(entt::registry& registry, entt::entity player);
     void DrawEntityList(entt::registry& registry);
     void DrawSettingsTab(Camera3D* camera, GameSettings& settings, AudioEngine* audioEngine);
     void DrawInventory(entt::registry &registry, entt::entity player); 

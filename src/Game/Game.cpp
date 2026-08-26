@@ -12,6 +12,10 @@
 #include <imgui/imgui.h>
 #include "../Components/InteractionSystem.h"
 #include "ItemDatabase.h"
+#include "PlaceableDatabase.h"
+#include "../Components/PlacementSystem.h"
+#include "RecipeDatabase.h"
+
 
 Game::Game() {
 
@@ -48,6 +52,14 @@ void Game::Init() {
 
     std::cout << "=== Registering item Database ===" << std::endl;
     ItemDatabase::Init();
+    RecipeDatabase::Init();
+
+
+    PlaceableDatabase::Init();
+    m_PlacementSystem = std::make_unique<PlacementSystem>();
+
+
+
 
 
     std::cout << "=== Initializing Game ===" << std::endl;
@@ -202,13 +214,15 @@ void Game::HandleInput(float deltaTime) {
 }
 
 void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
-    static bool qWasDown = false, eWasDown = false, f11WasDown = false, interactWasDown = false;
+    static bool qWasDown = false, eWasDown = false, f11WasDown = false, interactWasDown = false, placeWasDown = false;
 
     bool qIsDown = glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS;
     bool eIsDown = glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
     bool f11IsDown = glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS;
     bool interactIsDown = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
+    bool placeIsDown = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS;   
 
+	if (placeWasDown && !placeIsDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity);
     if (qIsDown && !qWasDown) m_Camera->SnapRotateIso(false);
     if (eIsDown && !eWasDown) m_Camera->SnapRotateIso(true);
     if (f11IsDown && !f11WasDown) m_VulkanEngine->ToggleFullscreen();
@@ -218,6 +232,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     qWasDown = qIsDown;
     eWasDown = eIsDown;
     f11WasDown = f11IsDown;
+    placeWasDown = placeIsDown;
 
     glm::vec3 moveDir(0.0f);
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveDir.z += 1.0f;
@@ -316,8 +331,10 @@ void Game::Update(float deltaTime) {
 
     if (m_Registry->valid(m_PlayerEntity)) {
         auto &transform = m_Registry->get<TransformComponent>(m_PlayerEntity);
-        m_CurrentTarget = InteractionSystem::FindNearestInteractable(*m_Registry, transform.Position, 3.0f); // 3 unit range
+        m_CurrentTarget = InteractionSystem::FindNearestInteractable(*m_Registry, transform.Position, 20.0f); // 3 unit range
     }
+
+    m_PlacementSystem->Update(*m_Registry, m_PlayerEntity, m_SelectedItem, 2.0f);
 
 }
 

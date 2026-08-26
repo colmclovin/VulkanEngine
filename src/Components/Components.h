@@ -7,3 +7,4 @@
 #include "HarvestableComponent.h"
 #include "InventoryComponent.h"
 #include "PickupComponent.h"
+#include "GhostComponent.h"

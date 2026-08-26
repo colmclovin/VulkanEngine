@@ -5,6 +5,8 @@
 #include "../Game/Camera3D.h"
 #include "../Components/GameSettings.h"
 #include "../Audio/AudioEngine.h"
+#include "../Game/CraftingSystem.h"
+#include "../Game/RecipeDatabase.h"
 
 void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine, entt::entity m_PlayerEntity) {
 
@@ -21,6 +23,7 @@ void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3
             ImGui::Separator();
             DrawEntityList(registry);
             DrawInventory(registry, m_PlayerEntity);
+			DrawCrafting(registry, m_PlayerEntity);
             ImGui::EndTabItem();
         }
 
@@ -48,6 +51,18 @@ void DebugUI::DrawInventory(entt::registry &registry, entt::entity player) {
         if (slot.item != ItemId::None) {
             ImGui::Text("%s x%d", ItemDatabase::Get(slot.item).name.c_str(), slot.count);
         }
+    }
+    ImGui::End();
+}
+void DebugUI::DrawCrafting(entt::registry& registry, entt::entity player) {
+    ImGui::Begin("Crafting");
+    for (const auto& recipe : RecipeDatabase::GetAll()) {
+        bool canCraft = CraftingSystem::CanCraft(registry, player, recipe);
+        ImGui::BeginDisabled(!canCraft);
+        if (ImGui::Button(recipe.name.c_str())) {
+            CraftingSystem::TryCraft(registry, player, recipe);
+        }
+        ImGui::EndDisabled();
     }
     ImGui::End();
 }

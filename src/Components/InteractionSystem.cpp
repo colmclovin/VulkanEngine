@@ -44,18 +44,30 @@ void InteractionSystem::Mine(entt::registry &registry, entt::entity target, entt
 
     harvest.health -= 25.0f; // tune per-hit damage as needed
 
-    inventory.AddItem(harvest.yieldItem, harvest.yieldPerHit);
+    //inventory.AddItem(harvest.yieldItem, harvest.yieldPerHit);
     audio->Trigger(AudioEvent::TreeChopped);
 
-    if (harvest.health <= 0.0f) {
+    
         auto &targetTransform = registry.get<TransformComponent>(target);
+
+        float scatterRadius = 1.0f;   // tune to taste
+        float angle = static_cast<float>(rand()) / RAND_MAX * glm::two_pi<float>();
+        float distance = static_cast<float>(rand()) / RAND_MAX * scatterRadius;
+        glm::vec3 offset(cos(angle) * distance, 0.0f, sin(angle) * distance);
+
+
 
         auto pickupEntity = registry.create();
         auto &pickupTransform = registry.emplace<TransformComponent>(pickupEntity);
-        pickupTransform.Position = targetTransform.Position;
+        pickupTransform.Position = targetTransform.Position + offset;
+		pickupTransform.Scale = glm::vec3(0.3f); 
         registry.emplace<PickupComponent>(pickupEntity, PickupComponent{ harvest.yieldItem, harvest.yieldOnDestroy });
         // TODO: give it a small mesh (a dropped-item model) via MeshComponent once you have one
-
+        auto dropMesh = ItemDatabase::GetWorldMesh(harvest.yieldItem);   // CHANGED — looked up, not stored
+        if (dropMesh) {
+            registry.emplace<MeshComponent>(pickupEntity, dropMesh);
+        }
+    if (harvest.health <= 0.0f) {
         registry.destroy(target);
     }
 }
