@@ -22,15 +22,15 @@ public:
 
     // Matrix generation for graphics pipeline integration
     glm::mat4 GetViewMatrix() const;
-    glm::mat4 GetProjectionMatrix(float aspectRatio, float nearPlane = 0.1f, float farPlane = 100.0f) const;
-
+    glm::mat4 GetProjectionMatrix(float aspectRatio, float nearPlane = 0.1f, float farPlane = 1000.0f) const;
+    glm::vec3 GetEyePosition() const;
     void ProcessIsoZoom(float deltaDistance);
 
     void SnapRotateIso(bool clockwise);            // call once per Q/E press, not per frame
     void PanIso(glm::vec3 direction, float deltaTime); // WASD ground-plane panning
     void UpdateIso(float deltaTime);                // smooth the snap animation
     glm::mat4 GetIsoViewMatrix() const;
-
+    glm::vec3 GetIsoPosition() const;
     // Input handling — called every frame from your input polling code
     void ProcessKeyboard(CameraMovement direction, float deltaTime, bool sprint = false);
     void ProcessMouseMovement(float xOffset, float yOffset, bool constrainPitch = true);
@@ -45,6 +45,8 @@ public:
     Mode GetMode() const { return m_Mode; }
     void SetIsoTarget(glm::vec3 pos) { isoTarget = pos; }
     glm::mat4 GetActiveViewMatrix() const;   // picks the right one internally
+    glm::vec3 ScreenPointToRay(float mouseX, float mouseY, float screenWidth, float screenHeight, float aspect) const;
+
 
 
     //Setters

@@ -249,7 +249,14 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     }
     m_VulkanEngine->ResetScrollDelta();
     
-
+    for (int i = 0; i < HOTBAR_SIZE; i++) {
+        static bool numWasDown[HOTBAR_SIZE] = { false };
+        bool numIsDown = glfwGetKey(window, GLFW_KEY_1 + i) == GLFW_PRESS;
+        if (numIsDown && !numWasDown[i]) {
+            m_SelectedHotbarSlot = (m_SelectedHotbarSlot == i) ? -1 : i;   // toggle off if already selected
+        }
+        numWasDown[i] = numIsDown;
+    }
 
 
     if (glm::length(moveDir) > 0.0f && m_Registry->valid(m_PlayerEntity)) {
@@ -306,6 +313,7 @@ void Game::HandleFreeFlyInput(GLFWwindow* window, float deltaTime) {
     }
 }
 void Game::Update(float deltaTime) {
+    GLFWwindow* window = m_VulkanEngine->GetWindow();
     if (m_Registry->valid(m_PlayerEntity)) {
         auto& transform = m_Registry->get<TransformComponent>(m_PlayerEntity);
         m_Camera->SetIsoTarget(transform.Position);
@@ -334,7 +342,14 @@ void Game::Update(float deltaTime) {
         m_CurrentTarget = InteractionSystem::FindNearestInteractable(*m_Registry, transform.Position, 20.0f); // 3 unit range
     }
 
-    m_PlacementSystem->Update(*m_Registry, m_PlayerEntity, m_SelectedItem, 2.0f);
+    double mx, my;
+    glfwGetCursorPos(window, &mx, &my);
+    VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();
+    float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+
+    m_PlacementSystem->Update(*m_Registry, m_PlayerEntity, *m_Camera, GetSelectedItem(),
+        m_Settings.terrain, static_cast<float>(mx), static_cast<float>(my),
+        static_cast<float>(extent.width), static_cast<float>(extent.height), aspect);
 
 }
 

@@ -72,3 +72,10 @@ std::shared_ptr<Mesh> TerrainGenerator::GenerateHeightmapTerrain(
 
     return mesh;
 }
+float TerrainGenerator::SampleHeight(float worldX, float worldZ, const TerrainSettings& settings) {
+    FastNoiseLite noise;
+    noise.SetSeed(settings.seed);
+    noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    noise.SetFrequency(settings.noiseScale);
+    return noise.GetNoise(worldX, worldZ) * settings.heightScale;
+}

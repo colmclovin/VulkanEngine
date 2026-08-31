@@ -111,6 +111,13 @@ void Camera3D::PanIso(glm::vec3 direction, float deltaTime) {
 
     isoTarget += (forward * direction.z + right * direction.x) * movementSpeed * deltaTime;
 }
+glm::vec3 Camera3D::GetIsoPosition() const {
+    glm::vec3 isoPos;
+    isoPos.x = isoTarget.x + isoDistance * cos(glm::radians(isoPitch)) * cos(glm::radians(isoYaw));
+    isoPos.y = isoTarget.y + isoDistance * sin(glm::radians(isoPitch));
+    isoPos.z = isoTarget.z + isoDistance * cos(glm::radians(isoPitch)) * sin(glm::radians(isoYaw));
+    return isoPos;
+}
 
 glm::mat4 Camera3D::GetIsoViewMatrix() const {
     glm::vec3 isoPos;
@@ -124,4 +131,27 @@ glm::mat4 Camera3D::GetIsoViewMatrix() const {
 // Camera3D.cpp
 glm::mat4 Camera3D::GetActiveViewMatrix() const {
     return (m_Mode == Mode::Isometric) ? GetIsoViewMatrix() : GetViewMatrix();
+}
+
+
+glm::vec3 Camera3D::ScreenPointToRay(float mouseX, float mouseY, float screenWidth, float screenHeight, float aspect) const {
+    // Convert mouse pixel coords to normalized device coordinates [-1, 1]
+    float ndcX = (2.0f * mouseX) / screenWidth - 1.0f;
+    float ndcY = (2.0f * mouseY) / screenHeight - 1.0f;   // CHANGED — no extra flip; Vulkan's proj matrix already accounts for this
+
+
+    glm::mat4 proj = GetProjectionMatrix(aspect);
+    glm::mat4 view = GetActiveViewMatrix();
+    glm::mat4 invVP = glm::inverse(proj * view);
+
+    glm::vec4 nearPoint = invVP * glm::vec4(ndcX, ndcY, -1.0f, 1.0f);
+    glm::vec4 farPoint = invVP * glm::vec4(ndcX, ndcY, 1.0f, 1.0f);
+    nearPoint /= nearPoint.w;
+    farPoint /= farPoint.w;
+
+    return glm::normalize(glm::vec3(farPoint - nearPoint));
+}
+
+glm::vec3 Camera3D::GetEyePosition() const{
+    return (m_Mode == Mode::Isometric) ? GetIsoPosition() : position;
 }
