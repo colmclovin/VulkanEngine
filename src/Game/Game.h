@@ -5,6 +5,9 @@
 #include "../Audio/AudioEngine.h"
 #include "../Audio/AudioEventSystem.h"
 #include "ItemDatabase.h"
+#include "../Components/ResourceMap.h"
+#include "../Components/WorldGenerator.h"
+
 
 class TerrainGenerator;
 class VulkanEngine;
@@ -14,6 +17,8 @@ class AudioEngine;
 
 class PlaceableDatabase;
 class PlacementSystem;
+
+
 struct GLFWwindow;
 
 
@@ -46,6 +51,9 @@ private:
     static constexpr int HOTBAR_SIZE = 5;
     ItemId m_Hotbar[HOTBAR_SIZE] = { ItemId::Wood, ItemId::CopperOre, ItemId::IronOre, ItemId::None, ItemId::None };
     int m_SelectedHotbarSlot = -1;   // -1 = nothing selected
+    ResourceMap m_ResourceMap;
+
+
 
     ItemId GetSelectedItem() const {
         return (m_SelectedHotbarSlot >= 0 && m_SelectedHotbarSlot < HOTBAR_SIZE) ? m_Hotbar[m_SelectedHotbarSlot] : ItemId::None;

@@ -166,7 +166,9 @@
     <ClCompile Include="src\Components\Mesh.cpp" />
     <ClCompile Include="src\Components\ModelLoader.cpp" />
     <ClCompile Include="src\Components\PlacementSystem.cpp" />
+    <ClCompile Include="src\Components\ResourceMap.cpp" />
     <ClCompile Include="src\Components\TerrainGenerator.cpp" />
+    <ClCompile Include="src\Components\WorldGenerator.cpp" />
     <ClCompile Include="src\Game\Camera3D.cpp" />
     <ClCompile Include="src\Game\CraftingSystem.cpp" />
     <ClCompile Include="src\Game\Game.cpp" />
@@ -201,11 +203,13 @@
     <ClInclude Include="src\Components\PickupComponent.h" />
     <ClInclude Include="src\Components\PlacementSystem.h" />
     <ClInclude Include="src\Components\PlayerComponent.h" />
+    <ClInclude Include="src\Components\ResourceMap.h" />
     <ClInclude Include="src\Components\SpriteComponent.h" />
     <ClInclude Include="src\Components\SubMesh.h" />
     <ClInclude Include="src\Components\TerrainGenerator.h" />
     <ClInclude Include="src\Components\TransformComponent.h" />
     <ClInclude Include="src\Components\Vertex.h" />
+    <ClInclude Include="src\Components\WorldGenerator.h" />
     <ClInclude Include="src\Engine\VulkanEngine.h" />
     <ClInclude Include="src\Game\Camera3D.h" />
     <ClInclude Include="src\Game\CraftingSystem.h" />

@@ -165,19 +165,24 @@ void Game::CreateInitialEntities() {
         m_Registry->emplace<NameTag>(ironEntity, "Iron");
 
 
+        m_ResourceMap.Generate(m_Settings.terrain.gridWidth, m_Settings.terrain.gridDepth,
+            m_Settings.terrain.cellSize, m_Settings.terrain.seed);
+
+
+
         
         auto terrainMesh = TerrainGenerator::GenerateHeightmapTerrain(
-            m_Settings.terrain.gridWidth,
-            m_Settings.terrain.gridDepth,
-            m_Settings.terrain.cellSize,
-            m_Settings.terrain.heightScale,
-            m_Settings.terrain.noiseScale,
-            m_Settings.terrain.seed);
+            m_Settings.terrain.gridWidth, m_Settings.terrain.gridDepth,
+            m_Settings.terrain.cellSize, m_Settings.terrain.heightScale,
+            m_Settings.terrain.noiseScale, m_Settings.terrain.seed,
+            m_ResourceMap);
 
         m_TerrainEntity = m_Registry->create();
         m_Registry->emplace<TransformComponent>(m_TerrainEntity);
         m_Registry->emplace<MeshComponent>(m_TerrainEntity, terrainMesh);
         m_Registry->emplace<NameTag>(m_TerrainEntity, "Terrain");
+
+        WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain);
 }
 void Game::HandleInput(float deltaTime) {
     GLFWwindow* window = m_VulkanEngine->GetWindow();
@@ -220,18 +225,27 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     bool eIsDown = glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
     bool f11IsDown = glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS;
     bool interactIsDown = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
-    bool placeIsDown = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS;   
+    bool placeIsDown = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS;
 
-	if (placeWasDown && !placeIsDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity);
+    if (placeIsDown && !placeWasDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity);
     if (qIsDown && !qWasDown) m_Camera->SnapRotateIso(false);
     if (eIsDown && !eWasDown) m_Camera->SnapRotateIso(true);
     if (f11IsDown && !f11WasDown) m_VulkanEngine->ToggleFullscreen();
-    if (interactIsDown && !interactWasDown && m_Registry->valid(m_CurrentTarget)) InteractionSystem::Mine(*m_Registry, m_CurrentTarget, m_PlayerEntity, m_AudioEvents.get());
-    
-    interactWasDown = interactIsDown;
+
+    if (interactIsDown && !interactWasDown) {
+        if (m_Registry->valid(m_CurrentTarget)) {
+            InteractionSystem::Mine(*m_Registry, m_CurrentTarget, m_PlayerEntity, m_AudioEvents.get());
+        }
+        else {
+            auto& playerTransform = m_Registry->get<TransformComponent>(m_PlayerEntity);
+            InteractionSystem::TryMineGround(m_ResourceMap, *m_Registry, m_PlayerEntity, playerTransform.Position, 10.0f, m_AudioEvents.get());
+        }
+    }
+
     qWasDown = qIsDown;
     eWasDown = eIsDown;
     f11WasDown = f11IsDown;
+    interactWasDown = interactIsDown;
     placeWasDown = placeIsDown;
 
     glm::vec3 moveDir(0.0f);
@@ -324,17 +338,24 @@ void Game::Update(float deltaTime) {
     }
 
     if (m_RenderSystem->GetDebugUI()->ConsumeRegenerateRequest()) {
-        m_VulkanEngine->WaitIdle();   // ensure GPU is done with the old terrain buffers first
+        m_VulkanEngine->WaitIdle();
 
         auto oldTerrainMesh = m_Registry->get<MeshComponent>(m_TerrainEntity).mesh;
         oldTerrainMesh->DestroyGPUResources(m_VulkanEngine->GetDevice());
 
+        m_ResourceMap.Generate(m_Settings.terrain.gridWidth, m_Settings.terrain.gridDepth,
+            m_Settings.terrain.cellSize, m_Settings.terrain.seed);
+
         auto newTerrainMesh = TerrainGenerator::GenerateHeightmapTerrain(
             m_Settings.terrain.gridWidth, m_Settings.terrain.gridDepth,
             m_Settings.terrain.cellSize, m_Settings.terrain.heightScale,
-            m_Settings.terrain.noiseScale, m_Settings.terrain.seed);
+            m_Settings.terrain.noiseScale, m_Settings.terrain.seed,
+            m_ResourceMap);
 
         m_Registry->replace<MeshComponent>(m_TerrainEntity, newTerrainMesh);
+
+        WorldGenerator::ClearHarvestables(*m_Registry);
+        WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain);
     }
 
     if (m_Registry->valid(m_PlayerEntity)) {

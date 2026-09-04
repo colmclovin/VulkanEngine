@@ -13,6 +13,6 @@ void main() {
     float diffuse = max(dot(normal, lightDir), 0.0);
     float ambient = 0.2;
 
-    vec3 litColor = fragBaseColor.rgb * (ambient + diffuse * 0.8);
+    vec3 litColor = fragBaseColor.rgb * fragColor * (ambient + diffuse * 0.8);   // CHANGED — includes per-vertex color
     outColor = vec4(litColor, fragBaseColor.a);
 }

@@ -87,3 +87,15 @@ void InteractionSystem::CollectPickup(entt::registry &registry, entt::entity pic
         pickupComp.count = leftover; // partial pickup if inventory was nearly full
     }
 }
+
+bool InteractionSystem::TryMineGround(ResourceMap& resourceMap, entt::registry& registry, entt::entity player,
+    glm::vec3 playerPos, float extractAmount, AudioEventSystem* audio) {
+    ResourceCell* cell = resourceMap.GetCellAtWorldPos(playerPos.x, playerPos.z);
+    if (!cell || cell->resource == ItemId::None) return false;
+
+    auto& inventory = registry.get<InventoryComponent>(player);
+    inventory.AddItem(cell->resource, 1);
+    resourceMap.ExtractFromCell(cell, extractAmount);
+    audio->Trigger(AudioEvent::OreCollected);
+    return true;
+}
