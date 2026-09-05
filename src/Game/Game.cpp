@@ -15,7 +15,7 @@
 #include "PlaceableDatabase.h"
 #include "../Components/PlacementSystem.h"
 #include "RecipeDatabase.h"
-
+#include "../Components/TerrainRaycast.h"
 
 Game::Game() {
 
@@ -182,7 +182,7 @@ void Game::CreateInitialEntities() {
         m_Registry->emplace<MeshComponent>(m_TerrainEntity, terrainMesh);
         m_Registry->emplace<NameTag>(m_TerrainEntity, "Terrain");
 
-        WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain);
+        WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain, m_ResourceMap);
 }
 void Game::HandleInput(float deltaTime) {
     GLFWwindow* window = m_VulkanEngine->GetWindow();
@@ -232,14 +232,18 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     if (eIsDown && !eWasDown) m_Camera->SnapRotateIso(true);
     if (f11IsDown && !f11WasDown) m_VulkanEngine->ToggleFullscreen();
 
-    if (interactIsDown && !interactWasDown) {
-        if (m_Registry->valid(m_CurrentTarget)) {
-            InteractionSystem::Mine(*m_Registry, m_CurrentTarget, m_PlayerEntity, m_AudioEvents.get());
-        }
-        else {
-            auto& playerTransform = m_Registry->get<TransformComponent>(m_PlayerEntity);
-            InteractionSystem::TryMineGround(m_ResourceMap, *m_Registry, m_PlayerEntity, playerTransform.Position, 10.0f, m_AudioEvents.get());
-        }
+if (interactIsDown && !interactWasDown) {
+        double mx, my;
+        glfwGetCursorPos(window, &mx, &my);
+        VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();
+        float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+
+        glm::vec3 rayOrigin = m_Camera->GetEyePosition();
+        glm::vec3 rayDir = m_Camera->ScreenPointToRay(static_cast<float>(mx), static_cast<float>(my),
+                                                      static_cast<float>(extent.width), static_cast<float>(extent.height), aspect);
+
+        InteractionSystem::TryMineAtCursor(*m_Registry, m_ResourceMap, m_PlayerEntity,
+                                           rayOrigin, rayDir, m_Settings.terrain, 5.0f, m_AudioEvents.get());
     }
 
     qWasDown = qIsDown;
@@ -355,7 +359,7 @@ void Game::Update(float deltaTime) {
         m_Registry->replace<MeshComponent>(m_TerrainEntity, newTerrainMesh);
 
         WorldGenerator::ClearHarvestables(*m_Registry);
-        WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain);
+        WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain, m_ResourceMap);
     }
 
     if (m_Registry->valid(m_PlayerEntity)) {

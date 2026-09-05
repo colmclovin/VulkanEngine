@@ -6,7 +6,7 @@
 #include "../Game/ItemDatabase.h"
 #include <FastNoiseLite.h>
 #include <cstdlib>
-
+#include "BoundsComponent.h"
 
 
 static void SpawnTree(entt::registry& registry, glm::vec3 pos, std::shared_ptr<Mesh> treeMesh) {
@@ -15,7 +15,7 @@ static void SpawnTree(entt::registry& registry, glm::vec3 pos, std::shared_ptr<M
     transform.Position = pos;
 
     registry.emplace<MeshComponent>(entity, treeMesh);
-
+    registry.emplace<BoundsComponent>(entity, BoundsComponent{ glm::vec3(0.5f, 2.0f, 0.5f) }); // ADD THIS — tune to your tree model's actual size
     HarvestableComponent harvest;
     harvest.health = 100.0f;
     harvest.maxHealth = 100.0f;
@@ -27,22 +27,25 @@ static void SpawnTree(entt::registry& registry, glm::vec3 pos, std::shared_ptr<M
     registry.emplace<NameTag>(entity, "Tree");
 }
 
-void WorldGenerator::ScatterTrees(entt::registry& registry, const TerrainSettings& terrainSettings) {
-    FastNoiseLite placementNoise;
-    placementNoise.SetSeed(terrainSettings.seed + 2000);   // distinct offset from both height and resource noise
-    placementNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    placementNoise.SetFrequency(0.15f);
+void WorldGenerator::ScatterTrees(entt::registry &registry, const TerrainSettings &terrainSettings, ResourceMap &resourceMap) {
+    FastNoiseLite treeDensityNoise;
+    treeDensityNoise.SetSeed(terrainSettings.seed + 4000);
+    treeDensityNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    treeDensityNoise.SetFrequency(0.4f); // fine detail for "which exact spots have a tree"
 
     float worldWidth = terrainSettings.gridWidth * terrainSettings.cellSize;
     float worldDepth = terrainSettings.gridDepth * terrainSettings.cellSize;
-    float sampleSpacing = 3.0f;
+    float sampleSpacing = 2.0f; // denser sampling than before, since not every sample spawns a tree
 
     auto treeMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Tree.glb"));
 
     for (float x = 0.0f; x < worldWidth; x += sampleSpacing) {
         for (float z = 0.0f; z < worldDepth; z += sampleSpacing) {
-            float n = placementNoise.GetNoise(x, z);
-            if (n > 0.5f && n < 0.6f) {   // narrow band = sparse, scattered trees
+            RegionType region = resourceMap.GetRegionAtWorldPos(x, z, terrainSettings.seed);
+            if (region != RegionType::Forest) continue; // only place trees inside forest regions
+
+            float density = treeDensityNoise.GetNoise(x, z);
+            if (density > 0.3f) { // sparse — only a fraction of forest tiles actually get a tree
                 float jitterX = (rand() / (float)RAND_MAX - 0.5f) * sampleSpacing;
                 float jitterZ = (rand() / (float)RAND_MAX - 0.5f) * sampleSpacing;
                 float worldX = x + jitterX;

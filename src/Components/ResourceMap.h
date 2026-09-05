@@ -7,6 +7,12 @@ struct ResourceCell {
 	ItemId resource = ItemId::None;
 	float amount = 0.0f;
 };
+enum class RegionType {
+    Plains,
+    IronDeposit,
+    CopperDeposit,
+    Forest,
+};
 
 class ResourceMap
 {
@@ -20,7 +26,8 @@ public:
 	int getGridDepth() const { return m_GridDepth; }
 	float getCellSize() const { return m_CellSize; }
 	ResourceCell& GetCell(int x, int z) { return m_Cells[z * m_GridWidth + x]; }
-	
+    static RegionType DetermineRegion(float regionNoiseValue);
+	RegionType GetRegionAtWorldPos(float worldX, float worldZ, int seed) const;
 
 
 private:
@@ -35,3 +42,4 @@ private:
 
 
 };
+

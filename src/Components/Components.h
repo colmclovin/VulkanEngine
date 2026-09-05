@@ -8,3 +8,4 @@
 #include "InventoryComponent.h"
 #include "PickupComponent.h"
 #include "GhostComponent.h"
+#include "BoundsComponent.h"

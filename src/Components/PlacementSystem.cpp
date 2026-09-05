@@ -4,7 +4,7 @@
 #include "../Game/PlaceableDatabase.h"
 #include "../Components/ModelLoader.h"
 #include "TerrainGenerator.h"
-
+#include "TerrainRaycast.h"
 void PlacementSystem::Update(entt::registry& registry, entt::entity player, Camera3D& camera,
     ItemId selectedItem, const TerrainSettings& terrainSettings,
     float mouseX, float mouseY, float screenWidth, float screenHeight, float aspect) {
@@ -16,7 +16,7 @@ void PlacementSystem::Update(entt::registry& registry, entt::entity player, Came
 
     glm::vec3 rayOrigin = camera.GetEyePosition();
     glm::vec3 rayDir = camera.ScreenPointToRay(mouseX, mouseY, screenWidth, screenHeight, aspect);
-    glm::vec3 hitPoint = RaycastToTerrain(rayOrigin, rayDir, terrainSettings);
+    glm::vec3 hitPoint = TerrainRaycast::RaycastToTerrain(rayOrigin, rayDir, terrainSettings);
 
     float gridSize = 1.0f;   // tune — match your terrain's cellSize for visually clean alignment
     glm::vec3 ghostPos = SnapToGrid(hitPoint, gridSize);
@@ -67,7 +67,7 @@ void PlacementSystem::CancelPlacement(entt::registry& registry) {
     m_PendingItem = ItemId::None;
 }
 
-glm::vec3 PlacementSystem::RaycastToTerrain(glm::vec3 rayOrigin, glm::vec3 rayDir, const TerrainSettings& terrainSettings) {
+/*glm::vec3 PlacementSystem::RaycastToTerrain(glm::vec3 rayOrigin, glm::vec3 rayDir, const TerrainSettings& terrainSettings) {
     // March along the ray in small steps, checking when it crosses the terrain height at that XZ.
     // Simple and robust for a heightmap; avoids needing real mesh-triangle intersection.
     const float stepSize = 0.25f;
@@ -83,6 +83,7 @@ glm::vec3 PlacementSystem::RaycastToTerrain(glm::vec3 rayOrigin, glm::vec3 rayDi
     }
     return rayOrigin + rayDir * maxDistance;   // no hit within range — fallback point far along the ray
 }
+*/
 glm::vec3 PlacementSystem::SnapToGrid(glm::vec3 pos, float gridSize) {   // ADD PlacementSystem:: qualifier
     return glm::vec3(
         std::round(pos.x / gridSize) * gridSize,

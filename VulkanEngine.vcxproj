@@ -183,12 +183,14 @@
     <ClCompile Include="src\Renderer\MeshRenderer.cpp" />
     <ClCompile Include="src\Renderer\QuadRenderer.cpp" />
     <ClCompile Include="src\Renderer\RenderSystem.cpp" />
+    <ClCompile Include="src\Components\TerrainRaycast.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\External\JSON\json.hpp" />
     <ClInclude Include="src\Audio\AudioEngine.h" />
     <ClInclude Include="src\Audio\AudioEvent.h" />
     <ClInclude Include="src\Audio\AudioEventSystem.h" />
+    <ClInclude Include="src\Components\BoundsComponent.h" />
     <ClInclude Include="src\Components\Components.h" />
     <ClInclude Include="src\Components\GameSettings.h" />
     <ClInclude Include="src\Components\GhostComponent.h" />
@@ -224,6 +226,7 @@
     <ClInclude Include="src\Renderer\MeshRenderer.h" />
     <ClInclude Include="src\Renderer\QuadRenderer.h" />
     <ClInclude Include="src\Renderer\RenderSystem.h" />
+    <ClInclude Include="src\Components\TerrainRaycast.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
