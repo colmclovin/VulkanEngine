@@ -9,3 +9,4 @@
 #include "PickupComponent.h"
 #include "GhostComponent.h"
 #include "BoundsComponent.h"
+#include "MinerComponent.h"

@@ -7,6 +7,7 @@
 #include "../Audio/AudioEngine.h"
 #include "../Game/CraftingSystem.h"
 #include "../Game/RecipeDatabase.h"
+#include <entt/entt.hpp>
 
 void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine, entt::entity m_PlayerEntity) {
 
@@ -19,7 +20,7 @@ void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3
     if (ImGui::BeginTabBar("InspectorTabs")) {
 
         if (ImGui::BeginTabItem("Overview")) {
-            DrawStats();
+            DrawStats(registry);
             ImGui::Separator();
             DrawEntityList(registry);
             DrawInventory(registry, m_PlayerEntity);
@@ -38,9 +39,10 @@ void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3
     ImGui::End();
 }
 
-void DebugUI::DrawStats() {
+void DebugUI::DrawStats(entt::registry &registry) {
     ImGui::Text("Frame time: %.3f ms", 1000.0f / ImGui::GetIO().Framerate);
     ImGui::Text("Frame rate: %.3f fps", ImGui::GetIO().Framerate);
+    ImGui::Text("Total entities: %zu", registry.storage<entt::entity>().size());
     ImGui::Checkbox("Show Demo Window", &m_ShowDemo);
 }
 void DebugUI::DrawInventory(entt::registry &registry, entt::entity player) {

@@ -16,6 +16,7 @@
 #include "../Components/PlacementSystem.h"
 #include "RecipeDatabase.h"
 #include "../Components/TerrainRaycast.h"
+#include "../Components/MinerSystem.h"
 
 Game::Game() {
 
@@ -76,6 +77,12 @@ void Game::Init() {
     m_AudioEvents->RegisterSound(AudioEvent::UIClick, "Assets/Audio/Tambourine 3.wav");
 
     m_AudioEngine->PlayMusic("Assets/Audio/GremlinRapFin.mp3", true, m_Settings.masterVolume);
+
+    m_AudioEngine->SetMasterVolume(m_Settings.masterVolume);
+    m_AudioEngine->SetMusicVolume(m_Settings.musicVolume);
+    m_AudioEngine->SetSFXVolume(m_Settings.sfxVolume);
+
+
 
     m_RenderSystem = std::make_unique<RenderSystem>(m_VulkanEngine.get());
     m_RenderSystem->Init();
@@ -227,7 +234,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     bool interactIsDown = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
     bool placeIsDown = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS;
 
-    if (placeIsDown && !placeWasDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity);
+    if (placeIsDown && !placeWasDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity, m_ResourceMap);
     if (qIsDown && !qWasDown) m_Camera->SnapRotateIso(false);
     if (eIsDown && !eWasDown) m_Camera->SnapRotateIso(true);
     if (f11IsDown && !f11WasDown) m_VulkanEngine->ToggleFullscreen();
@@ -242,8 +249,28 @@ if (interactIsDown && !interactWasDown) {
         glm::vec3 rayDir = m_Camera->ScreenPointToRay(static_cast<float>(mx), static_cast<float>(my),
                                                       static_cast<float>(extent.width), static_cast<float>(extent.height), aspect);
 
-        InteractionSystem::TryMineAtCursor(*m_Registry, m_ResourceMap, m_PlayerEntity,
-                                           rayOrigin, rayDir, m_Settings.terrain, 5.0f, m_AudioEvents.get());
+        auto &playerTransform = m_Registry->get<TransformComponent>(m_PlayerEntity);
+        float interactRange = 5.0f;
+
+        // Check for a miner first
+        entt::entity minerTarget = InteractionSystem::FindMinerAlongRay(*m_Registry, rayOrigin, rayDir, 100.0f);
+        if (m_Registry->valid(minerTarget)) {
+            auto &minerTransform = m_Registry->get<TransformComponent>(minerTarget);
+            float dist = glm::length(minerTransform.Position - playerTransform.Position);
+
+            if (dist <= interactRange) {
+                // Try collecting output first; if there's nothing to collect, try feeding fuel instead
+                bool collected = InteractionSystem::TryCollectMinerOutput(*m_Registry, minerTarget, m_PlayerEntity);
+                if (!collected) {
+                    auto &miner = m_Registry->get<MinerComponent>(minerTarget);
+                    InteractionSystem::TryFuelMiner(*m_Registry, minerTarget, m_PlayerEntity, miner.fuelItem, 1);
+                }
+            }
+        } else {
+            // No miner targeted — fall back to your existing mining logic
+            InteractionSystem::TryMineAtCursor(*m_Registry, m_ResourceMap, m_PlayerEntity,
+                                               rayOrigin, rayDir, m_Settings.terrain, interactRange, m_AudioEvents.get());
+        }
     }
 
     qWasDown = qIsDown;
@@ -375,7 +402,7 @@ void Game::Update(float deltaTime) {
     m_PlacementSystem->Update(*m_Registry, m_PlayerEntity, *m_Camera, GetSelectedItem(),
         m_Settings.terrain, static_cast<float>(mx), static_cast<float>(my),
         static_cast<float>(extent.width), static_cast<float>(extent.height), aspect);
-
+    MinerSystem::Update(*m_Registry, m_ResourceMap, deltaTime);
 }
 
 void Game::Render() {

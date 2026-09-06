@@ -36,7 +36,7 @@ void PlacementSystem::Update(entt::registry& registry, entt::entity player, Came
     }
 }
 
-void PlacementSystem::TryConfirmPlacement(entt::registry& registry, entt::entity player) {
+void PlacementSystem::TryConfirmPlacement(entt::registry& registry, entt::entity player, ResourceMap& resourceMap) {
     if (m_GhostEntity == entt::null) return;
 
     auto& inventory = registry.get<InventoryComponent>(player);
@@ -47,10 +47,21 @@ void PlacementSystem::TryConfirmPlacement(entt::registry& registry, entt::entity
             slot.count--;
             if (slot.count == 0) slot.item = ItemId::None;
 
+            
+            // TODO: emplace whatever "this is a real placed building" component you want here
+            if (m_PendingItem == ItemId::Miner) {
+                auto pos = registry.get<TransformComponent>(m_GhostEntity).Position;
+                ResourceCell *cell = resourceMap.GetCellAtWorldPos(pos.x, pos.z);
+
+                MinerComponent miner;
+                if (cell && cell->resource != ItemId::None) {
+                    miner.outputItem = cell->resource;
+                }
+                registry.emplace<MinerComponent>(m_GhostEntity, miner);
+                registry.emplace<BoundsComponent>(m_GhostEntity, BoundsComponent{ glm::vec3(1.0f, 1.0f, 1.0f) });
+            }
             // Promote the ghost into a real placed entity
             registry.remove<GhostComponent>(m_GhostEntity);
-            // TODO: emplace whatever "this is a real placed building" component you want here
-
             m_GhostEntity = entt::null;
             m_PendingItem = ItemId::None;
             return;

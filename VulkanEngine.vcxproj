@@ -164,6 +164,7 @@
     <ClCompile Include="src\Components\GameSettings.cpp" />
     <ClCompile Include="src\Components\InteractionSystem.cpp" />
     <ClCompile Include="src\Components\Mesh.cpp" />
+    <ClCompile Include="src\Components\MinerSystem.cpp" />
     <ClCompile Include="src\Components\ModelLoader.cpp" />
     <ClCompile Include="src\Components\PlacementSystem.cpp" />
     <ClCompile Include="src\Components\ResourceMap.cpp" />
@@ -200,6 +201,8 @@
     <ClInclude Include="src\Components\Material.h" />
     <ClInclude Include="src\Components\Mesh.h" />
     <ClInclude Include="src\Components\MeshComponent.h" />
+    <ClInclude Include="src\Components\MinerComponent.h" />
+    <ClInclude Include="src\Components\MinerSystem.h" />
     <ClInclude Include="src\Components\ModelLoader.h" />
     <ClInclude Include="src\Components\NameTag.h" />
     <ClInclude Include="src\Components\PickupComponent.h" />

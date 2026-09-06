@@ -19,4 +19,7 @@ public:
                                 glm::vec3 rayOrigin, glm::vec3 rayDir, const TerrainSettings &terrainSettings,
                                 float maxRange, AudioEventSystem *audio);
     static entt::entity FindEntityAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
+    static bool TryFuelMiner(entt::registry &registry, entt::entity minerEntity, entt::entity player, ItemId fuelItem, int amount);
+    static bool TryCollectMinerOutput(entt::registry &registry, entt::entity minerEntity, entt::entity player);
+    static entt::entity FindMinerAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
 };

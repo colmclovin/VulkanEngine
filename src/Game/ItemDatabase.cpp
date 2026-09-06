@@ -13,7 +13,9 @@ void ItemDatabase::Init() {
     s_Items[ItemId::CopperPlate] = { "Copper Plate", 999, "Assets/Models/CopperOre.glb" };
 	s_Items[ItemId::IronOre] = { "Iron Ore", 999, "Assets/Models/IronOre.glb" };
     s_Items[ItemId::IronPlate] = { "Iron Plate", 999, "Assets/Models/IronOre.glb" };
-};
+    s_Items[ItemId::Miner] = { "Miner", 999, "Assets/Models/Miner.glb" };
+}
+
 
 const ItemDef& ItemDatabase::Get(ItemId id) {
     auto it = s_Items.find(id);

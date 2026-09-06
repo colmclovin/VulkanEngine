@@ -7,7 +7,7 @@
 #include <FastNoiseLite.h>
 #include <cstdlib>
 #include "BoundsComponent.h"
-
+#include <iostream>
 
 static void SpawnTree(entt::registry& registry, glm::vec3 pos, std::shared_ptr<Mesh> treeMesh) {
     auto entity = registry.create();
@@ -28,6 +28,7 @@ static void SpawnTree(entt::registry& registry, glm::vec3 pos, std::shared_ptr<M
 }
 
 void WorldGenerator::ScatterTrees(entt::registry &registry, const TerrainSettings &terrainSettings, ResourceMap &resourceMap) {
+    int totalSamples = 0, forestSamples = 0, treesSpawned = 0;
     FastNoiseLite treeDensityNoise;
     treeDensityNoise.SetSeed(terrainSettings.seed + 4000);
     treeDensityNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
@@ -41,8 +42,10 @@ void WorldGenerator::ScatterTrees(entt::registry &registry, const TerrainSetting
 
     for (float x = 0.0f; x < worldWidth; x += sampleSpacing) {
         for (float z = 0.0f; z < worldDepth; z += sampleSpacing) {
+            totalSamples++;
             RegionType region = resourceMap.GetRegionAtWorldPos(x, z, terrainSettings.seed);
             if (region != RegionType::Forest) continue; // only place trees inside forest regions
+            forestSamples++;
 
             float density = treeDensityNoise.GetNoise(x, z);
             if (density > 0.3f) { // sparse — only a fraction of forest tiles actually get a tree
@@ -51,11 +54,12 @@ void WorldGenerator::ScatterTrees(entt::registry &registry, const TerrainSetting
                 float worldX = x + jitterX;
                 float worldZ = z + jitterZ;
                 float worldY = TerrainGenerator::SampleHeight(worldX, worldZ, terrainSettings);
-
+                treesSpawned++;
                 SpawnTree(registry, glm::vec3(worldX, worldY, worldZ), treeMesh);
             }
         }
     }
+    std::cout << "Total samples: " << totalSamples << "  Forest samples: " << forestSamples << "  Trees spawned: " << treesSpawned << std::endl;
 }
 
 void WorldGenerator::ClearHarvestables(entt::registry& registry) {

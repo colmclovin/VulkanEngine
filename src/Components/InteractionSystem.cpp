@@ -188,3 +188,56 @@ entt::entity InteractionSystem::FindEntityAlongRay(entt::registry &registry, glm
     }
     return closest;
 }
+
+bool InteractionSystem::TryFuelMiner(entt::registry &registry, entt::entity minerEntity, entt::entity player, ItemId fuelItem, int amount) {
+    if (!registry.valid(minerEntity) || !registry.any_of<MinerComponent>(minerEntity)) return false;
+
+    auto &miner = registry.get<MinerComponent>(minerEntity);
+    if (miner.fuelItem != fuelItem) return false;
+
+    auto &inventory = registry.get<InventoryComponent>(player);
+    for (auto &slot : inventory.slots) {
+        if (slot.item == fuelItem && slot.count > 0) {
+            int take = std::min(slot.count, amount);
+            slot.count -= take;
+            if (slot.count == 0) slot.item = ItemId::None;
+            miner.fuelBuffer += take;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool InteractionSystem::TryCollectMinerOutput(entt::registry &registry, entt::entity minerEntity, entt::entity player) {
+    if (!registry.valid(minerEntity) || !registry.any_of<MinerComponent>(minerEntity)) return false;
+
+    auto &miner = registry.get<MinerComponent>(minerEntity);
+    if (miner.outputBuffer <= 0) return false;
+
+    auto &inventory = registry.get<InventoryComponent>(player);
+    int leftover = inventory.AddItem(miner.outputItem, miner.outputBuffer);
+    miner.outputBuffer = leftover; // whatever didn't fit stays in the buffer
+    return true;
+}
+
+entt::entity InteractionSystem::FindMinerAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance) {
+    entt::entity closest = entt::null;
+    float closestT = maxDistance;
+
+    auto view = registry.view<TransformComponent, BoundsComponent, MinerComponent>();
+    for (auto entity : view) {
+        auto &transform = view.get<TransformComponent>(entity);
+        auto &bounds = view.get<BoundsComponent>(entity);
+
+        glm::vec3 center = transform.Position + glm::vec3(0.0f, bounds.halfExtents.y, 0.0f);
+        glm::vec3 boxMin = center - bounds.halfExtents;
+        glm::vec3 boxMax = center + bounds.halfExtents;
+
+        float t;
+        if (RayIntersectsAABB(rayOrigin, rayDir, boxMin, boxMax, t) && t < closestT) {
+            closestT = t;
+            closest = entity;
+        }
+    }
+    return closest;
+}

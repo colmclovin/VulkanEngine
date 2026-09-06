@@ -12,7 +12,8 @@ enum class ItemId {
 	CopperOre,
 	CopperPlate,
 	IronOre,
-	IronPlate
+	IronPlate,
+    Miner
 
 };
 struct ItemDef {

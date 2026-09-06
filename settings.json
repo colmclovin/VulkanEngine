@@ -1,7 +1,7 @@
 {
-    "MasterVolume": 0.032999999821186066,
-    "MusicVolume": 0.1889999955892563,
-    "SFXVolume": 0.14399999380111694,
+    "MasterVolume": 0.0,
+    "MusicVolume": 0.0,
+    "SFXVolume": 0.0,
     "clearColor": [
         0.10196078568696976,
         0.10196078568696976,
@@ -14,15 +14,15 @@
     "isoDistance": 20.347999572753906,
     "isoPitch": 34.810001373291016,
     "isoRotateSpeed": 13.664999961853027,
-    "isoZoomSpeed": 0.9769999980926514,
-    "playerMoveSpeed": 12.958999633789063,
+    "isoZoomSpeed": 2.068000078201294,
+    "playerMoveSpeed": 20.0,
     "playerRunSpeed": 10.0,
     "terrain": {
-        "cellSize": 3.0999999046325684,
+        "cellSize": 1.0,
         "gridDepth": 100,
         "gridWidth": 100,
         "heightScale": 0.20000000298023224,
-        "noiseScale": 0.10700000077486038,
+        "noiseScale": 0.0989999994635582,
         "seed": 2143
     },
     "wireframeMode": false
