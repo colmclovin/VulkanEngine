@@ -36,7 +36,7 @@ void PlacementSystem::Update(entt::registry& registry, entt::entity player, Came
     }
 }
 
-void PlacementSystem::TryConfirmPlacement(entt::registry& registry, entt::entity player, ResourceMap& resourceMap) {
+void PlacementSystem::TryConfirmPlacement(entt::registry& registry, entt::entity player, ResourceMap& resourceMap, PlacementGrid& placementGrid ) {
     if (m_GhostEntity == entt::null) return;
 
     auto& inventory = registry.get<InventoryComponent>(player);
@@ -47,7 +47,11 @@ void PlacementSystem::TryConfirmPlacement(entt::registry& registry, entt::entity
             slot.count--;
             if (slot.count == 0) slot.item = ItemId::None;
 
-            
+            glm::vec3 ghostPos = registry.get<TransformComponent>(m_GhostEntity).Position; // ADD THIS — read it off the ghost's actual transform
+            float gridSize = 1.0f; // ADD THIS — same value you already use in Update() for SnapToGrid
+            GridCoord coord = PlacementGrid::WorldToGrid(ghostPos, gridSize); // ghostPos = the position you already computed
+            placementGrid.Register(coord, m_GhostEntity); // needs PlacementGrid& passed into this function now
+
             // TODO: emplace whatever "this is a real placed building" component you want here
             if (m_PendingItem == ItemId::Miner) {
                 auto pos = registry.get<TransformComponent>(m_GhostEntity).Position;
@@ -59,6 +63,27 @@ void PlacementSystem::TryConfirmPlacement(entt::registry& registry, entt::entity
                 }
                 registry.emplace<MinerComponent>(m_GhostEntity, miner);
                 registry.emplace<BoundsComponent>(m_GhostEntity, BoundsComponent{ glm::vec3(1.0f, 1.0f, 1.0f) });
+            } else if (m_PendingItem == ItemId::Furnace) {
+                registry.emplace<FurnaceComponent>(m_GhostEntity);
+                registry.emplace<MachineInventoryComponent>(m_GhostEntity, MachineInventoryComponent{
+                                                                                   { MachineSlot{} }, // one input slot
+                                                                                   { MachineSlot{} } // one output slot
+                                                                           });
+                registry.emplace<BoundsComponent>(m_GhostEntity, BoundsComponent{ glm::vec3(1.0f) });
+
+            } else if (m_PendingItem == ItemId::Assembler) {
+                registry.emplace<AssemblerComponent>(m_GhostEntity);
+                registry.emplace<MachineInventoryComponent>(m_GhostEntity, MachineInventoryComponent{
+                                                                                   { MachineSlot{}, MachineSlot{} }, // a couple input slots for multi-ingredient recipes
+                                                                                   { MachineSlot{} } });
+                registry.emplace<BoundsComponent>(m_GhostEntity, BoundsComponent{ glm::vec3(1.0f) });
+
+            } else if (m_PendingItem == ItemId::Belt) {
+                registry.emplace<BeltComponent>(m_GhostEntity); // direction defaults to +X; you'll want rotation control eventually
+                registry.emplace<BoundsComponent>(m_GhostEntity, BoundsComponent{ glm::vec3(1.0f) });
+            } else if (m_PendingItem == ItemId::Inserter) {
+                registry.emplace<InserterComponent>(m_GhostEntity);
+                registry.emplace<BoundsComponent>(m_GhostEntity, BoundsComponent{ glm::vec3(1.0f) });
             }
             // Promote the ghost into a real placed entity
             registry.remove<GhostComponent>(m_GhostEntity);

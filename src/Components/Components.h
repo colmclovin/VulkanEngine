@@ -10,3 +10,8 @@
 #include "GhostComponent.h"
 #include "BoundsComponent.h"
 #include "MinerComponent.h"
+#include "MachineInventoryComponent.h"
+#include "FurnaceComponent.h"
+#include "AssemblerComponent.h"
+#include "BeltComponent.h"
+#include "InserterComponent.h"

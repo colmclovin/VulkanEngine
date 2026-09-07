@@ -14,6 +14,10 @@ void ItemDatabase::Init() {
 	s_Items[ItemId::IronOre] = { "Iron Ore", 999, "Assets/Models/IronOre.glb" };
     s_Items[ItemId::IronPlate] = { "Iron Plate", 999, "Assets/Models/IronOre.glb" };
     s_Items[ItemId::Miner] = { "Miner", 999, "Assets/Models/Miner.glb" };
+    s_Items[ItemId::Furnace] = { "Furnace", 999, "Assets/Models/Furnace.glb" };
+    s_Items[ItemId::Assembler] = { "Assembler", 999, "Assets/Models/Assembler.glb" };
+    s_Items[ItemId::Belt] = { "Belt", 999, "Assets/Models/Belt.glb" };
+    s_Items[ItemId::Inserter] = { "Inserter", 999, "Assets/Models/Inserter.glb" };
 }
 
 

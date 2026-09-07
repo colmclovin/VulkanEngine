@@ -8,7 +8,7 @@
 #include "../Components/ResourceMap.h"
 #include "../Components/WorldGenerator.h"
 #include "../Components/MinerSystem.h"
-
+#include "../Components/PlacementGrid.h"
 class TerrainGenerator;
 class VulkanEngine;
 class RenderSystem;
@@ -48,11 +48,11 @@ private:
     std::unique_ptr<entt::registry> m_Registry;
     std::unique_ptr<PlacementSystem> m_PlacementSystem;
     ItemId m_SelectedItem = ItemId::None;   // whatever "hotbar slot" logic you build later selects this
-    static constexpr int HOTBAR_SIZE = 5;
-    ItemId m_Hotbar[HOTBAR_SIZE] = { ItemId::Wood, ItemId::CopperOre, ItemId::IronOre, ItemId::Miner, ItemId::None };
+    static constexpr int HOTBAR_SIZE = 9;
+    ItemId m_Hotbar[HOTBAR_SIZE] = { ItemId::Wood, ItemId::CopperOre, ItemId::IronOre, ItemId::Miner, ItemId::Furnace, ItemId::Assembler, ItemId::Belt, ItemId::Inserter, ItemId::None };
     int m_SelectedHotbarSlot = -1;   // -1 = nothing selected
     ResourceMap m_ResourceMap;
-
+    PlacementGrid m_PlacementGrid;
 
 
     ItemId GetSelectedItem() const {

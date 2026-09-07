@@ -17,6 +17,12 @@
 #include "RecipeDatabase.h"
 #include "../Components/TerrainRaycast.h"
 #include "../Components/MinerSystem.h"
+#include "FurnaceRecipeDatabase.h"
+#include "../Components/FurnaceSystem.h"
+#include "../Components/AssemblerSystem.h"
+#include "../Components/BeltSystem.h"
+#include "../Components/InserterSystem.h"
+
 
 Game::Game() {
 
@@ -59,7 +65,7 @@ void Game::Init() {
     PlaceableDatabase::Init();
     m_PlacementSystem = std::make_unique<PlacementSystem>();
 
-
+    FurnaceRecipeDatabase::Init();
 
 
 
@@ -234,7 +240,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     bool interactIsDown = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
     bool placeIsDown = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS;
 
-    if (placeIsDown && !placeWasDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity, m_ResourceMap);
+    if (placeIsDown && !placeWasDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity, m_ResourceMap, m_PlacementGrid);
     if (qIsDown && !qWasDown) m_Camera->SnapRotateIso(false);
     if (eIsDown && !eWasDown) m_Camera->SnapRotateIso(true);
     if (f11IsDown && !f11WasDown) m_VulkanEngine->ToggleFullscreen();
@@ -298,6 +304,7 @@ if (interactIsDown && !interactWasDown) {
         static bool numWasDown[HOTBAR_SIZE] = { false };
         bool numIsDown = glfwGetKey(window, GLFW_KEY_1 + i) == GLFW_PRESS;
         if (numIsDown && !numWasDown[i]) {
+            if ()
             m_SelectedHotbarSlot = (m_SelectedHotbarSlot == i) ? -1 : i;   // toggle off if already selected
         }
         numWasDown[i] = numIsDown;
@@ -403,6 +410,10 @@ void Game::Update(float deltaTime) {
         m_Settings.terrain, static_cast<float>(mx), static_cast<float>(my),
         static_cast<float>(extent.width), static_cast<float>(extent.height), aspect);
     MinerSystem::Update(*m_Registry, m_ResourceMap, deltaTime);
+    FurnaceSystem::Update(*m_Registry, deltaTime);
+    AssemblerSystem::Update(*m_Registry, deltaTime);
+    BeltSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
+    InserterSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
 }
 
 void Game::Render() {

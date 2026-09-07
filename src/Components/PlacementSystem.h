@@ -6,13 +6,14 @@
 #include "../Game/Camera3D.h"
 #include "Gamesettings.h"
 #include "../Components/ResourceMap.h"
+#include "../Components/PlacementGrid.h"
 
 class PlacementSystem {
 public:
     void Update(entt::registry& registry, entt::entity player, Camera3D& camera,
         ItemId selectedItem, const TerrainSettings& terrainSettings,
         float mouseX, float mouseY, float screenWidth, float screenHeight, float aspect);
-    void TryConfirmPlacement(entt::registry &registry, entt::entity player, ResourceMap& resourceMap);
+    void TryConfirmPlacement(entt::registry &registry, entt::entity player, ResourceMap &resourceMap, PlacementGrid &placementGrid);
     void CancelPlacement(entt::registry& registry);
     //glm::vec3 RaycastToTerrain(glm::vec3 rayOrigin, glm::vec3 rayDir, const TerrainSettings& terrainSettings);
     bool IsPlacing() const { return m_GhostEntity != entt::null; }

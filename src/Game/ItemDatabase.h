@@ -13,7 +13,11 @@ enum class ItemId {
 	CopperPlate,
 	IronOre,
 	IronPlate,
-    Miner
+    Miner,
+	Furnace,
+	Assembler,
+	Belt,
+	Inserter
 
 };
 struct ItemDef {

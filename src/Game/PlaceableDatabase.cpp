@@ -8,6 +8,11 @@ void PlaceableDatabase::Init() {
     s_Placeables[ItemId::CopperOre] = { "Assets/Models/CopperOre.glb", glm::vec3(1.0f) };
     s_Placeables[ItemId::IronOre] = { "Assets/Models/IronOre.glb", glm::vec3(1.0f) };
     s_Placeables[ItemId::Miner] = { "Assets/Models/Miner.glb", glm::vec3(1.0f) };
+    s_Placeables[ItemId::Furnace] = { "Assets/Models/Furnace.glb", glm::vec3(1.0f) };
+    s_Placeables[ItemId::Assembler] = { "Assets/Models/Assembler.glb", glm::vec3(1.0f) };
+    s_Placeables[ItemId::Belt] = { "Assets/Models/Belt.glb", glm::vec3(1.0f) };
+    s_Placeables[ItemId::Inserter] = { "Assets/Models/Inserter.glb", glm::vec3(1.0f) };
+
     // add more as you get building item types, e.g. ItemId::Furnace, ItemId::Belt
 }
 
