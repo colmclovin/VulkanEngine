@@ -23,7 +23,7 @@ void MeshRenderer::Init() {
     std::cout << "Mesh Renderer initialized" << std::endl;
 }
 
-void MeshRenderer::Render(entt::registry& registry, const Camera3D& camera, bool wireframe) {
+void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool wireframe) {
     VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
 
     VkPipeline pipelineToUse = wireframe ? m_WireframePipeline : m_Pipeline;
@@ -36,7 +36,7 @@ void MeshRenderer::Render(entt::registry& registry, const Camera3D& camera, bool
 
     VkViewport viewport{ 0.0f, 0.0f, (float)extent.width, (float)extent.height, 0.0f, 1.0f };
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-    VkRect2D scissor{ {0, 0}, extent };
+    VkRect2D scissor{ { 0, 0 }, extent };
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 
     glm::mat4 view = camera.GetActiveViewMatrix();
@@ -44,8 +44,8 @@ void MeshRenderer::Render(entt::registry& registry, const Camera3D& camera, bool
 
     auto view3D = registry.view<TransformComponent, MeshComponent>();
     for (auto entity : view3D) {
-        auto& transform = view3D.get<TransformComponent>(entity);
-        auto& meshComp = view3D.get<MeshComponent>(entity);
+        auto &transform = view3D.get<TransformComponent>(entity);
+        auto &meshComp = view3D.get<MeshComponent>(entity);
 
         if (!meshComp.mesh) continue;
         meshComp.mesh->UploadToGPU(m_Engine);
@@ -57,42 +57,68 @@ void MeshRenderer::Render(entt::registry& registry, const Camera3D& camera, bool
 
         glm::mat4 mvp = proj * view * transform.GetMatrix();
 
-        // --- goes right here, replacing the old single vkCmdPushConstants/vkCmdDrawIndexed pair ---
+        // Ghost state — computed once per entity, used by both branches below
+        bool isGhost = registry.any_of<GhostComponent>(entity);
+        bool isBlockedGhost = isGhost && registry.get<GhostComponent>(entity).blocked;
+
+        // Determine base color: belt facing tint, or default white for everything else
+        glm::vec4 baseTint = glm::vec4(1.0f);
+        if (registry.any_of<BeltComponent>(entity)) {
+            auto &belt = registry.get<BeltComponent>(entity);
+            if (belt.direction.x > 0.5f)
+                baseTint = glm::vec4(0.2f, 0.6f, 1.0f, 1.0f); // +X: blue
+            else if (belt.direction.x < -0.5f)
+                baseTint = glm::vec4(1.0f, 0.6f, 0.2f, 1.0f); // -X: orange
+            else if (belt.direction.z > 0.5f)
+                baseTint = glm::vec4(0.2f, 1.0f, 0.4f, 1.0f); // +Z: green
+            else
+                baseTint = glm::vec4(1.0f, 0.3f, 0.3f, 1.0f); // -Z: red
+        }
+        if (registry.any_of<BeltComponent>(entity)) {
+            auto &belt = registry.get<BeltComponent>(entity);
+            std::cout << "Entity has BeltComponent, direction: (" << belt.direction.x << "," << belt.direction.z << ")" << std::endl;
+        }
+
         if (meshComp.mesh->SubMeshes.empty()) {
-            // No material/submesh data (e.g. procedural terrain) — draw the whole mesh with default white
             MeshPushConstants pushConstants{};
             pushConstants.mvp = mvp;
-            bool isGhost = registry.any_of<GhostComponent>(entity);
-            // ... when building pushConstants.baseColor for each submesh:
-                pushConstants.baseColor = glm::vec4(1.0f);
-                if (isGhost) {
-                    pushConstants.baseColor.a = 0.4f;   // requires blending enabled on this pipeline — see note below
-                }
+
+            pushConstants.baseColor = baseTint; // CHANGED — was glm::vec4(1.0f)
+            if (isBlockedGhost) {
+                pushConstants.baseColor = glm::vec4(1.0f, 0.2f, 0.2f, 1.0f); // red override still wins over facing tint
+            } else if (isGhost) {
+                pushConstants.baseColor.a = 0.4f; // translucent, keeps whatever baseTint/facing color was set
+            }
+
             if (m_PipelineLayout != VK_NULL_HANDLE) {
                 vkCmdPushConstants(commandBuffer, m_PipelineLayout,
-                    VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &pushConstants);
+                                   VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &pushConstants);
             }
 
             vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshComp.mesh->Indices.size()), 1, 0, 0, 0);
-        }
-        else {
-            // Has material data — draw each sub-mesh range with its own material color
-            for (const auto& sub : meshComp.mesh->SubMeshes) {
+        } else {
+            for (const auto &sub : meshComp.mesh->SubMeshes) {
                 MeshPushConstants pushConstants{};
                 pushConstants.mvp = mvp;
-                pushConstants.baseColor = (sub.materialIndex >= 0 && sub.materialIndex < (int)meshComp.mesh->Materials.size())
-                    ? meshComp.mesh->Materials[sub.materialIndex].baseColor
-                    : glm::vec4(1.0f);
+
+                if (isBlockedGhost) {
+                    pushConstants.baseColor = glm::vec4(1.0f, 0.2f, 0.2f, 1.0f);
+                } else if (registry.any_of<BeltComponent>(entity)) {
+                    pushConstants.baseColor = baseTint; // NEW — belts use facing tint instead of material color
+                    if (isGhost) pushConstants.baseColor.a = 0.4f;
+                } else {
+                    pushConstants.baseColor = (sub.materialIndex >= 0 && sub.materialIndex < (int)meshComp.mesh->Materials.size()) ? meshComp.mesh->Materials[sub.materialIndex].baseColor : glm::vec4(1.0f);
+                    if (isGhost) pushConstants.baseColor.a = 0.4f;
+                }
 
                 if (m_PipelineLayout != VK_NULL_HANDLE) {
                     vkCmdPushConstants(commandBuffer, m_PipelineLayout,
-                        VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &pushConstants);
+                                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &pushConstants);
                 }
 
                 vkCmdDrawIndexed(commandBuffer, sub.indexCount, 1, sub.indexOffset, 0, 0);
             }
         }
-        // --- end replacement block ---
     }
 }
 

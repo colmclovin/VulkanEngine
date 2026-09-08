@@ -31,7 +31,8 @@ struct GameSettings {
     float masterVolume = 1.0f;
     float musicVolume = 0.5f;
     float sfxVolume = 0.5f;
-
+    bool showBoundsDebug = false;
+    bool showGridDebug = false;
 
     void SaveToFile(const std::string& path) const;
     static GameSettings LoadFromFile(const std::string& path);

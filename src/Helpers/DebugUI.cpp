@@ -9,7 +9,7 @@
 #include "../Game/RecipeDatabase.h"
 #include <entt/entt.hpp>
 
-void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine, entt::entity m_PlayerEntity) {
+void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity) {
 
     if (m_ShowDemo) {
         ImGui::ShowDemoWindow(&m_ShowDemo);
@@ -25,6 +25,7 @@ void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3
             DrawEntityList(registry);
             DrawInventory(registry, m_PlayerEntity);
 			DrawCrafting(registry, m_PlayerEntity);
+            DrawMachineInspector(registry, m_InspectedEntity);
             ImGui::EndTabItem();
         }
 
@@ -146,7 +147,84 @@ void DebugUI::DrawSettingsTab(Camera3D* camera, GameSettings& settings, AudioEng
     }
 
     if (ImGui::CollapsingHeader("Rendering")) {
+        ImGui::Checkbox("Show Bounds Boxes", &settings.showBoundsDebug);
+        ImGui::Checkbox("Show Placement Grid", &settings.showGridDebug);
         ImGui::Checkbox("Wireframe Mode", &settings.wireframeMode);
         ImGui::ColorEdit4("Clear Color", &settings.clearColor.x);
     }
+}
+void DebugUI::DrawMachineInspector(entt::registry &registry, entt::entity target) {
+    if (!registry.valid(target)) return;
+
+    ImGui::Begin("Machine Inspector");
+
+    if (registry.any_of<MinerComponent>(target)) {
+        auto &miner = registry.get<MinerComponent>(target);
+        ImGui::Text("Type: Miner");
+        ImGui::Text("Status: %s", (miner.fuelRemaining > 0.0f) ? "Running" : "Idle (no fuel)");
+        ImGui::Text("Output item: %s", miner.outputItem != ItemId::None ? ItemDatabase::Get(miner.outputItem).name.c_str() : "None");
+        ImGui::Text("Output buffer: %d / %d", miner.outputBuffer, miner.outputBufferCapacity);
+        ImGui::Text("Fuel: %d loaded, %.1fs remaining", miner.fuelBuffer, miner.fuelRemaining);
+    }
+
+    if (registry.any_of<FurnaceComponent>(target)) {
+        auto &furnace = registry.get<FurnaceComponent>(target);
+        ImGui::Text("Type: Furnace");
+        ImGui::Text("Status: %s", furnace.isCooking ? "Cooking" : "Idle");
+        if (furnace.isCooking) ImGui::Text("Cook timer: %.1fs left", furnace.cookTimer);
+        ImGui::Text("Fuel: %d loaded, %.1fs remaining", furnace.fuelBuffer, furnace.fuelRemaining);
+    }
+
+    if (registry.any_of<AssemblerComponent>(target)) {
+        auto &assembler = registry.get<AssemblerComponent>(target);
+        ImGui::Text("Type: Assembler");
+        ImGui::Text("Status: %s", assembler.isCrafting ? "Crafting" : "Idle");
+        if (assembler.selectedRecipeIndex >= 0) {
+            auto &recipes = RecipeDatabase::GetAll();
+            if (assembler.selectedRecipeIndex < (int)recipes.size()) {
+                ImGui::Text("Recipe: %s", recipes[assembler.selectedRecipeIndex].name.c_str());
+            }
+        } else {
+            ImGui::Text("Recipe: none selected");
+        }
+    }
+
+    if (registry.any_of<BeltComponent>(target)) {
+        auto &belt = registry.get<BeltComponent>(target);
+        ImGui::Text("Type: Belt");
+
+        ImGui::Text("Left lane: %d/%d", (int)belt.leftLane.queue.size(), belt.leftLane.capacity);
+        for (auto &item : belt.leftLane.queue) {
+            if (item.item != ItemId::None) {
+                ImGui::Text("  %s (%.0f%%)", ItemDatabase::Get(item.item).name.c_str(), item.progress * 100.0f);
+            }
+        }
+
+        ImGui::Text("Right lane: %d/%d", (int)belt.rightLane.queue.size(), belt.rightLane.capacity);
+        for (auto &item : belt.rightLane.queue) {
+            if (item.item != ItemId::None) {
+                ImGui::Text("  %s (%.0f%%)", ItemDatabase::Get(item.item).name.c_str(), item.progress * 100.0f);
+            }
+        }
+    }
+    if (registry.any_of<InserterComponent>(target)) {
+        auto &inserter = registry.get<InserterComponent>(target);
+        ImGui::Text("Type: Inserter");
+        ImGui::Text("Holding: %s", inserter.holdingItem ? ItemDatabase::Get(inserter.heldItem).name.c_str() : "Nothing");
+    }
+
+    if (registry.any_of<MachineInventoryComponent>(target)) {
+        auto &inv = registry.get<MachineInventoryComponent>(target);
+        ImGui::Separator();
+        ImGui::Text("Inputs:");
+        for (auto &slot : inv.inputs) {
+            if (slot.item != ItemId::None) ImGui::Text("  %s x%d / %d", ItemDatabase::Get(slot.item).name.c_str(), slot.count, slot.capacity);
+        }
+        ImGui::Text("Outputs:");
+        for (auto &slot : inv.outputs) {
+            if (slot.item != ItemId::None) ImGui::Text("  %s x%d / %d", ItemDatabase::Get(slot.item).name.c_str(), slot.count, slot.capacity);
+        }
+    }
+
+    ImGui::End();
 }

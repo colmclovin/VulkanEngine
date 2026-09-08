@@ -19,6 +19,8 @@
     <None Include="compile_shaders.bat">
       <Filter>Source Files</Filter>
     </None>
+    <None Include="Shaders\debugline.vert" />
+    <None Include="Shaders\debugline.frag" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Main.cpp">
@@ -133,6 +135,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Components\InserterSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\DebugLineRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -297,6 +302,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Components\InserterSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\DebugLineRenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

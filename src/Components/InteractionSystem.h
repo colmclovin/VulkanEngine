@@ -4,6 +4,7 @@
 #include <glm/glm.hpp>
 #include "ResourceMap.h"
 #include "GameSettings.h"
+#include "PlacementGrid.h"
 class AudioEventSystem;
 
 class InteractionSystem {
@@ -19,7 +20,13 @@ public:
                                 glm::vec3 rayOrigin, glm::vec3 rayDir, const TerrainSettings &terrainSettings,
                                 float maxRange, AudioEventSystem *audio);
     static entt::entity FindEntityAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
-    static bool TryFuelMiner(entt::registry &registry, entt::entity minerEntity, entt::entity player, ItemId fuelItem, int amount);
+    static bool TryFuelMiner(entt::registry &registry, entt::entity minerEntity, entt::entity player, ItemId selectedItem, int amount);
     static bool TryCollectMinerOutput(entt::registry &registry, entt::entity minerEntity, entt::entity player);
     static entt::entity FindMinerAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
+    static entt::entity FindMachineAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
+    static bool TryInsertIntoMachine(entt::registry &registry, entt::entity machine, entt::entity player, ItemId item, int amount);
+    static bool TryCollectFromMachine(entt::registry &registry, entt::entity machine, entt::entity player);
+    static bool TryFuelFurnace(entt::registry &registry, entt::entity furnaceEntity, entt::entity player, ItemId selectedItem, int amount);
+    static bool TryRotateMachine(entt::registry &registry, entt::entity target);
+    static bool TryPickupMachine(entt::registry &registry, entt::entity target, entt::entity player, PlacementGrid &placementGrid, float gridSize);
 };

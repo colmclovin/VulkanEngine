@@ -5,6 +5,7 @@
 #include <limits>
 #include "TerrainRaycast.h"
 #include <iostream>
+#include "PlacementGrid.h"
 entt::entity InteractionSystem::FindNearestInteractable(entt::registry &registry, glm::vec3 playerPos, float range) {
     entt::entity closest = entt::null;
     float closestDist = std::numeric_limits<float>::max();
@@ -189,15 +190,15 @@ entt::entity InteractionSystem::FindEntityAlongRay(entt::registry &registry, glm
     return closest;
 }
 
-bool InteractionSystem::TryFuelMiner(entt::registry &registry, entt::entity minerEntity, entt::entity player, ItemId fuelItem, int amount) {
+bool InteractionSystem::TryFuelMiner(entt::registry &registry, entt::entity minerEntity, entt::entity player, ItemId selectedItem, int amount) {
     if (!registry.valid(minerEntity) || !registry.any_of<MinerComponent>(minerEntity)) return false;
 
     auto &miner = registry.get<MinerComponent>(minerEntity);
-    if (miner.fuelItem != fuelItem) return false;
+    if (miner.fuelItem != selectedItem) return false; // must match what's selected, same as furnace/assembler insertion
 
     auto &inventory = registry.get<InventoryComponent>(player);
     for (auto &slot : inventory.slots) {
-        if (slot.item == fuelItem && slot.count > 0) {
+        if (slot.item == selectedItem && slot.count > 0) {
             int take = std::min(slot.count, amount);
             slot.count -= take;
             if (slot.count == 0) slot.item = ItemId::None;
@@ -240,4 +241,171 @@ entt::entity InteractionSystem::FindMinerAlongRay(entt::registry &registry, glm:
         }
     }
     return closest;
+}
+
+entt::entity InteractionSystem::FindMachineAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance) {
+    entt::entity closest = entt::null;
+    float closestT = maxDistance;
+
+    // Matches anything with bounds + an inventory OR a miner — covers furnace, assembler, miner alike
+    auto view = registry.view<TransformComponent, BoundsComponent>();
+    for (auto entity : view) {
+        bool isMachine = registry.any_of<MachineInventoryComponent, MinerComponent, BeltComponent, InserterComponent>(entity);
+        (entity);
+        if (!isMachine) continue;
+
+        auto &transform = view.get<TransformComponent>(entity);
+        auto &bounds = view.get<BoundsComponent>(entity);
+
+        glm::vec3 center = transform.Position + glm::vec3(0.0f, bounds.halfExtents.y, 0.0f);
+        glm::vec3 boxMin = center - bounds.halfExtents;
+        glm::vec3 boxMax = center + bounds.halfExtents;
+
+        float t;
+        if (RayIntersectsAABB(rayOrigin, rayDir, boxMin, boxMax, t) && t < closestT) {
+            closestT = t;
+            closest = entity;
+        }
+    }
+    return closest;
+}   
+bool InteractionSystem::TryInsertIntoMachine(entt::registry &registry, entt::entity machine, entt::entity player, ItemId item, int amount) {
+    if (!registry.valid(machine) || !registry.any_of<MachineInventoryComponent>(machine)) return false;
+
+    auto &machineInv = registry.get<MachineInventoryComponent>(machine);
+    auto &inventory = registry.get<InventoryComponent>(player);
+
+    for (auto &slot : inventory.slots) {
+        if (slot.item == item && slot.count > 0) {
+            int take = std::min(slot.count, amount);
+            int leftover = MachineInventoryComponent::AddToSlots(machineInv.inputs, item, take);
+            int actuallyTaken = take - leftover;
+            if (actuallyTaken <= 0) return false; // machine's input was already full
+
+            slot.count -= actuallyTaken;
+            if (slot.count == 0) slot.item = ItemId::None;
+            return true;
+        }
+    }
+    return false;
+}
+
+bool InteractionSystem::TryCollectFromMachine(entt::registry &registry, entt::entity machine, entt::entity player) {
+    if (!registry.valid(machine) || !registry.any_of<MachineInventoryComponent>(machine)) return false;
+
+    auto &machineInv = registry.get<MachineInventoryComponent>(machine);
+    auto &inventory = registry.get<InventoryComponent>(player);
+
+    bool collectedAny = false;
+    for (auto &outSlot : machineInv.outputs) {
+        if (outSlot.item == ItemId::None || outSlot.count <= 0) continue;
+
+        int leftover = inventory.AddItem(outSlot.item, outSlot.count);
+        int actuallyCollected = outSlot.count - leftover;
+        if (actuallyCollected > 0) {
+            outSlot.count = leftover;
+            if (outSlot.count == 0) outSlot.item = ItemId::None;
+            collectedAny = true;
+        }
+    }
+    return collectedAny;
+}
+bool InteractionSystem::TryFuelFurnace(entt::registry &registry, entt::entity furnaceEntity, entt::entity player, ItemId selectedItem, int amount) {
+    if (!registry.valid(furnaceEntity) || !registry.any_of<FurnaceComponent>(furnaceEntity)) return false;
+
+    auto &furnace = registry.get<FurnaceComponent>(furnaceEntity);
+    if (furnace.fuelItem != selectedItem) return false;
+
+    auto &inventory = registry.get<InventoryComponent>(player);
+    for (auto &slot : inventory.slots) {
+        if (slot.item == selectedItem && slot.count > 0) {
+            int take = std::min(slot.count, amount);
+            slot.count -= take;
+            if (slot.count == 0) slot.item = ItemId::None;
+            furnace.fuelBuffer += take;
+            return true;
+        }
+    }
+    return false;
+}
+bool InteractionSystem::TryRotateMachine(entt::registry &registry, entt::entity target) {
+    if (!registry.valid(target)) return false;
+
+    glm::vec3 *facingPtr = nullptr;
+    if (registry.any_of<BeltComponent>(target)) {
+        facingPtr = &registry.get<BeltComponent>(target).direction;
+    } else if (registry.any_of<InserterComponent>(target)) {
+        facingPtr = &registry.get<InserterComponent>(target).facing;
+    } else {
+        return false; // only belts/inserters have a meaningful facing to rotate
+    }
+
+    // Rotate 90 degrees: (x,z) -> (-z,x), same rotation step your placement ghost uses
+    glm::vec3 old = *facingPtr;
+    *facingPtr = glm::vec3(-old.z, 0.0f, old.x);
+
+    float angle = atan2(facingPtr->x, facingPtr->z);
+    registry.get<TransformComponent>(target).Rotation = glm::angleAxis(angle, glm::vec3(0, 1, 0));
+
+    return true;
+}
+bool InteractionSystem::TryPickupMachine(entt::registry &registry, entt::entity target, entt::entity player, PlacementGrid &placementGrid, float gridSize) {
+    if (!registry.valid(target)) return false;
+
+    ItemId machineItem = ItemId::None;
+    glm::vec3 halfExtents = glm::vec3(0.5f);
+
+    if (registry.any_of<BoundsComponent>(target)) {
+        halfExtents = registry.get<BoundsComponent>(target).halfExtents;
+    }
+
+    // Return any held items to the player first
+    auto &inventory = registry.get<InventoryComponent>(player);
+
+    if (registry.any_of<MinerComponent>(target)) {
+        auto &miner = registry.get<MinerComponent>(target);
+        if (miner.outputItem != ItemId::None && miner.outputBuffer > 0) {
+            inventory.AddItem(miner.outputItem, miner.outputBuffer);
+        }
+        machineItem = ItemId::Miner;
+    } else if (registry.any_of<FurnaceComponent>(target)) {
+        machineItem = ItemId::Furnace;
+    } else if (registry.any_of<AssemblerComponent>(target)) {
+        machineItem = ItemId::Assembler;
+    } else if (registry.any_of<BeltComponent>(target)) {
+        auto &belt = registry.get<BeltComponent>(target);
+        for (auto &item : belt.leftLane.queue)
+            if (item.item != ItemId::None) inventory.AddItem(item.item, 1);
+        for (auto &item : belt.rightLane.queue)
+            if (item.item != ItemId::None) inventory.AddItem(item.item, 1);
+        machineItem = ItemId::Belt;
+    } else if (registry.any_of<InserterComponent>(target)) {
+        auto &inserter = registry.get<InserterComponent>(target);
+        if (inserter.holdingItem && inserter.heldItem != ItemId::None) {
+            inventory.AddItem(inserter.heldItem, 1);
+        }
+        machineItem = ItemId::Inserter;
+    } else {
+        return false; // not a recognized machine type
+    }
+
+    // MachineInventoryComponent covers furnace/assembler input+output slots
+    if (registry.any_of<MachineInventoryComponent>(target)) {
+        auto &inv = registry.get<MachineInventoryComponent>(target);
+        for (auto &slot : inv.inputs)
+            if (slot.item != ItemId::None) inventory.AddItem(slot.item, slot.count);
+        for (auto &slot : inv.outputs)
+            if (slot.item != ItemId::None) inventory.AddItem(slot.item, slot.count);
+    }
+
+    // Free the grid tiles this machine occupied
+    auto &transform = registry.get<TransformComponent>(target);
+    auto coveredCells = PlacementGrid::GetCoveredCells(transform.Position, halfExtents, gridSize);
+    placementGrid.UnregisterArea(coveredCells);
+
+    // Give the machine item itself back
+    inventory.AddItem(machineItem, 1);
+
+    registry.destroy(target);
+    return true;
 }

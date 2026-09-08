@@ -11,8 +11,17 @@ void FurnaceSystem::Update(entt::registry &registry, float deltaTime) {
         auto &inv = view.get<MachineInventoryComponent>(entity);
 
         if (!furnace.isCooking) {
+            // Need fuel available before starting a new cook cycle
+            if (furnace.fuelRemaining <= 0.0f) {
+                if (furnace.fuelBuffer <= 0) continue; // no fuel loaded — idle
+                furnace.fuelBuffer--;
+                furnace.fuelRemaining = furnace.fuelBurnTime;
+            }
+
             for (auto &inSlot : inv.inputs) {
                 if (inSlot.item == ItemId::None || inSlot.count <= 0) continue;
+                if (inSlot.item == furnace.fuelItem) continue; // don't try to "cook" the fuel itself
+
                 const FurnaceRecipe *recipe = FurnaceRecipeDatabase::TryGet(inSlot.item);
                 if (!recipe) continue;
 
@@ -35,6 +44,8 @@ void FurnaceSystem::Update(entt::registry &registry, float deltaTime) {
             }
         } else {
             furnace.cookTimer -= deltaTime;
+            furnace.fuelRemaining -= deltaTime; // fuel burns down while actively cooking
+
             if (furnace.cookTimer <= 0.0f) {
                 MachineInventoryComponent::AddToSlots(inv.outputs, furnace.currentOutput, 1);
                 furnace.isCooking = false;

@@ -150,6 +150,8 @@
   <ItemGroup>
     <None Include="compile_shaders.bat" />
     <None Include="compile_shaders.ps1" />
+    <None Include="Shaders\debugline.frag" />
+    <None Include="Shaders\debugline.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\External\imgui\backends\imgui_impl_glfw.cpp" />
@@ -183,6 +185,7 @@
     <ClCompile Include="src\Game\RecipeDatabase.cpp" />
     <ClCompile Include="src\Helpers\DebugUI.cpp" />
     <ClCompile Include="src\Helpers\Serializer.cpp" />
+    <ClCompile Include="src\Renderer\DebugLineRenderer.cpp" />
     <ClCompile Include="src\Renderer\ImGuiVulkanUtil.cpp" />
     <ClCompile Include="src\Main.cpp" />
     <ClCompile Include="src\Engine\VulkanEngine.cpp" />
@@ -241,6 +244,7 @@
     <ClInclude Include="src\Helpers\DebugUI.h" />
     <ClInclude Include="src\Helpers\Serializer.h" />
     <ClInclude Include="src\Game\PlaceableDatabase.h" />
+    <ClInclude Include="src\Renderer\DebugLineRenderer.h" />
     <ClInclude Include="src\Renderer\ImGuiVulkanUtil.h" />
     <ClInclude Include="src\Renderer\MeshRenderer.h" />
     <ClInclude Include="src\Renderer\QuadRenderer.h" />

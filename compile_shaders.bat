@@ -61,6 +61,32 @@ if exist "Shaders\mesh.frag" (
 ) else (
 	echo WARNING: mesh.frag not found
 )
+REM Compile debug line vertex shader
+if exist "Shaders\debugline.vert" (
+	echo Compiling debug line vertex shader...
+	glslc Shaders\debugline.vert -o Shaders\debugline_vert.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Debug line vertex shader compiled successfully
+	) else (
+		echo   Debug line vertex shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: debugline.vert not found
+)
+REM Compile debug line fragment shader
+if exist "Shaders\debugline.frag" (
+	echo Compiling debug line fragment shader...
+	glslc Shaders\debugline.frag -o Shaders\debugline_frag.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Debug line fragment shader compiled successfully
+	) else (
+		echo   Debug line fragment shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: debugline.frag not found
+)
 echo.
 echo Shader compilation complete!
 dir shaders\*.spv /b

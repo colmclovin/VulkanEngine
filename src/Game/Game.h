@@ -70,4 +70,5 @@ private:
 
     bool m_IsRunning = false;
     bool m_Initialized = false;
+    entt::entity m_InspectedEntity = entt::null;
 };

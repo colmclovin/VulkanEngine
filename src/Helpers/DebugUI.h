@@ -9,9 +9,9 @@ struct GameSettings;
 
 class DebugUI {
 public:
-    void Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine, entt::entity m_PlayerEntity);
+    void Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity);
 
-    private:
+private:
     void DrawStats(entt::registry &registry);
     void DrawCrafting(entt::registry& registry, entt::entity player);
     void DrawEntityList(entt::registry& registry);
@@ -19,6 +19,7 @@ public:
     void DrawInventory(entt::registry &registry, entt::entity player); 
     bool m_ShowDemo = false;
     bool m_RegenerateTerrainRequested = false;   // set true when user clicks "Regenerate"
+    void DrawMachineInspector(entt::registry &registry, entt::entity target);
 
 public:
     bool ConsumeRegenerateRequest() {

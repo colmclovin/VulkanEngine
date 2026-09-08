@@ -140,44 +140,6 @@ void Game::CreateInitialEntities() {
         m_Registry->emplace<MeshComponent>(m_PlayerEntity, playerMesh);
         m_Registry->emplace<NameTag>(m_PlayerEntity, "Player");
 
-        // Tree
-        auto treeEntity = m_Registry->create();
-        auto& treeTransform = m_Registry->emplace<TransformComponent>(treeEntity);
-        treeTransform.Position = glm::vec3(5.0f, 0.0f, 0.0f);
-        auto treeMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Tree.glb")); // your tree asset
-
-        m_Registry->emplace<HarvestableComponent>(treeEntity, HarvestableComponent{ 100.0f, 100.0f, ItemId::Wood, 1, 5 });
-        m_Registry->emplace<MeshComponent>(treeEntity, treeMesh);
-        m_Registry->emplace<NameTag>(treeEntity, "Tree");
-
-        //wood
-        auto woodEntity = m_Registry->create();
-        auto &woodTransform = m_Registry->emplace<TransformComponent>(woodEntity);
-        woodTransform.Position = glm::vec3(5.0f, 0.0f, 10.0f);
-        m_Registry->emplace<HarvestableComponent>(woodEntity, HarvestableComponent{ 100.0f, 100.0f, ItemId::Wood, 1, 5 });
-
-        auto woodMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Wood.glb")); // your tree asset
-        m_Registry->emplace<MeshComponent>(woodEntity, woodMesh);
-        m_Registry->emplace<NameTag>(woodEntity, "Wood");
-        //Copper Ore
-        auto copperEntity = m_Registry->create();
-        auto &copperTransform = m_Registry->emplace<TransformComponent>(copperEntity);
-        copperTransform.Position = glm::vec3(5.0f, 0.0f, 7.0f);
- 
-        m_Registry->emplace<HarvestableComponent>(copperEntity, HarvestableComponent{ 100.0f, 100.0f, ItemId::CopperOre, 1, 5 });
-        auto copperMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/CopperOre.glb")); // your tree asset
-        m_Registry->emplace<MeshComponent>(copperEntity, copperMesh);
-        m_Registry->emplace<NameTag>(copperEntity, "Copper");
-        //Iron ore
-        auto ironEntity = m_Registry->create();
-        auto &ironTransform = m_Registry->emplace<TransformComponent>(ironEntity);
-        ironTransform.Position = glm::vec3(5.0f, 0.0f, 12.0f);
-        m_Registry->emplace<HarvestableComponent>(ironEntity, HarvestableComponent{ 100.0f, 100.0f, ItemId::IronOre, 1, 5 });
-        auto ironMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/IronOre.glb")); // your tree asset
-        m_Registry->emplace<MeshComponent>(ironEntity, ironMesh);
-        m_Registry->emplace<NameTag>(ironEntity, "Iron");
-
-
         m_ResourceMap.Generate(m_Settings.terrain.gridWidth, m_Settings.terrain.gridDepth,
             m_Settings.terrain.cellSize, m_Settings.terrain.seed);
 
@@ -232,50 +194,98 @@ void Game::HandleInput(float deltaTime) {
 }
 
 void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
-    static bool qWasDown = false, eWasDown = false, f11WasDown = false, interactWasDown = false, placeWasDown = false;
+    static bool qWasDown = false, eWasDown = false, f11WasDown = false, interactWasDown = false, 
+        placeWasDown = false, rotateWasDown = false, inspectWasDown = false, rotatePlacedWasDown = false, pickupWasDown = false;
+    
+     double mx, my;
+    glfwGetCursorPos(window, &mx, &my);
+    VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();
+    float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
 
+    glm::vec3 rayOrigin = m_Camera->GetEyePosition();
+    glm::vec3 rayDir = m_Camera->ScreenPointToRay(static_cast<float>(mx), static_cast<float>(my),
+                                                  static_cast<float>(extent.width), static_cast<float>(extent.height), aspect);
+
+    auto &playerTransform = m_Registry->get<TransformComponent>(m_PlayerEntity);
+    float interactRange = 5.0f;
+
+    entt::entity machineTarget = InteractionSystem::FindMachineAlongRay(*m_Registry, rayOrigin, rayDir, 100.0f);
+
+
+    bool pickupIsDown = glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS; // pick a free key
+    bool rotatePlacedIsDown = glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS; // separate key from ghost-rotation R
     bool qIsDown = glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS;
     bool eIsDown = glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS;
     bool f11IsDown = glfwGetKey(window, GLFW_KEY_F11) == GLFW_PRESS;
     bool interactIsDown = glfwGetKey(window, GLFW_KEY_F) == GLFW_PRESS;
     bool placeIsDown = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS;
+    bool rotateIsDown = glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS;
+    bool inspectIsDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
 
     if (placeIsDown && !placeWasDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity, m_ResourceMap, m_PlacementGrid);
     if (qIsDown && !qWasDown) m_Camera->SnapRotateIso(false);
     if (eIsDown && !eWasDown) m_Camera->SnapRotateIso(true);
     if (f11IsDown && !f11WasDown) m_VulkanEngine->ToggleFullscreen();
+    if (rotateIsDown && !rotateWasDown) {
+        m_PlacementSystem->RotateGhost();
+    }
+    if (interactIsDown && !interactWasDown) {
+       
 
-if (interactIsDown && !interactWasDown) {
-        double mx, my;
-        glfwGetCursorPos(window, &mx, &my);
-        VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();
-        float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
-
-        glm::vec3 rayOrigin = m_Camera->GetEyePosition();
-        glm::vec3 rayDir = m_Camera->ScreenPointToRay(static_cast<float>(mx), static_cast<float>(my),
-                                                      static_cast<float>(extent.width), static_cast<float>(extent.height), aspect);
-
-        auto &playerTransform = m_Registry->get<TransformComponent>(m_PlayerEntity);
-        float interactRange = 5.0f;
-
-        // Check for a miner first
-        entt::entity minerTarget = InteractionSystem::FindMinerAlongRay(*m_Registry, rayOrigin, rayDir, 100.0f);
-        if (m_Registry->valid(minerTarget)) {
-            auto &minerTransform = m_Registry->get<TransformComponent>(minerTarget);
-            float dist = glm::length(minerTransform.Position - playerTransform.Position);
+        if (m_Registry->valid(machineTarget)) {
+            auto &machineTransform = m_Registry->get<TransformComponent>(machineTarget);
+            float dist = glm::length(machineTransform.Position - playerTransform.Position);
 
             if (dist <= interactRange) {
-                // Try collecting output first; if there's nothing to collect, try feeding fuel instead
-                bool collected = InteractionSystem::TryCollectMinerOutput(*m_Registry, minerTarget, m_PlayerEntity);
+                // Try collecting first
+                bool collected = false;
+                if (m_Registry->any_of<MinerComponent>(machineTarget)) {
+                    collected = InteractionSystem::TryCollectMinerOutput(*m_Registry, machineTarget, m_PlayerEntity);
+                } else {
+                    collected = InteractionSystem::TryCollectFromMachine(*m_Registry, machineTarget, m_PlayerEntity);
+                }
                 if (!collected) {
-                    auto &miner = m_Registry->get<MinerComponent>(minerTarget);
-                    InteractionSystem::TryFuelMiner(*m_Registry, minerTarget, m_PlayerEntity, miner.fuelItem, 1);
+                    ItemId selected = GetSelectedItem();
+                    if (selected != ItemId::None) {
+                        // Try fuel first if this is a fuel-consuming machine, then fall back to generic ore/ingredient insertion
+                        bool fueledFurnace = false;
+                        if (m_Registry->any_of<FurnaceComponent>(machineTarget)) {
+                            fueledFurnace = InteractionSystem::TryFuelFurnace(*m_Registry, machineTarget, m_PlayerEntity, selected, 1);
+                        }
+                        if (!fueledFurnace) {
+                            InteractionSystem::TryInsertIntoMachine(*m_Registry, machineTarget, m_PlayerEntity, selected, 1);
+                        }
+                    }
+
+                    if (m_Registry->any_of<MinerComponent>(machineTarget)) {
+                        InteractionSystem::TryFuelMiner(*m_Registry, machineTarget, m_PlayerEntity, GetSelectedItem(), 1);
+                    }
                 }
             }
         } else {
-            // No miner targeted — fall back to your existing mining logic
             InteractionSystem::TryMineAtCursor(*m_Registry, m_ResourceMap, m_PlayerEntity,
                                                rayOrigin, rayDir, m_Settings.terrain, interactRange, m_AudioEvents.get());
+        }
+    }
+    if (inspectIsDown && !inspectWasDown && !ImGui::GetIO().WantCaptureMouse) {
+        double mx, my;
+        glfwGetCursorPos(window, &mx, &my);
+        VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();
+        float aspect = static_cast<float>(extent.width) / extent.height;
+        glm::vec3 rayOrigin = m_Camera->GetEyePosition();
+        glm::vec3 rayDir = m_Camera->ScreenPointToRay((float)mx, (float)my, (float)extent.width, (float)extent.height, aspect);
+
+        m_InspectedEntity = InteractionSystem::FindMachineAlongRay(*m_Registry, rayOrigin, rayDir, 100.0f);
+    }
+    if (rotatePlacedIsDown && !rotatePlacedWasDown) {
+
+        if (m_Registry->valid(machineTarget)) {
+            InteractionSystem::TryRotateMachine(*m_Registry, machineTarget);
+        }
+    }
+    if (pickupIsDown && !pickupWasDown) {
+        if (m_Registry->valid(machineTarget)) { // reuse the same machineTarget you compute for interact
+            InteractionSystem::TryPickupMachine(*m_Registry, machineTarget, m_PlayerEntity, m_PlacementGrid, m_Settings.terrain.cellSize);
         }
     }
 
@@ -284,6 +294,10 @@ if (interactIsDown && !interactWasDown) {
     f11WasDown = f11IsDown;
     interactWasDown = interactIsDown;
     placeWasDown = placeIsDown;
+    rotateWasDown = rotateIsDown;
+    inspectWasDown = inspectIsDown;
+    rotatePlacedWasDown = rotatePlacedIsDown;
+    pickupWasDown = pickupIsDown;
 
     glm::vec3 moveDir(0.0f);
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveDir.z += 1.0f;
@@ -304,7 +318,7 @@ if (interactIsDown && !interactWasDown) {
         static bool numWasDown[HOTBAR_SIZE] = { false };
         bool numIsDown = glfwGetKey(window, GLFW_KEY_1 + i) == GLFW_PRESS;
         if (numIsDown && !numWasDown[i]) {
-            if ()
+           
             m_SelectedHotbarSlot = (m_SelectedHotbarSlot == i) ? -1 : i;   // toggle off if already selected
         }
         numWasDown[i] = numIsDown;
@@ -408,7 +422,7 @@ void Game::Update(float deltaTime) {
 
     m_PlacementSystem->Update(*m_Registry, m_PlayerEntity, *m_Camera, GetSelectedItem(),
         m_Settings.terrain, static_cast<float>(mx), static_cast<float>(my),
-        static_cast<float>(extent.width), static_cast<float>(extent.height), aspect);
+        static_cast<float>(extent.width), static_cast<float>(extent.height), aspect, m_PlacementGrid);
     MinerSystem::Update(*m_Registry, m_ResourceMap, deltaTime);
     FurnaceSystem::Update(*m_Registry, deltaTime);
     AssemblerSystem::Update(*m_Registry, deltaTime);
@@ -417,7 +431,7 @@ void Game::Update(float deltaTime) {
 }
 
 void Game::Render() {
-    m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine, m_PlayerEntity);
+    m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine, m_PlayerEntity, m_InspectedEntity);
 }
 void Game::Shutdown() {
     std::cout << "=== Shutting Down Game ===" << std::endl;
