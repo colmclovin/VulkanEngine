@@ -187,6 +187,16 @@ void DebugUI::DrawMachineInspector(entt::registry &registry, entt::entity target
         } else {
             ImGui::Text("Recipe: none selected");
         }
+        ImGui::Separator();
+        ImGui::Text("Select Recipe:");
+        auto& recipes = RecipeDatabase::GetAll();
+        for (int i = 0; i < (int)recipes.size(); i++) {
+            ImGui::PushID(i);
+            if (ImGui::Button(recipes[i].name.c_str())) {
+                assembler.selectedRecipeIndex = i;
+            }
+            ImGui::PopID();
+        }
     }
 
     if (registry.any_of<BeltComponent>(target)) {
