@@ -13,6 +13,7 @@ enum class ItemId {
 	CopperPlate,
 	IronOre,
 	IronPlate,
+	Coal,
     Miner,
 	Furnace,
 	Assembler,

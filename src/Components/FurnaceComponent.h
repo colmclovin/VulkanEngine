@@ -7,8 +7,7 @@ struct FurnaceComponent {
     bool isCooking = false;
     ItemId currentOutput = ItemId::None;
 
-    ItemId fuelItem = ItemId::Wood;
+    ItemId loadedFuelType = ItemId::None;   // what's actually in the buffer right now
     int fuelBuffer = 0;
-    float fuelBurnTime = 5.0f; // seconds of cook-time this furnace can run per fuel item consumed
     float fuelRemaining = 0.0f;
 };

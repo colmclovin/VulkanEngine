@@ -6,6 +6,8 @@
 #include "TerrainRaycast.h"
 #include <iostream>
 #include "PlacementGrid.h"
+#include "../Game/FuelDatabase.h"
+
 entt::entity InteractionSystem::FindNearestInteractable(entt::registry &registry, glm::vec3 playerPos, float range) {
     entt::entity closest = entt::null;
     float closestDist = std::numeric_limits<float>::max();
@@ -192,17 +194,24 @@ entt::entity InteractionSystem::FindEntityAlongRay(entt::registry &registry, glm
 
 bool InteractionSystem::TryFuelMiner(entt::registry &registry, entt::entity minerEntity, entt::entity player, ItemId selectedItem, int amount) {
     if (!registry.valid(minerEntity) || !registry.any_of<MinerComponent>(minerEntity)) return false;
+    if (!FuelDatabase::IsFuel(selectedItem)) return false;   // CHANGED — check the database, not a fixed item
 
-    auto &miner = registry.get<MinerComponent>(minerEntity);
-    if (miner.fuelItem != selectedItem) return false; // must match what's selected, same as furnace/assembler insertion
+    auto& miner = registry.get<MinerComponent>(minerEntity);
 
-    auto &inventory = registry.get<InventoryComponent>(player);
-    for (auto &slot : inventory.slots) {
+    // Simplification: only allow loading one fuel TYPE at a time — refuse if a different fuel is already loaded and buffer isn't empty
+    if (miner.fuelBuffer > 0 && miner.loadedFuelType != selectedItem) {
+        return false;   // miner is currently loaded with a different fuel type
+    }
+
+    auto& inventory = registry.get<InventoryComponent>(player);
+    for (auto& slot : inventory.slots) {
         if (slot.item == selectedItem && slot.count > 0) {
             int take = std::min(slot.count, amount);
             slot.count -= take;
             if (slot.count == 0) slot.item = ItemId::None;
+
             miner.fuelBuffer += take;
+            miner.loadedFuelType = selectedItem;
             return true;
         }
     }
@@ -310,19 +319,26 @@ bool InteractionSystem::TryCollectFromMachine(entt::registry &registry, entt::en
     }
     return collectedAny;
 }
-bool InteractionSystem::TryFuelFurnace(entt::registry &registry, entt::entity furnaceEntity, entt::entity player, ItemId selectedItem, int amount) {
+bool InteractionSystem::TryFuelFurnace(entt::registry& registry, entt::entity furnaceEntity, entt::entity player, ItemId selectedItem, int amount) {
     if (!registry.valid(furnaceEntity) || !registry.any_of<FurnaceComponent>(furnaceEntity)) return false;
+    if (!FuelDatabase::IsFuel(selectedItem)) return false;   // CHANGED — check the database, not a fixed item
 
-    auto &furnace = registry.get<FurnaceComponent>(furnaceEntity);
-    if (furnace.fuelItem != selectedItem) return false;
+    auto& furnace = registry.get<FurnaceComponent>(furnaceEntity);
 
-    auto &inventory = registry.get<InventoryComponent>(player);
-    for (auto &slot : inventory.slots) {
+    // Simplification: only allow loading one fuel TYPE at a time — refuse if a different fuel is already loaded and buffer isn't empty
+    if (furnace.fuelBuffer > 0 && furnace.loadedFuelType != selectedItem) {
+        return false;   // furnace is currently loaded with a different fuel type
+    }
+
+    auto& inventory = registry.get<InventoryComponent>(player);
+    for (auto& slot : inventory.slots) {
         if (slot.item == selectedItem && slot.count > 0) {
             int take = std::min(slot.count, amount);
             slot.count -= take;
             if (slot.count == 0) slot.item = ItemId::None;
+
             furnace.fuelBuffer += take;
+            furnace.loadedFuelType = selectedItem;
             return true;
         }
     }

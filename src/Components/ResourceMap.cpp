@@ -26,12 +26,23 @@ void ResourceMap::Generate(int gridWidth, int gridDepth, float cellSize, int see
 
             ResourceCell &cell = m_Cells[z * gridWidth + x];
 
-            if (region == RegionType::IronDeposit || region == RegionType::CopperDeposit) {
+            if (region == RegionType::IronDeposit || region == RegionType::CopperDeposit || region == RegionType::CoalDeposit) {
                 float density = densityNoise.GetNoise(static_cast<float>(x), static_cast<float>(z));
                 // Even within the deposit region, only some tiles actually have ore —
                 // gives texture/richness variation instead of a flat solid block of color.
                 if (density > -0.2f) {
-                    cell.resource = (region == RegionType::IronDeposit) ? ItemId::IronOre : ItemId::CopperOre;
+                    if (region == RegionType::IronDeposit)
+                    {
+                        cell.resource = ItemId::IronOre;
+                    }
+                    else if (region == RegionType::CopperDeposit)
+                    {
+                        cell.resource = ItemId::CopperOre;
+                    }
+                    else if (region == RegionType::CoalDeposit)
+                    {
+                        cell.resource = ItemId::Coal;
+                    }
                     cell.amount = 500.0f;
                 }
             }
@@ -60,7 +71,9 @@ void ResourceMap::ExtractFromCell(ResourceCell* cell, float amount) {
 RegionType ResourceMap::DetermineRegion(float regionNoiseValue) {
     // Wide, non-overlapping ranges = large contiguous areas, not thin bands
     if (regionNoiseValue > 0.5f) return RegionType::IronDeposit;
+    if (regionNoiseValue > 0.25f) return RegionType::CoalDeposit;
     if (regionNoiseValue > 0.15f) return RegionType::CopperDeposit;
+    
     if (regionNoiseValue > -0.2f) return RegionType::Forest;
     return RegionType::Plains;
 }

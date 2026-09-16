@@ -3,6 +3,7 @@
 #include "FurnaceComponent.h"
 #include "../Game/FurnaceRecipeDatabase.h"
 #include "MachineInventoryComponent.h"
+#include "../Game/FuelDatabase.h"
 
 void FurnaceSystem::Update(entt::registry &registry, float deltaTime) {
     auto view = registry.view<FurnaceComponent, MachineInventoryComponent>();
@@ -14,13 +15,17 @@ void FurnaceSystem::Update(entt::registry &registry, float deltaTime) {
             // Need fuel available before starting a new cook cycle
             if (furnace.fuelRemaining <= 0.0f) {
                 if (furnace.fuelBuffer <= 0) continue; // no fuel loaded — idle
+                const FuelDef* fuelDef = FuelDatabase::TryGet(furnace.loadedFuelType);
+                if (!fuelDef) continue;   // shouldn't happen, but guards against bad state
+
                 furnace.fuelBuffer--;
-                furnace.fuelRemaining = furnace.fuelBurnTime;
+                furnace.fuelRemaining = fuelDef->burnTime;
+                if (furnace.fuelBuffer == 0) furnace.loadedFuelType = ItemId::None;
             }
 
             for (auto &inSlot : inv.inputs) {
                 if (inSlot.item == ItemId::None || inSlot.count <= 0) continue;
-                if (inSlot.item == furnace.fuelItem) continue; // don't try to "cook" the fuel itself
+                if (FuelDatabase::IsFuel(inSlot.item)) continue; // don't try to "cook" the fuel itself
 
                 const FurnaceRecipe *recipe = FurnaceRecipeDatabase::TryGet(inSlot.item);
                 if (!recipe) continue;

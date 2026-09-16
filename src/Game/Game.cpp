@@ -22,6 +22,7 @@
 #include "../Components/AssemblerSystem.h"
 #include "../Components/BeltSystem.h"
 #include "../Components/InserterSystem.h"
+#include "FuelDatabase.h"
 
 
 Game::Game() {
@@ -60,7 +61,7 @@ void Game::Init() {
     std::cout << "=== Registering item Database ===" << std::endl;
     ItemDatabase::Init();
     RecipeDatabase::Init();
-
+    FuelDatabase::Init();
 
     PlaceableDatabase::Init();
     m_PlacementSystem = std::make_unique<PlacementSystem>();

@@ -7,7 +7,8 @@ glm::vec3 TerrainGenerator::ColorForResource(ItemId resource) {
     switch (resource) {
     case ItemId::CopperOre: return glm::vec3(0.85f, 0.45f, 0.25f);
     case ItemId::IronOre:   return glm::vec3(0.55f, 0.55f, 0.65f);
-    default:                return glm::vec3(1.0f);
+    case ItemId::Coal:      return glm::vec3(0.f, 0.0f, 0.0f);
+    default:                return glm::vec3(0.0f, 0.7f, 0.0f);
     }
 }
 

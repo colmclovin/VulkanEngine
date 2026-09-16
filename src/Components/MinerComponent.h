@@ -7,9 +7,8 @@ struct MinerComponent {
     float outputInterval = 1.0f; // seconds between producing one item into its output buffer
     float outputTimer = 0.0f; // internal countdown
 
-    ItemId fuelItem = ItemId::Wood;
+    ItemId loadedFuelType = ItemId::None;   // what's actually in the buffer right now
     int fuelBuffer = 0; // how many fuel items currently loaded
-    float fuelBurnTime = 5.0f; // seconds of runtime per single fuel item
     float fuelRemaining = 0.0f; // seconds left on the currently-burning fuel item
 
     ItemId outputItem = ItemId::None; // set once, based on what resource is under it

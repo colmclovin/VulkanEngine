@@ -11,6 +11,7 @@ enum class RegionType {
     Plains,
     IronDeposit,
     CopperDeposit,
+	CoalDeposit,
     Forest,
 };
 

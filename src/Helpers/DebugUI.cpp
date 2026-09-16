@@ -164,7 +164,9 @@ void DebugUI::DrawMachineInspector(entt::registry &registry, entt::entity target
         ImGui::Text("Status: %s", (miner.fuelRemaining > 0.0f) ? "Running" : "Idle (no fuel)");
         ImGui::Text("Output item: %s", miner.outputItem != ItemId::None ? ItemDatabase::Get(miner.outputItem).name.c_str() : "None");
         ImGui::Text("Output buffer: %d / %d", miner.outputBuffer, miner.outputBufferCapacity);
-        ImGui::Text("Fuel: %d loaded, %.1fs remaining", miner.fuelBuffer, miner.fuelRemaining);
+        ImGui::Text("Fuel: %s x%d, %.1fs remaining",
+            miner.loadedFuelType != ItemId::None ? ItemDatabase::Get(miner.loadedFuelType).name.c_str() : "none",
+            miner.fuelBuffer, miner.fuelRemaining);
     }
 
     if (registry.any_of<FurnaceComponent>(target)) {
@@ -172,7 +174,9 @@ void DebugUI::DrawMachineInspector(entt::registry &registry, entt::entity target
         ImGui::Text("Type: Furnace");
         ImGui::Text("Status: %s", furnace.isCooking ? "Cooking" : "Idle");
         if (furnace.isCooking) ImGui::Text("Cook timer: %.1fs left", furnace.cookTimer);
-        ImGui::Text("Fuel: %d loaded, %.1fs remaining", furnace.fuelBuffer, furnace.fuelRemaining);
+        ImGui::Text("Fuel: %s x%d, %.1fs remaining",
+            furnace.loadedFuelType != ItemId::None ? ItemDatabase::Get(furnace.loadedFuelType).name.c_str() : "none",
+            furnace.fuelBuffer, furnace.fuelRemaining);
     }
 
     if (registry.any_of<AssemblerComponent>(target)) {
