@@ -246,7 +246,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
                     collected = InteractionSystem::TryCollectFromMachine(*m_Registry, machineTarget, m_PlayerEntity);
                 }
                 if (!collected) {
-                    ItemId selected = GetSelectedItem();
+                    ItemId selected = m_SelectedItem;
                     if (selected != ItemId::None) {
                         // Try fuel first if this is a fuel-consuming machine, then fall back to generic ore/ingredient insertion
                         bool fueledFurnace = false;
@@ -259,7 +259,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
                     }
 
                     if (m_Registry->any_of<MinerComponent>(machineTarget)) {
-                        InteractionSystem::TryFuelMiner(*m_Registry, machineTarget, m_PlayerEntity, GetSelectedItem(), 1);
+                        InteractionSystem::TryFuelMiner(*m_Registry, machineTarget, m_PlayerEntity, m_SelectedItem, 1);
                     }
                 }
             }
@@ -319,8 +319,8 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
         static bool numWasDown[HOTBAR_SIZE] = { false };
         bool numIsDown = glfwGetKey(window, GLFW_KEY_1 + i) == GLFW_PRESS;
         if (numIsDown && !numWasDown[i]) {
-           
-            m_SelectedHotbarSlot = (m_SelectedHotbarSlot == i) ? -1 : i;   // toggle off if already selected
+            ItemId hotbarItem = m_Hotbar[i];
+            m_SelectedItem = (m_SelectedItem == hotbarItem) ? ItemId::None : hotbarItem;
         }
         numWasDown[i] = numIsDown;
     }
@@ -421,7 +421,7 @@ void Game::Update(float deltaTime) {
     VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();
     float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
 
-    m_PlacementSystem->Update(*m_Registry, m_PlayerEntity, *m_Camera, GetSelectedItem(),
+    m_PlacementSystem->Update(*m_Registry, m_PlayerEntity, *m_Camera, m_SelectedItem,
         m_Settings.terrain, static_cast<float>(mx), static_cast<float>(my),
         static_cast<float>(extent.width), static_cast<float>(extent.height), aspect, m_PlacementGrid);
     MinerSystem::Update(*m_Registry, m_ResourceMap, deltaTime);
@@ -432,7 +432,7 @@ void Game::Update(float deltaTime) {
 }
 
 void Game::Render() {
-    m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine, m_PlayerEntity, m_InspectedEntity);
+    m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine, m_PlayerEntity, m_InspectedEntity, m_SelectedItem);
 }
 void Game::Shutdown() {
     std::cout << "=== Shutting Down Game ===" << std::endl;

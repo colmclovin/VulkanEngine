@@ -9,7 +9,7 @@
 #include "../Game/RecipeDatabase.h"
 #include <entt/entt.hpp>
 
-void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity) {
+void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem) {
 
     if (m_ShowDemo) {
         ImGui::ShowDemoWindow(&m_ShowDemo);
@@ -23,7 +23,7 @@ void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3
             DrawStats(registry);
             ImGui::Separator();
             DrawEntityList(registry);
-            DrawInventory(registry, m_PlayerEntity);
+            DrawInventory(registry, m_PlayerEntity, selectedItem);
 			DrawCrafting(registry, m_PlayerEntity);
             DrawMachineInspector(registry, m_InspectedEntity);
             ImGui::EndTabItem();
@@ -46,14 +46,25 @@ void DebugUI::DrawStats(entt::registry &registry) {
     ImGui::Text("Total entities: %zu", registry.storage<entt::entity>().size());
     ImGui::Checkbox("Show Demo Window", &m_ShowDemo);
 }
-void DebugUI::DrawInventory(entt::registry &registry, entt::entity player) {
+void DebugUI::DrawInventory(entt::registry &registry, entt::entity player, ItemId &selectedItem) {
     if (!registry.valid(player) || !registry.any_of<InventoryComponent>(player)) return;
     auto &inv = registry.get<InventoryComponent>(player);
+
     ImGui::Begin("Inventory");
-    for (auto &slot : inv.slots) {
-        if (slot.item != ItemId::None) {
-            ImGui::Text("%s x%d", ItemDatabase::Get(slot.item).name.c_str(), slot.count);
+    for (int i = 0; i < (int)inv.slots.size(); i++) {
+        auto &slot = inv.slots[i];
+        if (slot.item == ItemId::None) continue;
+
+        ImGui::PushID(i);
+        bool isSelected = (slot.item == selectedItem);
+
+        char label[128];
+        snprintf(label, sizeof(label), "%s x%d", ItemDatabase::Get(slot.item).name.c_str(), slot.count);
+
+        if (ImGui::Selectable(label, isSelected)) {
+            selectedItem = isSelected ? ItemId::None : slot.item; // click again to deselect
         }
+        ImGui::PopID();
     }
     ImGui::End();
 }

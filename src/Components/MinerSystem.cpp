@@ -2,6 +2,7 @@
 #include "Components.h"
 #include "InventoryComponent.h"
 #include "MinerComponent.h"
+#include "../Game/FuelDatabase.h"
 
 void MinerSystem::Update(entt::registry &registry, ResourceMap &resourceMap, float deltaTime) {
     auto view = registry.view<TransformComponent, MinerComponent>();
@@ -16,8 +17,11 @@ void MinerSystem::Update(entt::registry &registry, ResourceMap &resourceMap, flo
         // --- Fuel handling ---
         if (miner.fuelRemaining <= 0.0f) {
             if (miner.fuelBuffer > 0) {
+                const FuelDef *fuelDef = FuelDatabase::TryGet(miner.loadedFuelType);
+                if (!fuelDef) continue;
                 miner.fuelBuffer--;
-                miner.fuelRemaining = miner.fuelBurnTime;
+                miner.fuelRemaining = fuelDef->burnTime;
+                if (miner.fuelBuffer == 0) miner.loadedFuelType = ItemId::None;
             } else {
                 continue; // out of fuel, idle
             }
