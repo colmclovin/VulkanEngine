@@ -2,6 +2,7 @@
 #pragma once
 #include <entt/entt.hpp>
 #include "../Game/ItemDatabase.h"
+#include "../Game/TechState.h"
 
 class RenderSystem;
 class Camera3D;
@@ -11,7 +12,7 @@ struct GameSettings;
 
 class DebugUI {
 public:
-    void Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem);
+    void Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState);
 
 private:
     void DrawStats(entt::registry &registry);
@@ -22,7 +23,8 @@ private:
     bool m_ShowDemo = false;
     bool m_RegenerateTerrainRequested = false;   // set true when user clicks "Regenerate"
     void DrawMachineInspector(entt::registry &registry, entt::entity target);
-
+    void DrawTechTree(entt::registry &registry, entt::entity player, TechState &techState);
+    bool ConsumeTechPointFromInventory(entt::registry &registry, entt::entity player, TechState &techState);
 public:
     bool ConsumeRegenerateRequest() {
         bool r = m_RegenerateTerrainRequested;

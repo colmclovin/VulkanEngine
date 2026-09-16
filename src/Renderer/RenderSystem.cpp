@@ -38,7 +38,7 @@ void RenderSystem::Init() {
     std::cout << "RenderSystem initialized with all subsystems" << std::endl;
 }
 
-void RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem) {
+void RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState) {
     m_Engine->SetClearColor(settings.clearColor);   // NEW
 
     // Render the frame using the quad renderer
@@ -49,7 +49,7 @@ void RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameS
     
     
     m_ImGuiVulkanUtil->NewFrame();                              // MOVED — now always runs against up-to-date window state
-    m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine, m_PlayerEntity, m_InspectedEntity, selectedItem);
+    m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine, m_PlayerEntity, m_InspectedEntity, selectedItem, techState);
 
     m_MeshRenderer->Render(registry, camera, settings.wireframeMode);
     m_QuadRenderer->Render(registry);

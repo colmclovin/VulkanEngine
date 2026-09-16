@@ -46,6 +46,10 @@ void RecipeDatabase::Init() {
         { { ItemId::Inserter, 1 } },  
         0.0f
         });
+    s_Recipes.push_back({ "Tech Point",
+                          { { ItemId::IronPlate, 5 }, { ItemId::CopperPlate, 5 } },
+                          { { ItemId::TechPoint, 1 } },
+                          5.0f });
 }
 
 const std::vector<Recipe>& RecipeDatabase::GetAll() {

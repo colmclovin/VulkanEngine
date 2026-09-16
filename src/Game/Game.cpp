@@ -432,7 +432,7 @@ void Game::Update(float deltaTime) {
 }
 
 void Game::Render() {
-    m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine, m_PlayerEntity, m_InspectedEntity, m_SelectedItem);
+    m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine, m_PlayerEntity, m_InspectedEntity, m_SelectedItem, m_TechState);
 }
 void Game::Shutdown() {
     std::cout << "=== Shutting Down Game ===" << std::endl;

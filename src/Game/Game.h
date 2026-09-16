@@ -9,6 +9,8 @@
 #include "../Components/WorldGenerator.h"
 #include "../Components/MinerSystem.h"
 #include "../Components/PlacementGrid.h"
+#include "TechState.h"
+
 class TerrainGenerator;
 class VulkanEngine;
 class RenderSystem;
@@ -53,7 +55,7 @@ private:
     int m_SelectedHotbarSlot = -1;   // -1 = nothing selected
     ResourceMap m_ResourceMap;
     PlacementGrid m_PlacementGrid;
-
+    TechState m_TechState;
 
     ItemId GetSelectedItem() const {
         return (m_SelectedHotbarSlot >= 0 && m_SelectedHotbarSlot < HOTBAR_SIZE) ? m_Hotbar[m_SelectedHotbarSlot] : ItemId::None;

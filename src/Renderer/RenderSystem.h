@@ -2,6 +2,7 @@
 #include <memory>
 #include <entt/entt.hpp>
 #include "../Game/ItemDatabase.h"
+#include "../Game/TechState.h"
 class VulkanEngine;
 class QuadRenderer;
 class ImGuiVulkanUtil;
@@ -21,7 +22,7 @@ public:
     
     
     void Init();
-    void RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem);
+    void RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState);
     void Shutdown();
 
     //ResourceManager *GetResourceManager() const { return m_ResourceManager.get(); }

@@ -18,8 +18,8 @@ enum class ItemId {
 	Furnace,
 	Assembler,
 	Belt,
-	Inserter
-
+	Inserter,
+    TechPoint,
 };
 struct ItemDef {
 	std::string name;

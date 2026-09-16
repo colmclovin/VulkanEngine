@@ -8,8 +8,8 @@
 #include "../Game/CraftingSystem.h"
 #include "../Game/RecipeDatabase.h"
 #include <entt/entt.hpp>
-
-void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem) {
+#include "../Game/TechState.h"
+void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3D *camera, GameSettings &settings, AudioEngine *audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState) {
 
     if (m_ShowDemo) {
         ImGui::ShowDemoWindow(&m_ShowDemo);
@@ -23,11 +23,10 @@ void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3
             DrawStats(registry);
             ImGui::Separator();
             DrawEntityList(registry);
-            DrawInventory(registry, m_PlayerEntity, selectedItem);
-			DrawCrafting(registry, m_PlayerEntity);
-            DrawMachineInspector(registry, m_InspectedEntity);
+
             ImGui::EndTabItem();
         }
+
 
         if (ImGui::BeginTabItem("Settings")) {
             DrawSettingsTab(camera, settings, audioEngine);
@@ -36,8 +35,15 @@ void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3
 
         ImGui::EndTabBar();
     }
-
     ImGui::End();
+   
+    DrawInventory(registry, m_PlayerEntity, selectedItem);
+
+    DrawCrafting(registry, m_PlayerEntity);
+
+    DrawMachineInspector(registry, m_InspectedEntity);
+    
+    DrawTechTree(registry, m_PlayerEntity, techState);
 }
 
 void DebugUI::DrawStats(entt::registry &registry) {
@@ -252,4 +258,48 @@ void DebugUI::DrawMachineInspector(entt::registry &registry, entt::entity target
     }
 
     ImGui::End();
+}
+
+void DebugUI::DrawTechTree(entt::registry &registry, entt::entity player, TechState &techState) {
+    ImGui::Begin("Tech Tree");
+    ImGui::Text("Tech Points: %d", techState.techPoints);
+    if (ImGui::Button("Consume Tech Point from Inventory")) {
+        ConsumeTechPointFromInventory(registry, player, techState);
+    }
+    ImGui::Separator();
+
+    for (TechId id : TechDatabase::GetAllIds()) {
+        const TechDef &def = TechDatabase::Get(id);
+        bool unlocked = techState.IsUnlocked(id);
+        bool canUnlock = techState.CanUnlock(id);
+
+        ImGui::PushID(static_cast<int>(id));
+        if (unlocked) {
+            ImGui::TextColored(ImVec4(0.4f, 1.0f, 0.4f, 1.0f), "[Unlocked] %s", def.name.c_str());
+        } else {
+            ImGui::Text("%s (cost: %d)", def.name.c_str(), def.cost);
+            ImGui::TextWrapped("%s", def.description.c_str());
+            ImGui::BeginDisabled(!canUnlock);
+            if (ImGui::Button("Unlock")) {
+                techState.TryUnlock(id);
+            }
+            ImGui::EndDisabled();
+        }
+        ImGui::Separator();
+        ImGui::PopID();
+    }
+    ImGui::End();
+}
+
+bool DebugUI::ConsumeTechPointFromInventory(entt::registry &registry, entt::entity player, TechState &techState) {
+    auto &inventory = registry.get<InventoryComponent>(player);
+    for (auto &slot : inventory.slots) {
+        if (slot.item == ItemId::TechPoint && slot.count > 0) {
+            slot.count--;
+            if (slot.count == 0) slot.item = ItemId::None;
+            techState.techPoints++;
+            return true;
+        }
+    }
+    return false;
 }

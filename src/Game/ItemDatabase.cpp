@@ -19,7 +19,7 @@ void ItemDatabase::Init() {
     s_Items[ItemId::Assembler] = { "Assembler", 999, "Assets/Models/Assembler.glb" };
     s_Items[ItemId::Belt] = { "Belt", 999, "Assets/Models/Belt.glb" };
     s_Items[ItemId::Inserter] = { "Inserter", 999, "Assets/Models/Inserter.glb" };
-
+    s_Items[ItemId::TechPoint] = { "Tech Point", 999, "Assets/Models/TechPoint.glb" };
 }
 
 

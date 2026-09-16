@@ -184,6 +184,7 @@
     <ClCompile Include="src\Game\ItemDatabase.cpp" />
     <ClCompile Include="src\Game\PlaceableDatabase.cpp" />
     <ClCompile Include="src\Game\RecipeDatabase.cpp" />
+    <ClCompile Include="src\Game\TechDatabase.cpp" />
     <ClCompile Include="src\Helpers\DebugUI.cpp" />
     <ClCompile Include="src\Helpers\Serializer.cpp" />
     <ClCompile Include="src\Renderer\DebugLineRenderer.cpp" />
@@ -243,6 +244,8 @@
     <ClInclude Include="src\Game\ItemDatabase.h" />
     <ClInclude Include="src\Game\Recipe.h" />
     <ClInclude Include="src\Game\RecipeDatabase.h" />
+    <ClInclude Include="src\Game\TechDatabase.h" />
+    <ClInclude Include="src\Game\TechState.h" />
     <ClInclude Include="src\Helpers\DebugUI.h" />
     <ClInclude Include="src\Helpers\Serializer.h" />
     <ClInclude Include="src\Game\PlaceableDatabase.h" />
