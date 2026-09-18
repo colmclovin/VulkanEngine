@@ -93,20 +93,30 @@ void PlacementSystem::TryConfirmPlacement(entt::registry &registry, entt::entity
                     miner.outputItem = cell->resource;
                 }
                 registry.emplace<MinerComponent>(m_GhostEntity, miner);
+                registry.emplace<PowerConsumerComponent>(m_GhostEntity, PowerConsumerComponent{ 5.0f, false }); // NEW
+
             } else if (m_PendingItem == ItemId::Furnace) {
                 registry.emplace<FurnaceComponent>(m_GhostEntity);
                 registry.emplace<MachineInventoryComponent>(m_GhostEntity, MachineInventoryComponent{
-                                                                                   { MachineSlot{} },
-                                                                                   { MachineSlot{} } });
+                                                                                   { MachineSlot{} }, { MachineSlot{} } });
+                registry.emplace<PowerConsumerComponent>(m_GhostEntity, PowerConsumerComponent{ 5.0f, false }); // NEW
             } else if (m_PendingItem == ItemId::Assembler) {
                 registry.emplace<AssemblerComponent>(m_GhostEntity);
                 registry.emplace<MachineInventoryComponent>(m_GhostEntity, MachineInventoryComponent{
                                                                                    { MachineSlot{}, MachineSlot{} },
                                                                                    { MachineSlot{} } });
+                registry.emplace<PowerConsumerComponent>(m_GhostEntity, PowerConsumerComponent{ 5.0f, false }); // NEW
             } else if (m_PendingItem == ItemId::Belt) {
                 registry.emplace_or_replace<BeltComponent>(m_GhostEntity, BeltComponent{ facing }); // safe whether or not it already exists
             } else if (m_PendingItem == ItemId::Inserter) {
                 registry.emplace<InserterComponent>(m_GhostEntity, InserterComponent{ facing });
+                registry.emplace<PowerConsumerComponent>(m_GhostEntity, PowerConsumerComponent{ 5.0f, false }); // NEW
+            } else if (m_PendingItem == ItemId::CoalGenerator) {
+                registry.emplace<PowerGeneratorComponent>(m_GhostEntity);
+                registry.emplace<MachineInventoryComponent>(m_GhostEntity, MachineInventoryComponent{
+                                                                                   { MachineSlot{} } });
+            } else if (m_PendingItem == ItemId::PowerPole) {
+                registry.emplace<PowerPoleComponent>(m_GhostEntity);
             }
 
             registry.emplace<BoundsComponent>(m_GhostEntity, BoundsComponent{ def->footprintHalfExtents });

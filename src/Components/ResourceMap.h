@@ -2,7 +2,7 @@
 #include "../Game/ItemDatabase.h"
 #include <vector>
 #include <cmath>
-
+#include <glm/glm.hpp>
 struct ResourceCell {
 	ItemId resource = ItemId::None;
 	float amount = 0.0f;
@@ -29,7 +29,7 @@ public:
 	ResourceCell& GetCell(int x, int z) { return m_Cells[z * m_GridWidth + x]; }
     static RegionType DetermineRegion(float regionNoiseValue);
 	RegionType GetRegionAtWorldPos(float worldX, float worldZ, int seed) const;
-
+    static glm::vec2 DomainWarp(float x, float z, int seed);
 
 private:
 

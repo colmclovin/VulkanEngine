@@ -4,6 +4,7 @@
 #include "../Game/FurnaceRecipeDatabase.h"
 #include "MachineInventoryComponent.h"
 #include "../Game/FuelDatabase.h"
+#include "PowerComponent.h"
 
 void FurnaceSystem::Update(entt::registry &registry, float deltaTime) {
     auto view = registry.view<FurnaceComponent, MachineInventoryComponent>();
@@ -11,16 +12,29 @@ void FurnaceSystem::Update(entt::registry &registry, float deltaTime) {
         auto &furnace = view.get<FurnaceComponent>(entity);
         auto &inv = view.get<MachineInventoryComponent>(entity);
 
+        bool hasPower = false;
+        if (registry.any_of<PowerConsumerComponent>(entity)) {
+            hasPower = registry.get<PowerConsumerComponent>(entity).isPowered;
+        }
+
+
         if (!furnace.isCooking) {
             // Need fuel available before starting a new cook cycle
-            if (furnace.fuelRemaining <= 0.0f) {
-                if (furnace.fuelBuffer <= 0) continue; // no fuel loaded — idle
-                const FuelDef* fuelDef = FuelDatabase::TryGet(furnace.loadedFuelType);
-                if (!fuelDef) continue;   // shouldn't happen, but guards against bad state
 
-                furnace.fuelBuffer--;
-                furnace.fuelRemaining = fuelDef->burnTime;
-                if (furnace.fuelBuffer == 0) furnace.loadedFuelType = ItemId::None;
+            if (hasPower) {
+                furnace.runningOnPower = true;
+            } else {
+                furnace.runningOnPower = false;
+
+                if (furnace.fuelRemaining <= 0.0f) {
+                    if (furnace.fuelBuffer <= 0) continue; // no fuel loaded — idle
+                    const FuelDef *fuelDef = FuelDatabase::TryGet(furnace.loadedFuelType);
+                    if (!fuelDef) continue; // shouldn't happen, but guards against bad state
+
+                    furnace.fuelBuffer--;
+                    furnace.fuelRemaining = fuelDef->burnTime;
+                    if (furnace.fuelBuffer == 0) furnace.loadedFuelType = ItemId::None;
+                }
             }
 
             for (auto &inSlot : inv.inputs) {
@@ -48,9 +62,15 @@ void FurnaceSystem::Update(entt::registry &registry, float deltaTime) {
                 break;
             }
         } else {
-            furnace.cookTimer -= deltaTime;
-            furnace.fuelRemaining -= deltaTime; // fuel burns down while actively cooking
 
+            // Currently cooking — if running on power, power must stay available or the furnace stalls
+            if (furnace.runningOnPower && !hasPower) {
+                continue; // lost power mid-cook — pause (don't lose progress, just wait)
+            }
+            furnace.cookTimer -= deltaTime;
+            if (!furnace.runningOnPower) {
+                furnace.fuelRemaining -= deltaTime; // only burn fuel if actually using fuel this cycle
+            }
             if (furnace.cookTimer <= 0.0f) {
                 MachineInventoryComponent::AddToSlots(inv.outputs, furnace.currentOutput, 1);
                 furnace.isCooking = false;

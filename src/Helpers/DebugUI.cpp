@@ -181,9 +181,14 @@ void DebugUI::DrawMachineInspector(entt::registry &registry, entt::entity target
         ImGui::Text("Status: %s", (miner.fuelRemaining > 0.0f) ? "Running" : "Idle (no fuel)");
         ImGui::Text("Output item: %s", miner.outputItem != ItemId::None ? ItemDatabase::Get(miner.outputItem).name.c_str() : "None");
         ImGui::Text("Output buffer: %d / %d", miner.outputBuffer, miner.outputBufferCapacity);
-        ImGui::Text("Fuel: %s x%d, %.1fs remaining",
-            miner.loadedFuelType != ItemId::None ? ItemDatabase::Get(miner.loadedFuelType).name.c_str() : "none",
-            miner.fuelBuffer, miner.fuelRemaining);
+        ImGui::Text("Powered: %s", miner.runningOnPower ? "Yes" : "No");
+        if (miner.runningOnPower) {
+            ImGui::Text("Power usage: %.1f/s", miner.powerUsage);
+        } else {
+            ImGui::Text("Fuel: %s x%d, %.1fs remaining",
+                        miner.loadedFuelType != ItemId::None ? ItemDatabase::Get(miner.loadedFuelType).name.c_str() : "none",
+                        miner.fuelBuffer, miner.fuelRemaining);
+        }
     }
 
     if (registry.any_of<FurnaceComponent>(target)) {
@@ -191,15 +196,33 @@ void DebugUI::DrawMachineInspector(entt::registry &registry, entt::entity target
         ImGui::Text("Type: Furnace");
         ImGui::Text("Status: %s", furnace.isCooking ? "Cooking" : "Idle");
         if (furnace.isCooking) ImGui::Text("Cook timer: %.1fs left", furnace.cookTimer);
-        ImGui::Text("Fuel: %s x%d, %.1fs remaining",
-            furnace.loadedFuelType != ItemId::None ? ItemDatabase::Get(furnace.loadedFuelType).name.c_str() : "none",
-            furnace.fuelBuffer, furnace.fuelRemaining);
+        ImGui::Text("Powered: %s", furnace.runningOnPower ? "Yes" : "No");
+        ImGui::Text("Power source: %s", furnace.runningOnPower ? "Electricity" : "Fuel");
+        if (furnace.runningOnPower) {
+            ImGui::Text("Power usage: %.1f/s", furnace.powerUsage);
+        } else {
+            ImGui::Text("Fuel: %s x%d, %.1fs remaining",
+                        furnace.loadedFuelType != ItemId::None ? ItemDatabase::Get(furnace.loadedFuelType).name.c_str() : "none",
+                        furnace.fuelBuffer, furnace.fuelRemaining);
+        }
     }
-
+    if (registry.any_of<PowerGeneratorComponent>(target)) {
+        auto &generator = registry.get<PowerGeneratorComponent>(target);
+        ImGui::Text("Type: Power Generator");
+        //ImGui::Text("Status: %s", generator.isGenerating ? "Generating" : "Idle");
+       // if (generator.isGenerating) ImGui::Text("Generation timer: %.1fs left", generator.generationTimer);
+        ImGui::Text("Fuel: %s x%d, %.1fs remaining",
+                    generator.loadedFuelType != ItemId::None ? ItemDatabase::Get(generator.loadedFuelType).name.c_str() : "none",
+                    generator.fuelBuffer, generator.fuelRemaining);
+    }
     if (registry.any_of<AssemblerComponent>(target)) {
         auto &assembler = registry.get<AssemblerComponent>(target);
         ImGui::Text("Type: Assembler");
         ImGui::Text("Status: %s", assembler.isCrafting ? "Crafting" : "Idle");
+        ImGui::Text("Powered: %s", assembler.runningOnPower ? "Yes" : "No");
+        if (assembler.runningOnPower) {
+            ImGui::Text("Power usage: %.1f/s", assembler.powerUsage);
+        } 
         if (assembler.selectedRecipeIndex >= 0) {
             auto &recipes = RecipeDatabase::GetAll();
             if (assembler.selectedRecipeIndex < (int)recipes.size()) {
@@ -241,6 +264,10 @@ void DebugUI::DrawMachineInspector(entt::registry &registry, entt::entity target
     if (registry.any_of<InserterComponent>(target)) {
         auto &inserter = registry.get<InserterComponent>(target);
         ImGui::Text("Type: Inserter");
+        ImGui::Text("Powered: %s", inserter.runningOnPower ? "Yes" : "No");
+        if (inserter.runningOnPower) {
+            ImGui::Text("Power usage: %.1f/s", inserter.powerUsage);
+        } 
         ImGui::Text("Holding: %s", inserter.holdingItem ? ItemDatabase::Get(inserter.heldItem).name.c_str() : "Nothing");
     }
 

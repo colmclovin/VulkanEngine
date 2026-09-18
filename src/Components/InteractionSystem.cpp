@@ -259,7 +259,8 @@ entt::entity InteractionSystem::FindMachineAlongRay(entt::registry &registry, gl
     // Matches anything with bounds + an inventory OR a miner — covers furnace, assembler, miner alike
     auto view = registry.view<TransformComponent, BoundsComponent>();
     for (auto entity : view) {
-        bool isMachine = registry.any_of<MachineInventoryComponent, MinerComponent, BeltComponent, InserterComponent>(entity);
+        bool isMachine = registry.any_of<MachineInventoryComponent, MinerComponent, BeltComponent, InserterComponent,
+                                         PowerGeneratorComponent, PowerPoleComponent>(entity);
         (entity);
         if (!isMachine) continue;
 
@@ -424,4 +425,26 @@ bool InteractionSystem::TryPickupMachine(entt::registry &registry, entt::entity 
 
     registry.destroy(target);
     return true;
+}
+// InteractionSystem.cpp
+bool InteractionSystem::TryFuelGenerator(entt::registry &registry, entt::entity generatorEntity, entt::entity player, ItemId selectedItem, int amount) {
+    if (!registry.valid(generatorEntity) || !registry.any_of<PowerGeneratorComponent>(generatorEntity)) return false;
+    if (!FuelDatabase::IsFuel(selectedItem)) return false;
+
+    auto &gen = registry.get<PowerGeneratorComponent>(generatorEntity);
+    if (gen.fuelBuffer > 0 && gen.loadedFuelType != selectedItem) return false;
+
+    auto &inventory = registry.get<InventoryComponent>(player);
+    for (auto &slot : inventory.slots) {
+        if (slot.item == selectedItem && slot.count > 0) {
+            int take = std::min(slot.count, amount);
+            slot.count -= take;
+            if (slot.count == 0) slot.item = ItemId::None;
+
+            gen.fuelBuffer += take;
+            gen.loadedFuelType = selectedItem;
+            return true;
+        }
+    }
+    return false;
 }

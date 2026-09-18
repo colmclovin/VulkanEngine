@@ -16,6 +16,14 @@ void InserterSystem::Update(entt::registry &registry, PlacementGrid &grid, float
         glm::vec3 behindDir = -inserter.facing;
         glm::vec3 aheadDir = inserter.facing;
 
+        bool hasPower = false;
+        if (registry.any_of<PowerConsumerComponent>(entity)) {
+            hasPower = registry.get<PowerConsumerComponent>(entity).isPowered;
+        }
+        inserter.runningOnPower = hasPower;
+
+        if (!hasPower) continue;
+
         if (!inserter.holdingItem) {
             entt::entity sourceEntity = FindNeighborInDirection(registry, grid, transform.Position, bounds.halfExtents, behindDir, gridSize);
             if (!registry.valid(sourceEntity)) continue;

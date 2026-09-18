@@ -20,6 +20,8 @@ enum class ItemId {
 	Belt,
 	Inserter,
     TechPoint,
+	PowerPole,
+	CoalGenerator
 };
 struct ItemDef {
 	std::string name;

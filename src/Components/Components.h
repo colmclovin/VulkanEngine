@@ -15,3 +15,4 @@
 #include "AssemblerComponent.h"
 #include "BeltComponent.h"
 #include "InserterComponent.h"
+#include "PowerComponent.h"

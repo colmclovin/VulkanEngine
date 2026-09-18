@@ -14,4 +14,7 @@ struct MinerComponent {
     ItemId outputItem = ItemId::None; // set once, based on what resource is under it
     int outputBuffer = 0; // items waiting to be collected/transported
     int outputBufferCapacity = 50;
+
+        float powerUsage = 5.0f; // NEW — power units consumed per second while running on power
+    bool runningOnPower = false; // NEW — informational, tracks which mode this cook cycle used
 };

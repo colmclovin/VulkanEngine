@@ -23,6 +23,7 @@
 #include "../Components/BeltSystem.h"
 #include "../Components/InserterSystem.h"
 #include "FuelDatabase.h"
+#include "../Components/PowerSystem.h"
 
 
 Game::Game() {
@@ -248,18 +249,15 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
                 if (!collected) {
                     ItemId selected = m_SelectedItem;
                     if (selected != ItemId::None) {
-                        // Try fuel first if this is a fuel-consuming machine, then fall back to generic ore/ingredient insertion
-                        bool fueledFurnace = false;
+                        bool fueledSomething = false;
                         if (m_Registry->any_of<FurnaceComponent>(machineTarget)) {
-                            fueledFurnace = InteractionSystem::TryFuelFurnace(*m_Registry, machineTarget, m_PlayerEntity, selected, 1);
+                            fueledSomething = InteractionSystem::TryFuelFurnace(*m_Registry, machineTarget, m_PlayerEntity, selected, 1);
+                        } else if (m_Registry->any_of<PowerGeneratorComponent>(machineTarget)) {
+                            fueledSomething = InteractionSystem::TryFuelGenerator(*m_Registry, machineTarget, m_PlayerEntity, selected, 1);
                         }
-                        if (!fueledFurnace) {
+                        if (!fueledSomething) {
                             InteractionSystem::TryInsertIntoMachine(*m_Registry, machineTarget, m_PlayerEntity, selected, 1);
                         }
-                    }
-
-                    if (m_Registry->any_of<MinerComponent>(machineTarget)) {
-                        InteractionSystem::TryFuelMiner(*m_Registry, machineTarget, m_PlayerEntity, m_SelectedItem, 1);
                     }
                 }
             }
@@ -429,6 +427,7 @@ void Game::Update(float deltaTime) {
     AssemblerSystem::Update(*m_Registry, deltaTime);
     BeltSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
     InserterSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
+    PowerSystem::Update(*m_Registry, deltaTime);
 }
 
 void Game::Render() {

@@ -11,36 +11,42 @@ void MinerSystem::Update(entt::registry &registry, ResourceMap &resourceMap, flo
         auto &transform = view.get<TransformComponent>(entity);
         auto &miner = view.get<MinerComponent>(entity);
 
-        if (miner.outputItem == ItemId::None) continue; // nothing to mine here
-        if (miner.outputBuffer >= miner.outputBufferCapacity) continue; // buffer full, wait for collection
+        if (miner.outputItem == ItemId::None) continue;
+        if (miner.outputBuffer >= miner.outputBufferCapacity) continue;
 
-        // --- Fuel handling ---
-        if (miner.fuelRemaining <= 0.0f) {
-            if (miner.fuelBuffer > 0) {
+        bool hasPower = false;
+        if (registry.any_of<PowerConsumerComponent>(entity)) {
+            hasPower = registry.get<PowerConsumerComponent>(entity).isPowered;
+        }
+
+        miner.runningOnPower = hasPower;
+
+        if (!hasPower) {
+            // Fuel path — unchanged from before
+            if (miner.fuelRemaining <= 0.0f) {
+                if (miner.fuelBuffer <= 0) continue;
+
                 const FuelDef *fuelDef = FuelDatabase::TryGet(miner.loadedFuelType);
                 if (!fuelDef) continue;
+
                 miner.fuelBuffer--;
                 miner.fuelRemaining = fuelDef->burnTime;
                 if (miner.fuelBuffer == 0) miner.loadedFuelType = ItemId::None;
-            } else {
-                continue; // out of fuel, idle
             }
+            miner.fuelRemaining -= deltaTime;
         }
-        miner.fuelRemaining -= deltaTime;
+        // if hasPower, no fuel is touched at all — PowerSystem handles whether the generator can sustain this draw
 
-        // --- Extraction ---
         miner.outputTimer += deltaTime;
         if (miner.outputTimer >= miner.outputInterval) {
             miner.outputTimer -= miner.outputInterval;
 
-            // Pull from the ResourceMap cell(s) within collectionRadius.
-            // Simplest version: just sample the miner's own position — expand to a small area scan later if needed.
             ResourceCell *cell = resourceMap.GetCellAtWorldPos(transform.Position.x, transform.Position.z);
             if (cell && cell->resource == miner.outputItem && cell->amount > 0.0f) {
                 resourceMap.ExtractFromCell(cell, miner.extractionRate);
                 miner.outputBuffer++;
             } else {
-                miner.outputItem = ItemId::None; // patch depleted or gone — miner goes idle permanently
+                miner.outputItem = ItemId::None;
             }
         }
     }

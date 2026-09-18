@@ -12,41 +12,29 @@ void ResourceMap::Generate(int gridWidth, int gridDepth, float cellSize, int see
     FastNoiseLite regionNoise;
     regionNoise.SetSeed(seed + 1000);
     regionNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    regionNoise.SetFrequency(0.02f); // LOW frequency = large contiguous regions
+    regionNoise.SetFrequency(0.02f);
 
     FastNoiseLite densityNoise;
-    densityNoise.SetSeed(seed + 3000); // different seed offset, independent pattern
+    densityNoise.SetSeed(seed + 3000);
     densityNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    densityNoise.SetFrequency(0.3f); // HIGH frequency = fine-grained variation within a region
+    densityNoise.SetFrequency(0.3f);
 
     for (int z = 0; z < gridDepth; z++) {
         for (int x = 0; x < gridWidth; x++) {
-            float regionValue = regionNoise.GetNoise(static_cast<float>(x), static_cast<float>(z));
+            glm::vec2 warped = DomainWarp(static_cast<float>(x), static_cast<float>(z), seed); // CHANGED
+            float regionValue = regionNoise.GetNoise(warped.x, warped.y); // CHANGED — sample warped coords
             RegionType region = DetermineRegion(regionValue);
 
             ResourceCell &cell = m_Cells[z * gridWidth + x];
 
             if (region == RegionType::IronDeposit || region == RegionType::CopperDeposit || region == RegionType::CoalDeposit) {
-                float density = densityNoise.GetNoise(static_cast<float>(x), static_cast<float>(z));
-                // Even within the deposit region, only some tiles actually have ore —
-                // gives texture/richness variation instead of a flat solid block of color.
+                float density = densityNoise.GetNoise(static_cast<float>(x), static_cast<float>(z)); // density stays unwarped — fine detail within a region
                 if (density > -0.2f) {
-                    if (region == RegionType::IronDeposit)
-                    {
-                        cell.resource = ItemId::IronOre;
-                    }
-                    else if (region == RegionType::CopperDeposit)
-                    {
-                        cell.resource = ItemId::CopperOre;
-                    }
-                    else if (region == RegionType::CoalDeposit)
-                    {
-                        cell.resource = ItemId::Coal;
-                    }
+                    cell.resource = (region == RegionType::IronDeposit) ? ItemId::IronOre : (region == RegionType::CopperDeposit) ? ItemId::CopperOre :
+                                                                                                                                    ItemId::Coal;
                     cell.amount = 500.0f;
                 }
             }
-            // Forest/Plains: no ore; tree placement handled separately by WorldGenerator using the same region logic
         }
     }
 }
@@ -69,19 +57,36 @@ void ResourceMap::ExtractFromCell(ResourceCell* cell, float amount) {
 
 
 RegionType ResourceMap::DetermineRegion(float regionNoiseValue) {
-    // Wide, non-overlapping ranges = large contiguous areas, not thin bands
-    if (regionNoiseValue > 0.5f) return RegionType::IronDeposit;
-    if (regionNoiseValue > 0.25f) return RegionType::CoalDeposit;
-    if (regionNoiseValue > 0.15f) return RegionType::CopperDeposit;
-    
+    if (regionNoiseValue > 0.6f) return RegionType::IronDeposit;
+    if (regionNoiseValue > 0.35f) return RegionType::CopperDeposit;
+    if (regionNoiseValue > 0.15f) return RegionType::CoalDeposit;
     if (regionNoiseValue > -0.2f) return RegionType::Forest;
     return RegionType::Plains;
 }
 
 RegionType ResourceMap::GetRegionAtWorldPos(float worldX, float worldZ, int seed) const {
+    glm::vec2 warped = DomainWarp(worldX / m_CellSize, worldZ / m_CellSize, seed); // CHANGED
+
     FastNoiseLite regionNoise;
-    regionNoise.SetSeed(seed + 1000); // MUST match the seed offset used in Generate()
+    regionNoise.SetSeed(seed + 1000);
     regionNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
     regionNoise.SetFrequency(0.02f);
-    return DetermineRegion(regionNoise.GetNoise(worldX / m_CellSize, worldZ / m_CellSize));
+    return DetermineRegion(regionNoise.GetNoise(warped.x, warped.y));
+}
+glm::vec2 ResourceMap::DomainWarp(float x, float z, int seed) {
+    FastNoiseLite warpNoiseX;
+    warpNoiseX.SetSeed(seed + 5000);
+    warpNoiseX.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    warpNoiseX.SetFrequency(0.01f); // low frequency — large, slow-moving distortion
+
+    FastNoiseLite warpNoiseZ;
+    warpNoiseZ.SetSeed(seed + 6000);
+    warpNoiseZ.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    warpNoiseZ.SetFrequency(0.01f);
+
+    float warpStrength = 25.0f; // how far coordinates get pushed — tune to taste
+    float warpedX = x + warpNoiseX.GetNoise(x, z) * warpStrength;
+    float warpedZ = z + warpNoiseZ.GetNoise(x, z) * warpStrength;
+
+    return glm::vec2(warpedX, warpedZ);
 }

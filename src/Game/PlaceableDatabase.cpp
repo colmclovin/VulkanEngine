@@ -7,11 +7,14 @@ void PlaceableDatabase::Init() {
     s_Placeables[ItemId::Wood] = { "Assets/Models/Wood.glb", glm::vec3(1.0f), glm::vec3(0.5f, 1.0f, 0.5f) };
     s_Placeables[ItemId::CopperOre] = { "Assets/Models/CopperOre.glb", glm::vec3(1.0f), glm::vec3(0.5f, 1.0f, 0.5f) };
     s_Placeables[ItemId::IronOre] = { "Assets/Models/IronOre.glb", glm::vec3(1.0f), glm::vec3(0.5f, 1.0f, 0.5f) };
+    s_Placeables[ItemId::Coal] = { "Assets/Models/Coal.glb", glm::vec3(1.0f), glm::vec3(0.5f, 1.0f, 0.5f) };
     s_Placeables[ItemId::Miner] = { "Assets/Models/Miner.glb", glm::vec3(1.0f), glm::vec3(2.0f, 2.0f, 2.0f) };
     s_Placeables[ItemId::Furnace] = { "Assets/Models/Furnace.glb", glm::vec3(1.0f), glm::vec3(2.0f, 2.0f, 2.0f) };
     s_Placeables[ItemId::Assembler] = { "Assets/Models/Assembler.glb", glm::vec3(1.0f), glm::vec3(2.0f, 2.0f, 2.0f) };
     s_Placeables[ItemId::Belt] = { "Assets/Models/Belt.glb", glm::vec3(1.0f), glm::vec3(1.0f, 1.0f, 1.0f) };
     s_Placeables[ItemId::Inserter] = { "Assets/Models/Inserter.glb", glm::vec3(1.0f), glm::vec3(1.0f, 1.0f, 1.0f) };
+    s_Placeables[ItemId::PowerPole] = { "Assets/Models/PowerPole.glb", glm::vec3(1.0f), glm::vec3(0.5f, 3.0f, 0.5f) };
+    s_Placeables[ItemId::CoalGenerator] = { "Assets/Models/CoalGenerator.glb", glm::vec3(1.0f), glm::vec3(2.0f, 2.0f, 2.0f) };
 
     // add more as you get building item types, e.g. ItemId::Furnace, ItemId::Belt
 }

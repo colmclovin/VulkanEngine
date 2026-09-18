@@ -29,4 +29,5 @@ public:
     static bool TryFuelFurnace(entt::registry &registry, entt::entity furnaceEntity, entt::entity player, ItemId selectedItem, int amount);
     static bool TryRotateMachine(entt::registry &registry, entt::entity target);
     static bool TryPickupMachine(entt::registry &registry, entt::entity target, entt::entity player, PlacementGrid &placementGrid, float gridSize);
+    static bool TryFuelGenerator(entt::registry &registry, entt::entity generatorEntity, entt::entity player, ItemId selectedItem, int amount);
 };

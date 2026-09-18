@@ -8,4 +8,7 @@ struct InserterComponent {
     float timer = 0.0f;
     bool holdingItem = false;
     ItemId heldItem = ItemId::None;
+
+    float powerUsage = 1.0f; // NEW — power units consumed per second while running on power
+    bool runningOnPower = false; // NEW — informational, tracks which mode this cook cycle used
 };

@@ -173,6 +173,7 @@
     <ClCompile Include="src\Components\MinerSystem.cpp" />
     <ClCompile Include="src\Components\ModelLoader.cpp" />
     <ClCompile Include="src\Components\PlacementSystem.cpp" />
+    <ClCompile Include="src\Components\PowerSystem.cpp" />
     <ClCompile Include="src\Components\ResourceMap.cpp" />
     <ClCompile Include="src\Components\TerrainGenerator.cpp" />
     <ClCompile Include="src\Components\WorldGenerator.cpp" />
@@ -228,6 +229,8 @@
     <ClInclude Include="src\Components\PlacementGrid.h" />
     <ClInclude Include="src\Components\PlacementSystem.h" />
     <ClInclude Include="src\Components\PlayerComponent.h" />
+    <ClInclude Include="src\Components\PowerComponent.h" />
+    <ClInclude Include="src\Components\PowerSystem.h" />
     <ClInclude Include="src\Components\ResourceMap.h" />
     <ClInclude Include="src\Components\SpriteComponent.h" />
     <ClInclude Include="src\Components\SubMesh.h" />

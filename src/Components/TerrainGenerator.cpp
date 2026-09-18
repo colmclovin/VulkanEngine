@@ -83,10 +83,15 @@ std::shared_ptr<Mesh> TerrainGenerator::GenerateHeightmapTerrain(
 }
 
 
-float TerrainGenerator::SampleHeight(float worldX, float worldZ, const TerrainSettings& settings) {
+float TerrainGenerator::SampleHeight(float worldX, float worldZ, const TerrainSettings &settings) {
     FastNoiseLite noise;
     noise.SetSeed(settings.seed);
     noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+    noise.SetFractalType(FastNoiseLite::FractalType_FBm); // fractal Brownian motion — layers multiple octaves
+    noise.SetFractalOctaves(4); // more octaves = more fine detail
+    noise.SetFractalLacunarity(2.0f); // frequency multiplier per octave
+    noise.SetFractalGain(0.5f); // amplitude multiplier per octave
     noise.SetFrequency(settings.noiseScale);
+
     return noise.GetNoise(worldX, worldZ) * settings.heightScale;
 }

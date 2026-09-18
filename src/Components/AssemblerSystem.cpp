@@ -3,6 +3,7 @@
 #include "AssemblerComponent.h"
 #include "MachineInventoryComponent.h"
 #include "../Game/RecipeDatabase.h"
+#include "PowerComponent.h"
 
 void AssemblerSystem::Update(entt::registry &registry, float deltaTime) {
     auto view = registry.view<AssemblerComponent, MachineInventoryComponent>();
@@ -10,12 +11,20 @@ void AssemblerSystem::Update(entt::registry &registry, float deltaTime) {
         auto &assembler = view.get<AssemblerComponent>(entity);
         auto &inv = view.get<MachineInventoryComponent>(entity);
 
+        bool hasPower = false;
+        if (registry.any_of<PowerConsumerComponent>(entity)) {
+            hasPower = registry.get<PowerConsumerComponent>(entity).isPowered;
+        }
+        assembler.runningOnPower = hasPower;
+
         if (assembler.selectedRecipeIndex < 0) continue;
         const auto &recipes = RecipeDatabase::GetAll();
         if (assembler.selectedRecipeIndex >= static_cast<int>(recipes.size())) continue;
         const Recipe &recipe = recipes[assembler.selectedRecipeIndex];
 
         if (!assembler.isCrafting) {
+            if (!hasPower) continue; // ADD — can't START a new craft cycle without power
+
             bool hasAllInputs = true;
             for (auto &req : recipe.inputs) {
                 int have = 0;
@@ -50,6 +59,8 @@ void AssemblerSystem::Update(entt::registry &registry, float deltaTime) {
             assembler.isCrafting = true;
             assembler.craftTimer = recipe.craftTime;
         } else {
+            if (!hasPower) continue; // ADD — pause mid-craft if power is lost; progress isn't lost, just frozen
+
             assembler.craftTimer -= deltaTime;
             if (assembler.craftTimer <= 0.0f) {
                 for (auto &out : recipe.outputs) {
