@@ -18,7 +18,24 @@ MeshRenderer::~MeshRenderer() {
 void MeshRenderer::Init() {
     std::cout << "Initializing Mesh Renderer..." << std::endl;
     
+
+
+
     CreatePipeline();
+
+    TextureData whitePixel;
+    whitePixel.width = 1;
+    whitePixel.height = 1;
+    whitePixel.pixels = { 255, 255, 255, 255 };
+
+    m_DefaultTexture = std::make_shared<Texture>();
+    m_DefaultTexture->UploadToGPU(m_Engine, whitePixel);
+
+    m_DefaultDescriptorSet = AllocateTextureDescriptorSet(m_DefaultTexture->imageView, m_DefaultTexture->sampler);
+
+
+
+
     m_initialized = true;
     std::cout << "Mesh Renderer initialized" << std::endl;
 }
@@ -94,6 +111,9 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
                 vkCmdPushConstants(commandBuffer, m_PipelineLayout,
                                    VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &pushConstants);
             }
+            // No submesh/material — always use the default white texture
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout,
+                                    0, 1, &m_DefaultDescriptorSet, 0, nullptr);
 
             vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshComp.mesh->Indices.size()), 1, 0, 0, 0);
         } else {
@@ -116,6 +136,12 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
                                        VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &pushConstants);
                 }
 
+                VkDescriptorSet setToBind = (sub.materialIndex >= 0 && sub.materialIndex < (int)meshComp.mesh->Materials.size() && meshComp.mesh->Materials[sub.materialIndex].descriptorSet != VK_NULL_HANDLE) ? meshComp.mesh->Materials[sub.materialIndex].descriptorSet : m_DefaultDescriptorSet;
+
+                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout,
+                                        0, 1, &setToBind, 0, nullptr);
+
+
                 vkCmdDrawIndexed(commandBuffer, sub.indexCount, 1, sub.indexOffset, 0, 0);
             }
         }
@@ -131,13 +157,56 @@ void MeshRenderer::CreatePipeline() {
     pushConstantRange.offset = 0;
     pushConstantRange.size = sizeof(MeshPushConstants);
 
-    // Pipeline layout (no descriptor sets, just push constants)
+   /* // Pipeline layout (no descriptor sets, just push constants)
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 0;
     pipelineLayoutInfo.pSetLayouts = nullptr;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+    */
+
+       VkDescriptorSetLayoutBinding samplerBinding{};
+    samplerBinding.binding = 0;
+    samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    samplerBinding.descriptorCount = 1;
+    samplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutCreateInfo setLayoutInfo{};
+    setLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    setLayoutInfo.bindingCount = 1;
+    setLayoutInfo.pBindings = &samplerBinding;
+    vkCreateDescriptorSetLayout(m_Engine->GetDevice(), &setLayoutInfo, nullptr, &m_TextureDescriptorSetLayout);
+
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    poolSize.descriptorCount = 256; // max unique textured materials — raise if you have more
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = 256;
+    poolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    vkCreateDescriptorPool(m_Engine->GetDevice(), &poolInfo, nullptr, &m_TextureDescriptorPool);
+
+    // Default 1x1 white texture/sampler for materials without a real texture — avoids needing two shader paths
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = samplerInfo.addressModeV = samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    vkCreateSampler(m_Engine->GetDevice(), &samplerInfo, nullptr, &m_DefaultSampler);
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &m_TextureDescriptorSetLayout; // NEW
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+    vkCreatePipelineLayout(m_Engine->GetDevice(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout);
+
 
     if (vkCreatePipelineLayout(m_Engine->GetDevice(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create Mesh Renderer pipeline layout");
@@ -252,6 +321,7 @@ void MeshRenderer::CreatePipeline() {
     depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
 
 
+ 
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -306,4 +376,33 @@ void MeshRenderer::Shutdown() {
     }
     m_initialized = false;
     std::cout << "Mesh Renderer shut down" << std::endl;
+}
+VkDescriptorSet MeshRenderer::AllocateTextureDescriptorSet(VkImageView imageView, VkSampler sampler) {
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = m_TextureDescriptorPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &m_TextureDescriptorSetLayout;
+
+    VkDescriptorSet descriptorSet;
+    if (vkAllocateDescriptorSets(m_Engine->GetDevice(), &allocInfo, &descriptorSet) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to allocate texture descriptor set");
+    }
+
+    VkDescriptorImageInfo imageInfo{};
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = imageView;
+    imageInfo.sampler = sampler;
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = descriptorSet;
+    write.dstBinding = 0;
+    write.dstArrayElement = 0;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    write.descriptorCount = 1;
+    write.pImageInfo = &imageInfo;
+
+    vkUpdateDescriptorSets(m_Engine->GetDevice(), 1, &write, 0, nullptr);
+    return descriptorSet;
 }

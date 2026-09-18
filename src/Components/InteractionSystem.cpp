@@ -7,6 +7,7 @@
 #include <iostream>
 #include "PlacementGrid.h"
 #include "../Game/FuelDatabase.h"
+#include "../Engine/VulkanEngine.h"
 
 entt::entity InteractionSystem::FindNearestInteractable(entt::registry &registry, glm::vec3 playerPos, float range) {
     entt::entity closest = entt::null;
@@ -40,7 +41,7 @@ entt::entity InteractionSystem::FindNearestPickup(entt::registry &registry, glm:
     return closest;
 }
 
-void InteractionSystem::Mine(entt::registry &registry, entt::entity target, entt::entity player, AudioEventSystem *audio) {
+void InteractionSystem::Mine(entt::registry &registry, entt::entity target, entt::entity player, AudioEventSystem *audio, VulkanEngine *engine, MeshRenderer *meshRenderer) {
     if (!registry.valid(target) || !registry.any_of<HarvestableComponent>(target)) return;
 
     auto &harvest = registry.get<HarvestableComponent>(target);
@@ -67,7 +68,7 @@ void InteractionSystem::Mine(entt::registry &registry, entt::entity target, entt
 		pickupTransform.Scale = glm::vec3(0.3f); 
         registry.emplace<PickupComponent>(pickupEntity, PickupComponent{ harvest.yieldItem, harvest.yieldOnDestroy });
         // TODO: give it a small mesh (a dropped-item model) via MeshComponent once you have one
-        auto dropMesh = ItemDatabase::GetWorldMesh(harvest.yieldItem);   // CHANGED — looked up, not stored
+        auto dropMesh = ItemDatabase::GetWorldMesh(harvest.yieldItem, engine, meshRenderer);   // CHANGED — looked up, not stored
         if (dropMesh) {
             registry.emplace<MeshComponent>(pickupEntity, dropMesh);
         }
@@ -110,7 +111,7 @@ bool InteractionSystem::TryMineGround(ResourceMap &resourceMap, entt::registry &
 
 bool InteractionSystem::TryMineAtCursor(entt::registry &registry, ResourceMap &resourceMap, entt::entity player,
                                         glm::vec3 rayOrigin, glm::vec3 rayDir, const TerrainSettings &terrainSettings,
-                                        float maxRange, AudioEventSystem *audio) {
+                                        float maxRange, AudioEventSystem *audio, VulkanEngine *engine, MeshRenderer *meshRenderer) {
     auto &playerTransform = registry.get<TransformComponent>(player);
 
     std::cout << "rayOrigin: " << rayOrigin.x << "," << rayOrigin.y << "," << rayOrigin.z << std::endl;
@@ -120,7 +121,7 @@ entt::entity target = FindEntityAlongRay(registry, rayOrigin, rayDir, 100.0f); /
     if (registry.valid(target)) {
         float dist = glm::length(registry.get<TransformComponent>(target).Position - playerTransform.Position);
         if (dist <= maxRange) { // THIS is the real gameplay range check
-            Mine(registry, target, player, audio);
+            Mine(registry, target, player, audio, engine, meshRenderer);
             return true;
         
         }

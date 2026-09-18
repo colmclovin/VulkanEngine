@@ -8,4 +8,6 @@ struct HarvestableComponent {
     ItemId yieldItem = ItemId::Wood;
     int yieldPerHit = 1;
     int yieldOnDestroy = 5;
+
+        NLOHMANN_DEFINE_TYPE_INTRUSIVE(HarvestableComponent, health, maxHealth, yieldItem, yieldPerHit, yieldOnDestroy)
 };

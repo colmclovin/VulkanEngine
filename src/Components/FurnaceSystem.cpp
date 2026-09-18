@@ -17,6 +17,20 @@ void FurnaceSystem::Update(entt::registry &registry, float deltaTime) {
             hasPower = registry.get<PowerConsumerComponent>(entity).isPowered;
         }
 
+        if (registry.any_of<PowerConsumerComponent>(entity)) {
+            auto &consumer = registry.get<PowerConsumerComponent>(entity);
+            bool couldStartCooking = false;
+            if (!furnace.isCooking) {
+                for (auto &inSlot : inv.inputs) {
+                    if (inSlot.item != ItemId::None && FurnaceRecipeDatabase::TryGet(inSlot.item)) {
+                        couldStartCooking = true;
+                        break;
+                    }
+                }
+            }
+            consumer.wantsPower = furnace.isCooking || couldStartCooking;
+        }
+
 
         if (!furnace.isCooking) {
             // Need fuel available before starting a new cook cycle

@@ -25,6 +25,18 @@ public:
         return true;
     }
 
+    std::vector<TechId> GetUnlockedList() const {
+        return std::vector<TechId>(m_Unlocked.begin(), m_Unlocked.end());
+    }
+    void ForceUnlock(TechId id) { // bypasses cost/prereq checks, for loading
+        m_Unlocked.insert(id);
+    }
+
+
+
 private:
     std::unordered_set<TechId> m_Unlocked;
 };
+
+void to_json(nlohmann::json &j, const TechId &id);
+void from_json(const nlohmann::json &j, TechId &id);

@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>       // glm::quat, glm::mat4_cast
 #include <glm/gtc/matrix_transform.hpp> // glm::translate, glm::scale
+#include "../Helpers/GlmSerialization.h"  
 
 
 struct TransformComponent {
@@ -12,4 +13,6 @@ struct TransformComponent {
     glm::mat4 GetMatrix() const {
         return glm::translate(glm::mat4(1.0f), Position) * glm::mat4_cast(Rotation) * glm::scale(glm::mat4(1.0f), Scale);
     }
+   
+NLOHMANN_DEFINE_TYPE_INTRUSIVE(TransformComponent, Position, Rotation, Scale) // ADD
 };

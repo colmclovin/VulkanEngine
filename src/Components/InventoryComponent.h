@@ -1,10 +1,13 @@
 #pragma once
 #include "../Game/ItemDatabase.h"
 #include <vector>
+#include "../Helpers/GlmSerialization.h"  
+#include "../Game/ItemDatabase.h"
 
 struct ItemStack {
     ItemId item = ItemId::None;
     int count = 0;
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(ItemStack, item, count)
 };
 
 struct InventoryComponent {
@@ -39,4 +42,5 @@ struct InventoryComponent {
         }
         return count; // whatever didn't fit
     }
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(InventoryComponent, slots, capacity)
 };

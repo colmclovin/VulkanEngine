@@ -9,7 +9,7 @@
 #include <iostream>
 void PlacementSystem::Update(entt::registry& registry, entt::entity player, Camera3D& camera,
     ItemId selectedItem, const TerrainSettings& terrainSettings,
-    float mouseX, float mouseY, float screenWidth, float screenHeight, float aspect, PlacementGrid& placementGrid) {
+    float mouseX, float mouseY, float screenWidth, float screenHeight, float aspect, PlacementGrid& placementGrid, VulkanEngine *engine, MeshRenderer *meshRenderer) {
     const PlaceableDef* def = PlaceableDatabase::TryGet(selectedItem);
     if (!def) {
         CancelPlacement(registry);
@@ -40,7 +40,7 @@ void PlacementSystem::Update(entt::registry& registry, entt::entity player, Came
         ghostTransform.Position = ghostPos;
         ghostTransform.Rotation = glm::angleAxis(angle, glm::vec3(0, 1, 0));
 
-        auto mesh = ItemDatabase::GetWorldMesh(selectedItem);
+        auto mesh = ItemDatabase::GetWorldMesh(selectedItem, engine, meshRenderer);
         if (mesh) registry.emplace<MeshComponent>(m_GhostEntity, mesh);
         registry.emplace<GhostComponent>(m_GhostEntity, GhostComponent{ blocked }); // CHANGED — pass blocked in
 

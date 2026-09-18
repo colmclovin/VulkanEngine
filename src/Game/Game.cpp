@@ -1,4 +1,5 @@
 #include "Game.h"
+#include <filesystem>
 #include "../Engine/VulkanEngine.h"
 #include "../Renderer/RenderSystem.h"
 #include <iostream>
@@ -24,8 +25,9 @@
 #include "../Components/InserterSystem.h"
 #include "FuelDatabase.h"
 #include "../Components/PowerSystem.h"
-
-
+#include "../Helpers/SaveManager.h"
+#include "../Renderer/ImGuiVulkanUtil.h"
+#include "../Helpers/PauseMenuAction.h"
 Game::Game() {
 
 }
@@ -45,9 +47,28 @@ void Game::Run() {
         float deltaTime = currentTime - lastTime;
         lastTime = currentTime;
 
-        HandleInput(deltaTime);
-        Update(deltaTime);
-        Render();
+        GLFWwindow *window = m_VulkanEngine->GetWindow();
+
+        // Esc toggle — works regardless of Playing/Paused, checked once here rather than duplicated in both states
+        static bool escWasDown = false;
+        bool escIsDown = glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
+        if (escIsDown && !escWasDown) {
+            if (m_State == GameState::Playing)
+                m_State = GameState::Paused;
+            else if (m_State == GameState::Paused)
+                m_State = GameState::Playing;
+        }
+        escWasDown = escIsDown;
+
+        if (m_State == GameState::MainMenu) {
+            RunMainMenu();
+        } else if (m_State == GameState::Playing) {
+            HandleInput(deltaTime);
+            Update(deltaTime);
+            Render();
+        } else if (m_State == GameState::Paused) {
+            RunPauseMenu(); // renders the frozen last frame + pause UI on top, no gameplay update
+        }
     }
 
     Shutdown();
@@ -71,9 +92,9 @@ void Game::Init() {
 
 
 
-    std::cout << "=== Initializing Game ===" << std::endl;
+    std::cout << "=== Initializing Engine ===" << std::endl;
     m_VulkanEngine = std::make_unique<VulkanEngine>();
-    m_VulkanEngine->Init("Vulkan Game", 1280, 720);
+    m_VulkanEngine->Init("Game", 1280, 720);
 
     std::cout << "=== Initializing Audio Engine ===" << std::endl;
     m_AudioEngine = std::make_unique<AudioEngine>();
@@ -89,7 +110,7 @@ void Game::Init() {
     m_AudioEngine->SetMasterVolume(m_Settings.masterVolume);
     m_AudioEngine->SetMusicVolume(m_Settings.musicVolume);
     m_AudioEngine->SetSFXVolume(m_Settings.sfxVolume);
-
+    std::cout << "=== Initializing Render Engine ===" << std::endl;
 
 
     m_RenderSystem = std::make_unique<RenderSystem>(m_VulkanEngine.get());
@@ -104,12 +125,9 @@ void Game::Init() {
 
     m_Registry = std::make_unique<entt::registry>();
 
-
-
-    LoadResources();
-    CreateInitialEntities();
+    //CreateInitialEntities();
     m_Initialized = true;
-    std::cout << "=== Game Initialized ===" << std::endl;
+    std::cout << "=== Engine Initialized ===" << std::endl;
 }
 
 
@@ -138,7 +156,7 @@ void Game::CreateInitialEntities() {
         m_Registry->emplace<PlayerComponent>(m_PlayerEntity);
         m_Registry->emplace<InventoryComponent>(m_PlayerEntity);
 
-        auto playerMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Test1.glb")); // swap for a real player model later
+        auto playerMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Test1.glb", m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer())); // swap for a real player model later
         m_Registry->emplace<MeshComponent>(m_PlayerEntity, playerMesh);
         m_Registry->emplace<NameTag>(m_PlayerEntity, "Player");
 
@@ -159,7 +177,7 @@ void Game::CreateInitialEntities() {
         m_Registry->emplace<MeshComponent>(m_TerrainEntity, terrainMesh);
         m_Registry->emplace<NameTag>(m_TerrainEntity, "Terrain");
 
-        WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain, m_ResourceMap);
+        WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain, m_ResourceMap, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
 }
 void Game::HandleInput(float deltaTime) {
     GLFWwindow* window = m_VulkanEngine->GetWindow();
@@ -193,11 +211,23 @@ void Game::HandleInput(float deltaTime) {
     }
     f1WasDown = f1IsDown;
 
+    static bool escWasDown = false;
+    bool escIsDown = glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS;
+    if (escIsDown && !escWasDown) {
+        if (m_State == GameState::Playing) {
+            m_State = GameState::Paused;
+        } else if (m_State == GameState::Paused) {
+            m_State = GameState::Playing;
+        }
+    }
+    escWasDown = escIsDown;
+
 }
 
 void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     static bool qWasDown = false, eWasDown = false, f11WasDown = false, interactWasDown = false, 
-        placeWasDown = false, rotateWasDown = false, inspectWasDown = false, rotatePlacedWasDown = false, pickupWasDown = false;
+        placeWasDown = false, rotateWasDown = false, inspectWasDown = false, rotatePlacedWasDown = false, pickupWasDown = false, saveWasDown = false,
+        loadWasDown = false;
     
      double mx, my;
     glfwGetCursorPos(window, &mx, &my);
@@ -223,6 +253,9 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     bool placeIsDown = glfwGetKey(window, GLFW_KEY_G) == GLFW_PRESS;
     bool rotateIsDown = glfwGetKey(window, GLFW_KEY_R) == GLFW_PRESS;
     bool inspectIsDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+    bool saveIsDown = glfwGetKey(window, GLFW_KEY_F5) == GLFW_PRESS;
+    bool loadIsDown = glfwGetKey(window, GLFW_KEY_F9) == GLFW_PRESS;
+
 
     if (placeIsDown && !placeWasDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity, m_ResourceMap, m_PlacementGrid);
     if (qIsDown && !qWasDown) m_Camera->SnapRotateIso(false);
@@ -263,7 +296,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
             }
         } else {
             InteractionSystem::TryMineAtCursor(*m_Registry, m_ResourceMap, m_PlayerEntity,
-                                               rayOrigin, rayDir, m_Settings.terrain, interactRange, m_AudioEvents.get());
+                                               rayOrigin, rayDir, m_Settings.terrain, interactRange, m_AudioEvents.get(), m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
         }
     }
     if (inspectIsDown && !inspectWasDown && !ImGui::GetIO().WantCaptureMouse) {
@@ -284,9 +317,25 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     }
     if (pickupIsDown && !pickupWasDown) {
         if (m_Registry->valid(machineTarget)) { // reuse the same machineTarget you compute for interact
-            InteractionSystem::TryPickupMachine(*m_Registry, machineTarget, m_PlayerEntity, m_PlacementGrid, m_Settings.terrain.cellSize);
+            InteractionSystem::TryPickupMachine(*m_Registry, machineTarget, m_PlayerEntity, m_PlacementGrid, m_Settings.terrain.cellSize );
         }
     }
+
+  
+    if (saveIsDown && !saveWasDown) {
+        SaveManager::SaveGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, m_PlayerEntity, m_ResourceMap, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
+    }
+    saveWasDown = saveIsDown;
+    if (loadIsDown && !loadWasDown) {
+        m_Registry->clear();
+        m_PlacementGrid = PlacementGrid{};
+
+        entt::entity loadedPlayer;
+        if (SaveManager::LoadGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, loadedPlayer, m_ResourceMap, m_PlacementGrid, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer())) {
+            m_PlayerEntity = loadedPlayer;
+        }
+    }
+
 
     qWasDown = qIsDown;
     eWasDown = eIsDown;
@@ -297,6 +346,8 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     inspectWasDown = inspectIsDown;
     rotatePlacedWasDown = rotatePlacedIsDown;
     pickupWasDown = pickupIsDown;
+    saveWasDown = saveIsDown;
+    loadWasDown = loadIsDown;
 
     glm::vec3 moveDir(0.0f);
     if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveDir.z += 1.0f;
@@ -406,7 +457,7 @@ void Game::Update(float deltaTime) {
         m_Registry->replace<MeshComponent>(m_TerrainEntity, newTerrainMesh);
 
         WorldGenerator::ClearHarvestables(*m_Registry);
-        WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain, m_ResourceMap);
+        WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain, m_ResourceMap, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
     }
 
     if (m_Registry->valid(m_PlayerEntity)) {
@@ -421,7 +472,7 @@ void Game::Update(float deltaTime) {
 
     m_PlacementSystem->Update(*m_Registry, m_PlayerEntity, *m_Camera, m_SelectedItem,
         m_Settings.terrain, static_cast<float>(mx), static_cast<float>(my),
-        static_cast<float>(extent.width), static_cast<float>(extent.height), aspect, m_PlacementGrid);
+        static_cast<float>(extent.width), static_cast<float>(extent.height), aspect, m_PlacementGrid, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
     MinerSystem::Update(*m_Registry, m_ResourceMap, deltaTime);
     FurnaceSystem::Update(*m_Registry, deltaTime);
     AssemblerSystem::Update(*m_Registry, deltaTime);
@@ -431,7 +482,9 @@ void Game::Update(float deltaTime) {
 }
 
 void Game::Render() {
-    m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine, m_PlayerEntity, m_InspectedEntity, m_SelectedItem, m_TechState);
+    m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine,
+                                m_PlayerEntity, m_InspectedEntity, m_SelectedItem, m_TechState,
+                                false, m_ShowOptionsInPause);
 }
 void Game::Shutdown() {
     std::cout << "=== Shutting Down Game ===" << std::endl;
@@ -476,4 +529,123 @@ void Game::Shutdown() {
     }
     m_Initialized = false;
     std::cout << "=== Game Shut Down ===" << std::endl;
+}
+
+void Game::StartNewGame(const std::string &saveName) {
+    m_Registry->clear();
+    m_PlacementGrid = PlacementGrid{};
+    m_TechState = TechState{};
+
+    CreateInitialEntities(); // existing world-gen path: player, terrain, WorldGenerator::ScatterTrees, etc.
+
+    m_CurrentSaveName = saveName;
+    SaveManager::SaveGame("Saves/" + saveName + ".json", *m_Registry, m_PlayerEntity, m_ResourceMap, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer()); // save immediately so the file exists
+
+    m_State = GameState::Playing;
+}
+
+void Game::LoadExistingGame(const std::string &saveName) {
+    m_Registry->clear();
+    m_PlacementGrid = PlacementGrid{};
+
+    entt::entity loadedPlayer;
+    bool success = SaveManager::LoadGame("Saves/" + saveName + ".json", *m_Registry, loadedPlayer,
+                                         m_ResourceMap, m_PlacementGrid, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
+    if (success) {
+        m_PlayerEntity = loadedPlayer;
+        m_CurrentSaveName = saveName;
+        m_State = GameState::Playing;
+    } else {
+        std::cerr << "Failed to load save: " << saveName << std::endl;
+        // stay in MainMenu, maybe show an error message
+    }
+}
+
+void Game::RefreshSaveList() {
+    m_AvailableSaves.clear();
+    if (!std::filesystem::exists("Saves")) {
+        std::filesystem::create_directories("Saves");
+        return;
+    }
+    for (auto &entry : std::filesystem::directory_iterator("Saves")) {
+        if (entry.path().extension() == ".json") {
+            m_AvailableSaves.push_back(entry.path().stem().string());
+        }
+    }
+}
+
+void Game::RunMainMenu() {
+    m_RenderSystem->GetImGuiUtil()->NewFrame(); // adjust to however you drive ImGui's frame outside RenderFrame's normal path
+
+    ImGuiIO &io = ImGui::GetIO();
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(400, 350));
+    ImGui::Begin("Main Menu", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove);
+
+    ImGui::Text("My Factory Game");
+    ImGui::Separator();
+
+    ImGui::InputText("World Name", m_NewGameNameBuffer, sizeof(m_NewGameNameBuffer));
+    if (ImGui::Button("New Game", ImVec2(-1, 40))) {
+        StartNewGame(m_NewGameNameBuffer);
+    }
+
+    ImGui::Separator();
+    ImGui::Text("Load Game:");
+    RefreshSaveList();
+    for (auto &save : m_AvailableSaves) {
+        if (ImGui::Button(save.c_str(), ImVec2(-1, 0))) {
+            LoadExistingGame(save);
+        }
+    }
+
+    ImGui::Separator();
+    ImGui::BeginDisabled(true);
+    ImGui::Button("Multiplayer (coming soon)", ImVec2(-1, 40));
+    ImGui::EndDisabled();
+
+    if (ImGui::Button("Options", ImVec2(-1, 40))) {
+        m_ShowOptionsInMenu = true;
+    }
+
+    if (ImGui::Button("Quit", ImVec2(-1, 40))) {
+        m_IsRunning = false;
+    }
+
+    ImGui::End();
+
+    if (m_ShowOptionsInMenu) {
+        ImGui::Begin("Options", &m_ShowOptionsInMenu);
+        // reuse your existing settings sliders from DrawSettingsTab here
+        ImGui::End();
+    }
+
+    // Render just the menu — no 3D scene, no BeginFrame's mesh/quad rendering needed
+    if (!m_VulkanEngine->BeginFrame()) return;
+    m_RenderSystem->GetImGuiUtil()->RenderDrawData(m_VulkanEngine->GetCurrentCommandBuffer());
+    m_VulkanEngine->EndFrame();
+}
+void Game::RunPauseMenu() {
+    PauseMenuAction action = m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine,
+                                                         m_PlayerEntity, m_InspectedEntity, m_SelectedItem, m_TechState,
+                                                         true, m_ShowOptionsInPause);
+
+    switch (action) {
+    case PauseMenuAction::Resume:
+        m_State = GameState::Playing;
+        break;
+    case PauseMenuAction::SaveGame:
+        SaveManager::SaveGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, m_PlayerEntity, m_ResourceMap, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
+        break;
+    case PauseMenuAction::QuitToMenu:
+        m_Registry->clear();
+        m_PlacementGrid = PlacementGrid{};
+        m_State = GameState::MainMenu;
+        break;
+    case PauseMenuAction::QuitGame:
+        m_IsRunning = false;
+        break;
+    default:
+        break;
+    }
 }

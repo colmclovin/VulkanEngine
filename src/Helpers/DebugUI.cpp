@@ -330,3 +330,28 @@ bool DebugUI::ConsumeTechPointFromInventory(entt::registry &registry, entt::enti
     }
     return false;
 }
+
+PauseMenuAction DebugUI::DrawPauseMenu(GameSettings &settings, bool &showOptions) {
+    PauseMenuAction action = PauseMenuAction::None;
+
+    ImGuiIO &io = ImGui::GetIO();
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(300, 280));
+    ImGui::Begin("Paused", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove);
+
+    if (ImGui::Button("Resume", ImVec2(-1, 40))) action = PauseMenuAction::Resume;
+    if (ImGui::Button("Save Game", ImVec2(-1, 40))) action = PauseMenuAction::SaveGame;
+    if (ImGui::Button("Options", ImVec2(-1, 40))) showOptions = true;
+    if (ImGui::Button("Quit to Menu", ImVec2(-1, 40))) action = PauseMenuAction::QuitToMenu;
+    if (ImGui::Button("Quit Game", ImVec2(-1, 40))) action = PauseMenuAction::QuitGame;
+
+    ImGui::End();
+
+    if (showOptions) {
+        ImGui::Begin("Options", &showOptions);
+        // reuse your existing settings sliders here (volume, camera speed, etc. from DrawSettingsTab)
+        ImGui::End();
+    }
+
+    return action;
+}

@@ -18,8 +18,12 @@ void MinerSystem::Update(entt::registry &registry, ResourceMap &resourceMap, flo
         if (registry.any_of<PowerConsumerComponent>(entity)) {
             hasPower = registry.get<PowerConsumerComponent>(entity).isPowered;
         }
-
         miner.runningOnPower = hasPower;
+
+        if (registry.any_of<PowerConsumerComponent>(entity)) {
+            auto &consumer = registry.get<PowerConsumerComponent>(entity);
+            consumer.wantsPower = (miner.outputItem != ItemId::None && miner.outputBuffer < miner.outputBufferCapacity);
+        }
 
         if (!hasPower) {
             // Fuel path — unchanged from before

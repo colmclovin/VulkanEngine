@@ -8,6 +8,7 @@
 #include <cstdlib>
 #include "BoundsComponent.h"
 #include <iostream>
+#include "../Engine/VulkanEngine.h"
 
 static void SpawnTree(entt::registry& registry, glm::vec3 pos, std::shared_ptr<Mesh> treeMesh) {
     auto entity = registry.create();
@@ -27,7 +28,7 @@ static void SpawnTree(entt::registry& registry, glm::vec3 pos, std::shared_ptr<M
     registry.emplace<NameTag>(entity, "Tree");
 }
 
-void WorldGenerator::ScatterTrees(entt::registry &registry, const TerrainSettings &terrainSettings, ResourceMap &resourceMap) {
+void WorldGenerator::ScatterTrees(entt::registry &registry, const TerrainSettings &terrainSettings, ResourceMap &resourceMap, VulkanEngine *engine, MeshRenderer *meshRenderer) {
     int totalSamples = 0, forestSamples = 0, treesSpawned = 0;
     FastNoiseLite treeDensityNoise;
     treeDensityNoise.SetSeed(terrainSettings.seed + 4000);
@@ -38,7 +39,7 @@ void WorldGenerator::ScatterTrees(entt::registry &registry, const TerrainSetting
     float worldDepth = terrainSettings.gridDepth * terrainSettings.cellSize;
     float sampleSpacing = 2.0f; // denser sampling than before, since not every sample spawns a tree
 
-    auto treeMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Tree.glb"));
+    auto treeMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Tree.glb", engine, meshRenderer));
 
     for (float x = 0.0f; x < worldWidth; x += sampleSpacing) {
         for (float z = 0.0f; z < worldDepth; z += sampleSpacing) {

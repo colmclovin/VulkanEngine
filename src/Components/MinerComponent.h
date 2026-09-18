@@ -1,5 +1,7 @@
 #pragma once
 #include "../Game/ItemDatabase.h"
+#include "../Helpers/GlmSerialization.h"  
+
 
 struct MinerComponent {
     float collectionRadius = 3.0f; // how far around the miner it reaches into the ResourceMap
@@ -17,4 +19,10 @@ struct MinerComponent {
 
         float powerUsage = 5.0f; // NEW — power units consumed per second while running on power
     bool runningOnPower = false; // NEW — informational, tracks which mode this cook cycle used
+
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(MinerComponent,
+                                   collectionRadius, extractionRate, outputInterval, outputTimer,
+                                   fuelBuffer, loadedFuelType, fuelRemaining,
+                                   outputItem, outputBuffer, outputBufferCapacity,
+                                   powerUsage, runningOnPower)
 };

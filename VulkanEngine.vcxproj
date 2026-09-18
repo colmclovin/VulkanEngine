@@ -176,6 +176,8 @@
     <ClCompile Include="src\Components\PowerSystem.cpp" />
     <ClCompile Include="src\Components\ResourceMap.cpp" />
     <ClCompile Include="src\Components\TerrainGenerator.cpp" />
+    <ClCompile Include="src\Components\Texture.cpp" />
+    <ClCompile Include="src\Components\TextureLoader.cpp" />
     <ClCompile Include="src\Components\WorldGenerator.cpp" />
     <ClCompile Include="src\Game\Camera3D.cpp" />
     <ClCompile Include="src\Game\CraftingSystem.cpp" />
@@ -187,7 +189,7 @@
     <ClCompile Include="src\Game\RecipeDatabase.cpp" />
     <ClCompile Include="src\Game\TechDatabase.cpp" />
     <ClCompile Include="src\Helpers\DebugUI.cpp" />
-    <ClCompile Include="src\Helpers\Serializer.cpp" />
+    <ClCompile Include="src\Helpers\SaveManager.cpp" />
     <ClCompile Include="src\Renderer\DebugLineRenderer.cpp" />
     <ClCompile Include="src\Renderer\ImGuiVulkanUtil.cpp" />
     <ClCompile Include="src\Main.cpp" />
@@ -235,6 +237,8 @@
     <ClInclude Include="src\Components\SpriteComponent.h" />
     <ClInclude Include="src\Components\SubMesh.h" />
     <ClInclude Include="src\Components\TerrainGenerator.h" />
+    <ClInclude Include="src\Components\Texture.h" />
+    <ClInclude Include="src\Components\TextureLoader.h" />
     <ClInclude Include="src\Components\TransformComponent.h" />
     <ClInclude Include="src\Components\Vertex.h" />
     <ClInclude Include="src\Components\WorldGenerator.h" />
@@ -250,8 +254,10 @@
     <ClInclude Include="src\Game\TechDatabase.h" />
     <ClInclude Include="src\Game\TechState.h" />
     <ClInclude Include="src\Helpers\DebugUI.h" />
-    <ClInclude Include="src\Helpers\Serializer.h" />
+    <ClInclude Include="src\Helpers\GlmSerialization.h" />
     <ClInclude Include="src\Game\PlaceableDatabase.h" />
+    <ClInclude Include="src\Helpers\PauseMenuAction.h" />
+    <ClInclude Include="src\Helpers\SaveManager.h" />
     <ClInclude Include="src\Renderer\DebugLineRenderer.h" />
     <ClInclude Include="src\Renderer\ImGuiVulkanUtil.h" />
     <ClInclude Include="src\Renderer\MeshRenderer.h" />

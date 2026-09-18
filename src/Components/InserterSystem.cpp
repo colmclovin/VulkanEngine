@@ -22,6 +22,13 @@ void InserterSystem::Update(entt::registry &registry, PlacementGrid &grid, float
         }
         inserter.runningOnPower = hasPower;
 
+        if (registry.any_of<PowerConsumerComponent>(entity)) {
+            auto &consumer = registry.get<PowerConsumerComponent>(entity);
+            consumer.wantsPower = inserter.holdingItem; // simplify: wants power whenever mid-swing; could expand to "would pick something up" too
+        }
+
+
+
         if (!hasPower) continue;
 
         if (!inserter.holdingItem) {

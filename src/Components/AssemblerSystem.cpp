@@ -17,6 +17,18 @@ void AssemblerSystem::Update(entt::registry &registry, float deltaTime) {
         }
         assembler.runningOnPower = hasPower;
 
+        if (registry.any_of<PowerConsumerComponent>(entity)) {
+            auto &consumer = registry.get<PowerConsumerComponent>(entity);
+            bool couldStartCrafting = false;
+            if (!assembler.isCrafting && assembler.selectedRecipeIndex >= 0) {
+                // reuse your existing hasAllInputs check, or a simplified version
+                couldStartCrafting = true; // simplify: assume wants power if a recipe is selected at all; refine later if needed
+            }
+            consumer.wantsPower = assembler.isCrafting || couldStartCrafting;
+        }
+
+
+
         if (assembler.selectedRecipeIndex < 0) continue;
         const auto &recipes = RecipeDatabase::GetAll();
         if (assembler.selectedRecipeIndex >= static_cast<int>(recipes.size())) continue;

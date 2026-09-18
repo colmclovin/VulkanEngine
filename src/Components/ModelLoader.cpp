@@ -10,10 +10,10 @@
 #include <iostream>
 #include <string>
 #include <assimp/material.h>
-
+#include "TextureLoader.h"
 
 // ModelLoader.cpp
-Mesh ModelLoader::LoadModel(const std::string& filepath) {
+Mesh ModelLoader::LoadModel(const std::string &filepath, VulkanEngine *engine, MeshRenderer *meshRenderer) {
     Mesh mesh;
     Assimp::Importer importer;
 
@@ -31,8 +31,8 @@ Mesh ModelLoader::LoadModel(const std::string& filepath) {
     std::cout << "  Meshes: " << scene->mNumMeshes << std::endl;
     std::cout << "  Materials: " << scene->mNumMaterials << std::endl;
 
-    for (unsigned int i = 0; i < scene->mNumMaterials; i++) {
-        mesh.Materials.push_back(ProcessMaterial(scene->mMaterials[i]));
+   for (unsigned int i = 0; i < scene->mNumMaterials; i++) {
+        mesh.Materials.push_back(ProcessMaterial(scene, scene->mMaterials[i], engine, meshRenderer));
     }
 
     // Walk the scene graph from the root, accumulating each node's transform
@@ -103,7 +103,7 @@ void ModelLoader::ProcessMesh(aiMesh* aiMeshData, const aiMatrix4x4& transform, 
     outMesh.SubMeshes.push_back(sub);
 }
 
-Material ModelLoader::ProcessMaterial(aiMaterial *aiMat) {
+Material ModelLoader::ProcessMaterial(const aiScene *scene, aiMaterial *aiMat, VulkanEngine *engine, MeshRenderer *meshRenderer) {
     Material material;
 
     aiString name;
@@ -116,6 +116,26 @@ Material ModelLoader::ProcessMaterial(aiMaterial *aiMat) {
         material.baseColor = glm::vec4(baseColor.r, baseColor.g, baseColor.b, baseColor.a);
     } else if (aiGetMaterialColor(aiMat, AI_MATKEY_COLOR_DIFFUSE, &baseColor) == AI_SUCCESS) {
         material.baseColor = glm::vec4(baseColor.r, baseColor.g, baseColor.b, baseColor.a);
+    }
+
+    // NEW — extract the embedded base-color texture, if one exists
+    aiString texPath;
+    bool hasTexture = (aiMat->GetTexture(aiTextureType_BASE_COLOR, 0, &texPath) == AI_SUCCESS) ||
+                      (aiMat->GetTexture(aiTextureType_DIFFUSE, 0, &texPath) == AI_SUCCESS);
+
+if (hasTexture) {
+        const aiTexture *embeddedTexture = scene->GetEmbeddedTexture(texPath.C_Str());
+        if (embeddedTexture && embeddedTexture->mHeight == 0) {
+            TextureData texData = TextureLoader::LoadFromMemory(
+                    reinterpret_cast<const unsigned char *>(embeddedTexture->pcData),
+                    embeddedTexture->mWidth);
+
+            material.texture = std::make_shared<Texture>();
+            material.texture->UploadToGPU(engine, texData);
+
+            material.descriptorSet = meshRenderer->AllocateTextureDescriptorSet(
+                    material.texture->imageView, material.texture->sampler);
+        }
     }
 
     return material;

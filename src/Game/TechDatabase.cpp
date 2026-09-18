@@ -23,3 +23,21 @@ const TechDef &TechDatabase::Get(TechId id) {
 const std::vector<TechId> &TechDatabase::GetAllIds() {
     return s_Order;
 }
+
+static const std::unordered_map<TechId, std::string> s_TechIdToName = {
+    { TechId::Electrification, "Electrification" },
+};
+
+void to_json(nlohmann::json &j, const TechId &id) {
+    auto it = s_TechIdToName.find(id);
+    j = it != s_TechIdToName.end() ? it->second : "Unknown";
+}
+void from_json(const nlohmann::json &j, TechId &id) {
+    std::string name = j.get<std::string>();
+    for (auto &[tid, str] : s_TechIdToName) {
+        if (str == name) {
+            id = tid;
+            return;
+        }
+    }
+}

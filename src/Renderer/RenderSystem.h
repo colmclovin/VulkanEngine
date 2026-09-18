@@ -3,6 +3,7 @@
 #include <entt/entt.hpp>
 #include "../Game/ItemDatabase.h"
 #include "../Game/TechState.h"
+#include "../Helpers/PauseMenuAction.h"
 class VulkanEngine;
 class QuadRenderer;
 class ImGuiVulkanUtil;
@@ -22,7 +23,7 @@ public:
     
     
     void Init();
-    void RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState);
+    PauseMenuAction RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState, bool isPaused, bool &showOptionsInPause);
     void Shutdown();
 
     //ResourceManager *GetResourceManager() const { return m_ResourceManager.get(); }
@@ -30,6 +31,8 @@ public:
     QuadRenderer *GetQuadRenderer() const { return m_QuadRenderer.get(); }
     DebugLineRenderer *GetDebugLineRenderer() const { return m_DebugLineRenderer.get(); }
     DebugUI* GetDebugUI() const;
+    ImGuiVulkanUtil *GetImGuiUtil() const;
+
 private:
     VulkanEngine *m_Engine = nullptr;
 

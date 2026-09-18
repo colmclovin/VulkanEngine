@@ -23,6 +23,12 @@ class PlacementSystem;
 
 struct GLFWwindow;
 
+enum class GameState {
+    MainMenu,
+    Playing,
+    Paused,
+    GameOver,
+};
 
 class Game {
 public:
@@ -60,7 +66,20 @@ private:
     ItemId GetSelectedItem() const {
         return (m_SelectedHotbarSlot >= 0 && m_SelectedHotbarSlot < HOTBAR_SIZE) ? m_Hotbar[m_SelectedHotbarSlot] : ItemId::None;
     }
+    GameState m_State = GameState::MainMenu;
+    std::string m_CurrentSaveName; // which save file is active, once in Playing state
 
+    void RunMainMenu();
+    void StartNewGame(const std::string &saveName);
+    void LoadExistingGame(const std::string &saveName);
+    void RunPauseMenu();
+    void QuitToMenu(); // for later, if you add a "return to menu" option mid-game
+    bool m_ShowOptionsInPause = false;
+    bool m_ShowOptionsInMenu = false;
+    std::vector<std::string> m_AvailableSaves;
+    char m_NewGameNameBuffer[64] = "MyWorld";
+
+    void RefreshSaveList();
 
     entt::entity m_PlayerEntity = entt::null;
     entt::entity m_TerrainEntity = entt::null;

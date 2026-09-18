@@ -1,11 +1,14 @@
 #pragma once
 #include "../Game/ItemDatabase.h"
 #include <vector>
+#include "../Helpers/GlmSerialization.h"
+
 
 struct MachineSlot {
     ItemId item = ItemId::None;
     int count = 0;
     int capacity = 100;
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(MachineSlot, item, count, capacity)
 };
 
 struct MachineInventoryComponent {
@@ -52,4 +55,6 @@ struct MachineInventoryComponent {
         }
         return true;
     }
+        NLOHMANN_DEFINE_TYPE_INTRUSIVE(MachineInventoryComponent, inputs, outputs)
+
 };

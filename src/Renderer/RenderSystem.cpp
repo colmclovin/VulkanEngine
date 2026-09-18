@@ -38,13 +38,14 @@ void RenderSystem::Init() {
     std::cout << "RenderSystem initialized with all subsystems" << std::endl;
 }
 
-void RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState) {
+PauseMenuAction RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState, bool isPaused, bool& showOptionsInPause) {
     m_Engine->SetClearColor(settings.clearColor);   // NEW
 
     // Render the frame using the quad renderer
     if (!m_Engine->BeginFrame()) {
         ImGui::EndFrame();
-        return; // Skip frame if swapchain needs recreation
+        return PauseMenuAction::None; // FIXED — must return a value matching the declared return type
+
     }
     
     
@@ -54,7 +55,10 @@ void RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameS
     m_MeshRenderer->Render(registry, camera, settings.wireframeMode);
     m_QuadRenderer->Render(registry);
 
-
+    PauseMenuAction pauseAction = PauseMenuAction::None;
+    if (isPaused) {
+        pauseAction = m_DebugUI->DrawPauseMenu(settings, showOptionsInPause);
+    }
 
     m_DebugLineRenderer->BeginFrame();
 
@@ -90,6 +94,9 @@ void RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameS
 
     m_ImGuiVulkanUtil->RenderDrawData(m_Engine->GetCurrentCommandBuffer());
     m_Engine->EndFrame();
+
+
+     return pauseAction;
 }
 
 void RenderSystem::Shutdown() {
@@ -112,4 +119,7 @@ void RenderSystem::Shutdown() {
 
 DebugUI* RenderSystem::GetDebugUI() const {
     return m_DebugUI.get();
+}
+ImGuiVulkanUtil *RenderSystem::GetImGuiUtil() const {
+    return m_ImGuiVulkanUtil.get();
 }
