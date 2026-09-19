@@ -1,6 +1,7 @@
 #include "RenderSystem.h"
 #include "QuadRenderer.h"
 #include "MeshRenderer.h"
+#include "SkinnedMeshRenderer.h"
 #include "DebugLineRenderer.h"
 #include "ImGuiVulkanUtil.h"
 #include "../Engine/VulkanEngine.h"
@@ -24,6 +25,9 @@ void RenderSystem::Init() {
     
     m_MeshRenderer = std::make_unique<MeshRenderer>(m_Engine);
     m_MeshRenderer->Init();
+
+    m_SkinnedMeshRenderer = std::make_unique<SkinnedMeshRenderer>(m_Engine);
+    m_SkinnedMeshRenderer->Init();
 
     m_DebugLineRenderer = std::make_unique<DebugLineRenderer>(m_Engine);
     m_DebugLineRenderer->Init();
@@ -53,6 +57,7 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry &registry, Camera3D &ca
     m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine, m_PlayerEntity, m_InspectedEntity, selectedItem, techState);
 
     m_MeshRenderer->Render(registry, camera, settings.wireframeMode);
+    m_SkinnedMeshRenderer->Render(registry, camera);
     m_QuadRenderer->Render(registry);
 
     PauseMenuAction pauseAction = PauseMenuAction::None;

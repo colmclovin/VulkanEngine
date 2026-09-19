@@ -87,6 +87,32 @@ if exist "Shaders\debugline.frag" (
 ) else (
 	echo WARNING: debugline.frag not found
 )
+REM Compile skinned mesh vertex shader
+if exist "Shaders\skinned.vert" (
+	echo Compiling skinned mesh vertex shader...
+	glslc Shaders\skinned.vert -o Shaders\skinned_vert.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Skinned mesh vertex shader compiled successfully
+	) else (
+		echo   Skinned mesh vertex shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: skinned.vert not found
+)
+REM Compile skinned mesh fragment shader
+if exist "Shaders\skinned.frag" (
+	echo Compiling skinned mesh fragment shader...
+	glslc Shaders\skinned.frag -o Shaders\skinned_frag.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Skinned mesh fragment shader compiled successfully
+	) else (
+		echo   Skinned mesh fragment shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: skinned.frag not found
+)
 echo.
 echo Shader compilation complete!
 dir shaders\*.spv /b

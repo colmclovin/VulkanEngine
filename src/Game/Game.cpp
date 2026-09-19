@@ -28,6 +28,8 @@
 #include "../Helpers/SaveManager.h"
 #include "../Renderer/ImGuiVulkanUtil.h"
 #include "../Helpers/PauseMenuAction.h"
+#include "../Components/SkinnedMesh.h"
+#include "../Components/AnimationSystem.h"
 Game::Game() {
 
 }
@@ -156,8 +158,9 @@ void Game::CreateInitialEntities() {
         m_Registry->emplace<PlayerComponent>(m_PlayerEntity);
         m_Registry->emplace<InventoryComponent>(m_PlayerEntity);
 
-        auto playerMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Test1.glb", m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer())); // swap for a real player model later
-        m_Registry->emplace<MeshComponent>(m_PlayerEntity, playerMesh);
+        auto playerMesh = std::make_shared<SkinnedMesh>(ModelLoader::LoadSkinnedModel("Assets/Models/Test1.glb", m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer())); // swap for a real player model later
+        m_Registry->emplace<AnimationComponent>(m_PlayerEntity);
+        m_Registry->emplace<SkinnedMeshComponent>(m_PlayerEntity, playerMesh);
         m_Registry->emplace<NameTag>(m_PlayerEntity, "Player");
 
         m_ResourceMap.Generate(m_Settings.terrain.gridWidth, m_Settings.terrain.gridDepth,
@@ -479,6 +482,7 @@ void Game::Update(float deltaTime) {
     BeltSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
     InserterSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
     PowerSystem::Update(*m_Registry, deltaTime);
+    AnimationSystem::Update(*m_Registry, deltaTime);
 }
 
 void Game::Render() {

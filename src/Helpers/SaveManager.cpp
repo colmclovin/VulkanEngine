@@ -11,7 +11,7 @@
 #include "../Components/ModelLoader.h"
 #include "../Components/Mesh.h"
 #include "../Components/TerrainGenerator.h"
-
+#include "../Components/Components.h"
 using json = nlohmann::json;
 
 void SaveManager::SaveGame(const std::string &path, entt::registry &registry, entt::entity player,
@@ -227,8 +227,10 @@ outPlayer = registry.create();
     registry.emplace<PlayerComponent>(outPlayer);
     registry.emplace<InventoryComponent>(outPlayer, j["player"]["inventory"].get<InventoryComponent>());
 
-    auto playerMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Test1.glb", engine, meshRenderer));
-    registry.emplace<MeshComponent>(outPlayer, playerMesh);
+    auto playerMesh = std::make_shared<SkinnedMesh>(
+            ModelLoader::LoadSkinnedModel("Assets/Models/Test1.glb", engine, meshRenderer));
+    registry.emplace<SkinnedMeshComponent>(outPlayer, playerMesh); // CHANGED — was MeshComponent/Mesh
+    registry.emplace<AnimationComponent>(outPlayer);
     registry.emplace<NameTag>(outPlayer, "Player");
 
 

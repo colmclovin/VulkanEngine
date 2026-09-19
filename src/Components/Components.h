@@ -16,3 +16,5 @@
 #include "BeltComponent.h"
 #include "InserterComponent.h"
 #include "PowerComponent.h"
+#include "SkinnedMeshComponent.h"
+#include "AnimationComponent.h"

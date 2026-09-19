@@ -152,6 +152,8 @@
     <None Include="compile_shaders.ps1" />
     <None Include="Shaders\debugline.frag" />
     <None Include="Shaders\debugline.vert" />
+    <None Include="Shaders\skinned.frag" />
+    <None Include="Shaders\skinned.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\External\imgui\backends\imgui_impl_glfw.cpp" />
@@ -163,6 +165,8 @@
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="src\Audio\AudioEngine.cpp" />
     <ClCompile Include="src\Audio\AudioEventSystem.cpp" />
+    <ClCompile Include="src\Components\AnimationSystem.cpp" />
+    <ClCompile Include="src\Components\Animator.cpp" />
     <ClCompile Include="src\Components\AssemblerSystem.cpp" />
     <ClCompile Include="src\Components\BeltSystem.cpp" />
     <ClCompile Include="src\Components\FurnaceSystem.cpp" />
@@ -175,6 +179,7 @@
     <ClCompile Include="src\Components\PlacementSystem.cpp" />
     <ClCompile Include="src\Components\PowerSystem.cpp" />
     <ClCompile Include="src\Components\ResourceMap.cpp" />
+    <ClCompile Include="src\Components\SkinnedMesh.cpp" />
     <ClCompile Include="src\Components\TerrainGenerator.cpp" />
     <ClCompile Include="src\Components\Texture.cpp" />
     <ClCompile Include="src\Components\TextureLoader.cpp" />
@@ -198,16 +203,22 @@
     <ClCompile Include="src\Renderer\QuadRenderer.cpp" />
     <ClCompile Include="src\Renderer\RenderSystem.cpp" />
     <ClCompile Include="src\Components\TerrainRaycast.cpp" />
+    <ClCompile Include="src\Renderer\SkinnedMeshRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\External\JSON\json.hpp" />
     <ClInclude Include="src\Audio\AudioEngine.h" />
     <ClInclude Include="src\Audio\AudioEvent.h" />
     <ClInclude Include="src\Audio\AudioEventSystem.h" />
+    <ClInclude Include="src\Components\AnimationClip.h" />
+    <ClInclude Include="src\Components\AnimationComponent.h" />
+    <ClInclude Include="src\Components\AnimationSystem.h" />
+    <ClInclude Include="src\Components\Animator.h" />
     <ClInclude Include="src\Components\AssemblerComponent.h" />
     <ClInclude Include="src\Components\AssemblerSystem.h" />
     <ClInclude Include="src\Components\BeltComponent.h" />
     <ClInclude Include="src\Components\BeltSystem.h" />
+    <ClInclude Include="src\Components\BoneMatrixUBO.h" />
     <ClInclude Include="src\Components\BoundsComponent.h" />
     <ClInclude Include="src\Components\Components.h" />
     <ClInclude Include="src\Components\FurnaceComponent.h" />
@@ -234,6 +245,10 @@
     <ClInclude Include="src\Components\PowerComponent.h" />
     <ClInclude Include="src\Components\PowerSystem.h" />
     <ClInclude Include="src\Components\ResourceMap.h" />
+    <ClInclude Include="src\Components\Skeleton.h" />
+    <ClInclude Include="src\Components\SkinnedMesh.h" />
+    <ClInclude Include="src\Components\SkinnedMeshComponent.h" />
+    <ClInclude Include="src\Components\SkinnedVertex.h" />
     <ClInclude Include="src\Components\SpriteComponent.h" />
     <ClInclude Include="src\Components\SubMesh.h" />
     <ClInclude Include="src\Components\TerrainGenerator.h" />
@@ -264,6 +279,7 @@
     <ClInclude Include="src\Renderer\QuadRenderer.h" />
     <ClInclude Include="src\Renderer\RenderSystem.h" />
     <ClInclude Include="src\Components\TerrainRaycast.h" />
+    <ClInclude Include="src\Renderer\SkinnedMeshRenderer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
