@@ -30,6 +30,7 @@
 #include "../Helpers/PauseMenuAction.h"
 #include "../Components/SkinnedMesh.h"
 #include "../Components/AnimationSystem.h"
+#include "../Components/PlayerAnimationSystem.h"
 Game::Game() {
 
 }
@@ -482,6 +483,15 @@ void Game::Update(float deltaTime) {
     BeltSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
     InserterSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
     PowerSystem::Update(*m_Registry, deltaTime);
+
+
+    if (m_Registry->valid(m_PlayerEntity)) {
+        auto &transform = m_Registry->get<TransformComponent>(m_PlayerEntity);
+        glm::vec3 velocity = (transform.Position - m_LastPlayerPosition) / deltaTime;
+        //PlayerAnimationSystem::Update(*m_Registry, m_PlayerEntity, velocity);
+        m_LastPlayerPosition = transform.Position;
+    }
+
     AnimationSystem::Update(*m_Registry, deltaTime);
 }
 
@@ -579,6 +589,9 @@ void Game::RefreshSaveList() {
 }
 
 void Game::RunMainMenu() {
+    if (!m_VulkanEngine->BeginFrame()) {
+        return; // swapchain recreation in progress — skip this frame entirely, ImGui::NewFrame was never called so nothing to close
+    }
     m_RenderSystem->GetImGuiUtil()->NewFrame(); // adjust to however you drive ImGui's frame outside RenderFrame's normal path
 
     ImGuiIO &io = ImGui::GetIO();
@@ -625,7 +638,7 @@ void Game::RunMainMenu() {
     }
 
     // Render just the menu — no 3D scene, no BeginFrame's mesh/quad rendering needed
-    if (!m_VulkanEngine->BeginFrame()) return;
+
     m_RenderSystem->GetImGuiUtil()->RenderDrawData(m_VulkanEngine->GetCurrentCommandBuffer());
     m_VulkanEngine->EndFrame();
 }

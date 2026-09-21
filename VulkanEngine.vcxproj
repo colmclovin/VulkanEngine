@@ -177,6 +177,7 @@
     <ClCompile Include="src\Components\MinerSystem.cpp" />
     <ClCompile Include="src\Components\ModelLoader.cpp" />
     <ClCompile Include="src\Components\PlacementSystem.cpp" />
+    <ClCompile Include="src\Components\PlayerAnimationSystem.cpp" />
     <ClCompile Include="src\Components\PowerSystem.cpp" />
     <ClCompile Include="src\Components\ResourceMap.cpp" />
     <ClCompile Include="src\Components\SkinnedMesh.cpp" />
@@ -241,6 +242,7 @@
     <ClInclude Include="src\Components\PickupComponent.h" />
     <ClInclude Include="src\Components\PlacementGrid.h" />
     <ClInclude Include="src\Components\PlacementSystem.h" />
+    <ClInclude Include="src\Components\PlayerAnimationSystem.h" />
     <ClInclude Include="src\Components\PlayerComponent.h" />
     <ClInclude Include="src\Components\PowerComponent.h" />
     <ClInclude Include="src\Components\PowerSystem.h" />

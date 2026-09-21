@@ -78,7 +78,7 @@ private:
     bool m_ShowOptionsInMenu = false;
     std::vector<std::string> m_AvailableSaves;
     char m_NewGameNameBuffer[64] = "MyWorld";
-
+    glm::vec3 m_LastPlayerPosition = glm::vec3(0.0f);
     void RefreshSaveList();
 
     entt::entity m_PlayerEntity = entt::null;
