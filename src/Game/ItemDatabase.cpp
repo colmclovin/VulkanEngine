@@ -9,10 +9,13 @@ std::unordered_map<ItemId, std::shared_ptr<Mesh>> ItemDatabase::s_MeshCache;
 
 void ItemDatabase::Init() {
 	s_Items[ItemId::Wood] = { "Wood", 999, "Assets/Models/Wood.glb" };
+    s_Items[ItemId::StoneOre] = { "Stone Ore", 999, "Assets/Models/StoneOre.glb" };
+    s_Items[ItemId::Stone] = { "Stone", 999, "Assets/Models/Stone.glb" };
 	s_Items[ItemId::CopperOre] = { "Copper Ore", 999, "Assets/Models/CopperOre.glb" };
-    s_Items[ItemId::CopperPlate] = { "Copper Plate", 999, "Assets/Models/CopperOre.glb" };
+    s_Items[ItemId::CopperPlate] = { "Copper Plate", 999, "Assets/Models/CopperPlate.glb" };
+    s_Items[ItemId::UraniumOre] = { "Uranium Ore", 999, "Assets/Models/UraniumOre.glb" };
 	s_Items[ItemId::IronOre] = { "Iron Ore", 999, "Assets/Models/IronOre.glb" };
-    s_Items[ItemId::IronPlate] = { "Iron Plate", 999, "Assets/Models/IronOre.glb" };
+    s_Items[ItemId::IronPlate] = { "Iron Plate", 999, "Assets/Models/IronPlate.glb" };
     s_Items[ItemId::Coal] = { "Coal", 999, "Assets/Models/Coal.glb" };
     s_Items[ItemId::Miner] = { "Miner", 999, "Assets/Models/Miner.glb" };
     s_Items[ItemId::Furnace] = { "Furnace", 999, "Assets/Models/Furnace.glb" };
@@ -22,6 +25,25 @@ void ItemDatabase::Init() {
     s_Items[ItemId::TechPoint] = { "Tech Point", 999, "Assets/Models/TechPoint.glb" };
     s_Items[ItemId::PowerPole] = { "Power Pole", 999, "Assets/Models/PowerPole.glb" };
     s_Items[ItemId::CoalGenerator] = { "Coal Generator", 999, "Assets/Models/CoalGenerator.glb" };
+    s_Items[ItemId::CopperWire] = { "Copper Wire", 999, "Assets/Models/CopperWire.glb" };
+    s_Items[ItemId::IntegratedCircuit] = { "Integrated Circuit", 999, "Assets/Models/IntegratedCircuit.glb" };
+    s_Items[ItemId::TechFrame] = { "Tech Frame", 999, "Assets/Models/TechFrame.glb" };
+    s_Items[ItemId::Engine] = { "Engine", 999, "Assets/Models/Engine.glb" };
+    s_Items[ItemId::Steel] = { "Steel", 999, "Assets/Models/Steel.glb" };
+    s_Items[ItemId::SteelPlate] = { "Steel Plate", 999, "Assets/Models/SteelPlate.glb" };
+    s_Items[ItemId::SteelFrame] = { "Steel Frame", 999, "Assets/Models/SteelFrame.glb" };
+    s_Items[ItemId::Pipe] = { "Pipe", 999, "Assets/Models/Pipe.glb" };
+    s_Items[ItemId::Ammunition] = { "Ammunition", 999, "Assets/Models/Ammunition.glb" };
+    s_Items[ItemId::RobotFrame] = { "Robot Frame", 999, "Assets/Models/RobotFrame.glb" };
+    s_Items[ItemId::Hunter] = { "Hunter", 999, "Assets/Models/Hunter.glb" };
+    s_Items[ItemId::Pistol] = { "Pistol", 999, "Assets/Models/Pistol.glb" };
+    s_Items[ItemId::SMG] = { "SMG", 999, "Assets/Models/SMG.glb" };
+    s_Items[ItemId::LMG] = { "LMG", 999, "Assets/Models/LMG.glb" };
+    s_Items[ItemId::Sniper] = { "Sniper", 999, "Assets/Models/Sniper.glb" };
+    s_Items[ItemId::Shotgun] = { "Shotgun", 999, "Assets/Models/Shotgun.glb" };
+    s_Items[ItemId::FlameThrower] = { "Flame Thrower", 999, "Assets/Models/FlameThrower.glb" };
+    s_Items[ItemId::Oil] = { "Oil", 999, "Assets/Models/Oil.glb" };
+    s_Items[ItemId::Plastic] = { "Plastic", 999, "Assets/Models/Plastic.glb" };
 
 }
 
