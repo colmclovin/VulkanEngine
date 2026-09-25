@@ -10,6 +10,7 @@
 #include "../Components/MinerSystem.h"
 #include "../Components/PlacementGrid.h"
 #include "TechState.h"
+#include "../Components/DayNightCycle.h"
 
 class TerrainGenerator;
 class VulkanEngine;
@@ -87,7 +88,7 @@ private:
     GameSettings m_Settings;
     bool m_FirstMouse = true;
     double m_LastMouseX = 0.0, m_LastMouseY = 0.0;
-
+    DayNightCycle m_DayNightCycle;
 
     bool m_IsRunning = false;
     bool m_Initialized = false;

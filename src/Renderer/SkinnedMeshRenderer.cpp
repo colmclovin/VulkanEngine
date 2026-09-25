@@ -11,7 +11,10 @@
 #include <cstring>
 #include <stdexcept>
 #include "../Components/BoneMatrixUBO.h"
+#include "../Components/LightingUBO.h"
 #include "../Components/Animator.h"
+#include <iostream>
+
 SkinnedMeshRenderer::SkinnedMeshRenderer(VulkanEngine *engine) : m_Engine(engine) {}
 
 void SkinnedMeshRenderer::Init() {
@@ -36,23 +39,28 @@ void SkinnedMeshRenderer::Init() {
     vkAllocateDescriptorSets(m_Engine->GetDevice(), &allocInfo, m_DescriptorSets);
 
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = m_BoneUBOBuffers[i];
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(BoneMatrixUBO);
+        VkDescriptorBufferInfo boneBufferInfo{};
+        boneBufferInfo.buffer = m_BoneUBOBuffers[i];
+        boneBufferInfo.offset = 0;
+        boneBufferInfo.range = sizeof(BoneMatrixUBO);
 
         VkDescriptorImageInfo imageInfo{};
         imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         imageInfo.imageView = m_DefaultTexture->imageView;
         imageInfo.sampler = m_DefaultTexture->sampler;
 
-        VkWriteDescriptorSet writes[2]{};
+        VkDescriptorBufferInfo lightingBufferInfo{};
+        lightingBufferInfo.buffer = m_LightingUBOBuffers[i];
+        lightingBufferInfo.offset = 0;
+        lightingBufferInfo.range = sizeof(LightingUBO);
+
+        VkWriteDescriptorSet writes[3]{};
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[0].dstSet = m_DescriptorSets[i];
         writes[0].dstBinding = 0;
         writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         writes[0].descriptorCount = 1;
-        writes[0].pBufferInfo = &bufferInfo;
+        writes[0].pBufferInfo = &boneBufferInfo;
 
         writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[1].dstSet = m_DescriptorSets[i];
@@ -61,8 +69,17 @@ void SkinnedMeshRenderer::Init() {
         writes[1].descriptorCount = 1;
         writes[1].pImageInfo = &imageInfo;
 
-        vkUpdateDescriptorSets(m_Engine->GetDevice(), 2, writes, 0, nullptr);
+        writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[2].dstSet = m_DescriptorSets[i];
+        writes[2].dstBinding = 2;
+        writes[2].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writes[2].descriptorCount = 1;
+        writes[2].pBufferInfo = &lightingBufferInfo;
+
+        vkUpdateDescriptorSets(m_Engine->GetDevice(), 3, writes, 0, nullptr);
     }
+    m_initialized = true;
+    std::cout << "Skinned Mesh Renderer initialized" << std::endl;
 }
 
 void SkinnedMeshRenderer::CreateUniformBuffers() {
@@ -74,6 +91,15 @@ void SkinnedMeshRenderer::CreateUniformBuffers() {
         vkMapMemory(m_Engine->GetDevice(), m_BoneUBOMemory[i], 0, bufferSize, 0, &m_BoneUBOMapped[i]);
         // Left mapped persistently — standard pattern for frequently-updated UBOs, avoids map/unmap every frame
     }
+
+    VkDeviceSize lightingBufferSize = sizeof(LightingUBO);
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        m_Engine->CreateBuffer(lightingBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            m_LightingUBOBuffers[i], m_LightingUBOMemory[i]);
+        vkMapMemory(m_Engine->GetDevice(), m_LightingUBOMemory[i], 0, lightingBufferSize, 0, &m_LightingUBOMapped[i]);
+    }
+
 }
 // SkinnedMeshRenderer.cpp
 void SkinnedMeshRenderer::CreatePipeline() {
@@ -90,18 +116,26 @@ void SkinnedMeshRenderer::CreatePipeline() {
     samplerBinding.descriptorCount = 1;
     samplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    VkDescriptorSetLayoutBinding bindings[] = { uboBinding, samplerBinding };
+
+    VkDescriptorSetLayoutBinding lightingBinding{};
+    lightingBinding.binding = 2;   // check this doesn't collide with your existing sampler binding
+    lightingBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    lightingBinding.descriptorCount = 1;
+    lightingBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+
+    VkDescriptorSetLayoutBinding bindings[] = { uboBinding, samplerBinding, lightingBinding };
 
     VkDescriptorSetLayoutCreateInfo setLayoutInfo{};
     setLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    setLayoutInfo.bindingCount = 2;
+    setLayoutInfo.bindingCount = 3;
     setLayoutInfo.pBindings = bindings;
     vkCreateDescriptorSetLayout(m_Engine->GetDevice(), &setLayoutInfo, nullptr, &m_DescriptorSetLayout);
 
     // --- Descriptor pool ---
     VkDescriptorPoolSize poolSizes[2]{};
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT;
+    poolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     poolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT;
 
@@ -221,18 +255,37 @@ void SkinnedMeshRenderer::CreatePipeline() {
     pipelineInfo.layout = m_PipelineLayout;
     pipelineInfo.renderPass = VK_NULL_HANDLE;
 
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     if (vkCreateGraphicsPipelines(m_Engine->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_Pipeline) != VK_SUCCESS) {
-        throw std::runtime_error("Failed to create skinned mesh pipeline");
+        throw std::runtime_error("Failed to create Skinned Mesh Renderer graphics pipeline");
+    }
+
+    rasterizer.polygonMode = VK_POLYGON_MODE_LINE;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;   // wireframe usually looks better without backface culling
+    if (vkCreateGraphicsPipelines(m_Engine->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_WireframePipeline) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create skinned mesh wireframe pipeline");
     }
 
     vkDestroyShaderModule(m_Engine->GetDevice(), fragModule, nullptr);
     vkDestroyShaderModule(m_Engine->GetDevice(), vertModule, nullptr);
+
+    std::cout << "Skinned Mesh Renderer pipelines created successfully" << std::endl;
 }
 
-void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camera) {
+void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle& dayNightCycle) {
     VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
     uint32_t frameIndex = m_Engine->GetCurrentFrameIndex();
 
+
+    LightingUBO lighting{};
+    lighting.sunDirection = glm::vec4(dayNightCycle.GetSunDirection(), 0.0f);
+    lighting.sunColor = glm::vec4(dayNightCycle.GetSunColor(), dayNightCycle.GetAmbientIntensity());
+    memcpy(m_LightingUBOMapped[frameIndex], &lighting, sizeof(LightingUBO));
+
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout,
+        0, 1, &m_DescriptorSets[frameIndex], 0, nullptr);
+
+    VkPipeline pipelineToUse = wireframe ? m_WireframePipeline : m_Pipeline;
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
 
     VkExtent2D extent = m_Engine->GetSwapChainExtent();
@@ -297,4 +350,45 @@ void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camer
 
         vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshComp.mesh->Indices.size()), 1, 0, 0, 0);
     }
+}
+
+void SkinnedMeshRenderer::Shutdown() {
+    VkDevice device = m_Engine->GetDevice();
+    if (!m_initialized) {
+        return;
+    }
+    vkDeviceWaitIdle(device);
+
+    if (m_Pipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(device, m_Pipeline, nullptr);
+    }
+    if (m_WireframePipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(device, m_WireframePipeline, nullptr);
+    }
+    if (m_PipelineLayout != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
+    }
+    if (m_DescriptorPool != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(device, m_DescriptorPool, nullptr);
+    }
+    if (m_DescriptorSetLayout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device, m_DescriptorSetLayout, nullptr);
+    }
+
+    if (m_DefaultTexture) {
+        m_DefaultTexture->DestroyGPUResources(device);
+    }
+
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        if (m_BoneUBOBuffers[i] != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, m_BoneUBOBuffers[i], nullptr);
+            vkFreeMemory(device, m_BoneUBOMemory[i], nullptr);
+        }
+        if (m_LightingUBOBuffers[i] != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, m_LightingUBOBuffers[i], nullptr);
+            vkFreeMemory(device, m_LightingUBOMemory[i], nullptr);
+        }
+    }
+
+    std::cout << "Skinned Mesh Renderer shut down" << std::endl;
 }

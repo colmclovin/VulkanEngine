@@ -10,6 +10,10 @@
 #include <iostream>
 #include "../Components/GameSettings.h"
 #include "../Components/Components.h"
+#include "../Components/LightingUBO.h"
+#include "../Components/DayNightCycle.h"
+#include <glm/glm.hpp>
+
 RenderSystem::RenderSystem(VulkanEngine *engine) : m_Engine(engine) {
 }
 
@@ -42,8 +46,10 @@ void RenderSystem::Init() {
     std::cout << "RenderSystem initialized with all subsystems" << std::endl;
 }
 
-PauseMenuAction RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState, bool isPaused, bool& showOptionsInPause) {
+PauseMenuAction RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState, bool isPaused, bool& showOptionsInPause, DayNightCycle& dayNightCycle) {
     m_Engine->SetClearColor(settings.clearColor);   // NEW
+
+    
 
     // Render the frame using the quad renderer
     if (!m_Engine->BeginFrame()) {
@@ -56,8 +62,8 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry &registry, Camera3D &ca
     m_ImGuiVulkanUtil->NewFrame();                              // MOVED — now always runs against up-to-date window state
     m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine, m_PlayerEntity, m_InspectedEntity, selectedItem, techState);
 
-    m_MeshRenderer->Render(registry, camera, settings.wireframeMode);
-    m_SkinnedMeshRenderer->Render(registry, camera);
+    m_MeshRenderer->Render(registry, camera, settings.wireframeMode , dayNightCycle);
+    m_SkinnedMeshRenderer->Render(registry, camera, settings.wireframeMode, dayNightCycle);
     m_QuadRenderer->Render(registry);
 
     PauseMenuAction pauseAction = PauseMenuAction::None;
@@ -116,7 +122,12 @@ void RenderSystem::Shutdown() {
         m_ImGuiVulkanUtil->Shutdown();
         m_ImGuiVulkanUtil.reset();
     }
-
+    if (m_MeshRenderer) {
+        m_MeshRenderer->Shutdown();
+    }
+    if (m_SkinnedMeshRenderer) {
+        m_SkinnedMeshRenderer->Shutdown();
+    }
 
     m_initialized = false;
     std::cout << "RenderSystem shut down" << std::endl;

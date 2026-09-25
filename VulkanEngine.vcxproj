@@ -169,6 +169,8 @@
     <ClCompile Include="src\Components\Animator.cpp" />
     <ClCompile Include="src\Components\AssemblerSystem.cpp" />
     <ClCompile Include="src\Components\BeltSystem.cpp" />
+    <ClCompile Include="src\Components\DayNightCycle.cpp" />
+    <ClCompile Include="src\Components\FogOfWarMap.h" />
     <ClCompile Include="src\Components\FurnaceSystem.cpp" />
     <ClCompile Include="src\Components\GameSettings.cpp" />
     <ClCompile Include="src\Components\InserterSystem.cpp" />
@@ -222,6 +224,7 @@
     <ClInclude Include="src\Components\BoneMatrixUBO.h" />
     <ClInclude Include="src\Components\BoundsComponent.h" />
     <ClInclude Include="src\Components\Components.h" />
+    <ClInclude Include="src\Components\DayNightCycle.h" />
     <ClInclude Include="src\Components\FurnaceComponent.h" />
     <ClInclude Include="src\Components\FurnaceSystem.h" />
     <ClInclude Include="src\Components\GameSettings.h" />
@@ -231,6 +234,7 @@
     <ClInclude Include="src\Components\InserterSystem.h" />
     <ClInclude Include="src\Components\InteractionSystem.h" />
     <ClInclude Include="src\Components\InventoryComponent.h" />
+    <ClInclude Include="src\Components\LightingUBO.h" />
     <ClInclude Include="src\Components\MachineInventoryComponent.h" />
     <ClInclude Include="src\Components\Material.h" />
     <ClInclude Include="src\Components\Mesh.h" />

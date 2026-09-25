@@ -477,6 +477,9 @@ void Game::Update(float deltaTime) {
     m_PlacementSystem->Update(*m_Registry, m_PlayerEntity, *m_Camera, m_SelectedItem,
         m_Settings.terrain, static_cast<float>(mx), static_cast<float>(my),
         static_cast<float>(extent.width), static_cast<float>(extent.height), aspect, m_PlacementGrid, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
+
+    m_DayNightCycle.Update(deltaTime);
+
     MinerSystem::Update(*m_Registry, m_ResourceMap, deltaTime);
     FurnaceSystem::Update(*m_Registry, deltaTime);
     AssemblerSystem::Update(*m_Registry, deltaTime);
@@ -498,7 +501,7 @@ void Game::Update(float deltaTime) {
 void Game::Render() {
     m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine,
                                 m_PlayerEntity, m_InspectedEntity, m_SelectedItem, m_TechState,
-                                false, m_ShowOptionsInPause);
+                                false, m_ShowOptionsInPause, m_DayNightCycle);
 }
 void Game::Shutdown() {
     std::cout << "=== Shutting Down Game ===" << std::endl;
@@ -645,7 +648,7 @@ void Game::RunMainMenu() {
 void Game::RunPauseMenu() {
     PauseMenuAction action = m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine,
                                                          m_PlayerEntity, m_InspectedEntity, m_SelectedItem, m_TechState,
-                                                         true, m_ShowOptionsInPause);
+                                                         true, m_ShowOptionsInPause, m_DayNightCycle);
 
     switch (action) {
     case PauseMenuAction::Resume:

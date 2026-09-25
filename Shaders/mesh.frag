@@ -1,6 +1,11 @@
 #version 450
 
-layout(binding = 0) uniform sampler2D texSampler;
+layout(set = 0, binding = 0) uniform sampler2D texSampler;   // existing texture binding, now explicit about set=0
+
+layout(set = 1, binding = 0) uniform LightingData {
+    vec4 sunDirection;
+    vec4 sunColor;
+} lighting;
 
 layout(location = 0) in vec3 fragNormal;
 layout(location = 1) in vec2 fragTexCoord;
@@ -9,11 +14,13 @@ layout(location = 3) in vec4 fragBaseColor;
 
 layout(location = 0) out vec4 outColor;
 
+
+
 void main() {
-    vec3 lightDir = normalize(vec3(0.5, 1.0, 0.3));
+     vec3 lightDir = normalize(lighting.sunDirection.xyz);
     vec3 normal = normalize(fragNormal);
     float diffuse = max(dot(normal, lightDir), 0.0);
-    float ambient = 0.2;
+    float ambient = lighting.sunColor.a;
 
     vec4 texColor = texture(texSampler, fragTexCoord);
     vec3 litColor = fragBaseColor.rgb * fragColor * texColor.rgb * (ambient + diffuse * 0.8);

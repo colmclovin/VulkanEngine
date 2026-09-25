@@ -4,6 +4,7 @@
 #include "../Game/ItemDatabase.h"
 #include "../Game/TechState.h"
 #include "../Helpers/PauseMenuAction.h"
+#include "../Components/DayNightCycle.h"
 
 class VulkanEngine;
 class QuadRenderer;
@@ -25,7 +26,7 @@ public:
     
     
     void Init();
-    PauseMenuAction RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState, bool isPaused, bool &showOptionsInPause);
+    PauseMenuAction RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState, bool isPaused, bool &showOptionsInPause, DayNightCycle& dayNightCycle);
     void Shutdown();
 
     //ResourceManager *GetResourceManager() const { return m_ResourceManager.get(); }
