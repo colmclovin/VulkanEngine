@@ -16,9 +16,9 @@ MeshRenderer::~MeshRenderer() {
     Shutdown();
 }
 
-void MeshRenderer::Init() {
+void MeshRenderer::Init(ShadowMap* shadowMap) {
     std::cout << "Initializing Mesh Renderer..." << std::endl;
-    
+    m_ShadowMap = shadowMap;
 
 
 
@@ -38,20 +38,32 @@ void MeshRenderer::Init() {
     vkAllocateDescriptorSets(m_Engine->GetDevice(), &lightingAllocInfo, m_LightingDescriptorSets);
 
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
-        VkDescriptorBufferInfo bufferInfo{};
-        bufferInfo.buffer = m_LightingUBOBuffers[i];
-        bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(LightingUBO);
+        VkDescriptorBufferInfo lightingBufferInfo{};
+        lightingBufferInfo.buffer = m_LightingUBOBuffers[i];
+        lightingBufferInfo.offset = 0;
+        lightingBufferInfo.range = sizeof(LightingUBO);
 
-        VkWriteDescriptorSet write{};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = m_LightingDescriptorSets[i];
-        write.dstBinding = 0;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        write.descriptorCount = 1;
-        write.pBufferInfo = &bufferInfo;
+        VkDescriptorImageInfo shadowMapInfo{};                              // NEW
+        shadowMapInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        shadowMapInfo.imageView = shadowMap->GetImageView();
+        shadowMapInfo.sampler = shadowMap->GetSampler();
 
-        vkUpdateDescriptorSets(m_Engine->GetDevice(), 1, &write, 0, nullptr);
+        VkWriteDescriptorSet writes[2]{};                                    // CHANGED — was a single write
+        writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[0].dstSet = m_LightingDescriptorSets[i];
+        writes[0].dstBinding = 0;
+        writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writes[0].descriptorCount = 1;
+        writes[0].pBufferInfo = &lightingBufferInfo;
+
+        writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;            // NEW
+        writes[1].dstSet = m_LightingDescriptorSets[i];
+        writes[1].dstBinding = 1;
+        writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[1].descriptorCount = 1;
+        writes[1].pImageInfo = &shadowMapInfo;
+
+        vkUpdateDescriptorSets(m_Engine->GetDevice(), 2, writes, 0, nullptr);   // CHANGED — count 2, was 1
     }
 
 
@@ -74,7 +86,7 @@ void MeshRenderer::Init() {
     std::cout << "Mesh Renderer initialized" << std::endl;
 }
 
-void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle& dayNightCycle) {
+void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle& dayNightCycle, const glm::mat4& lightSpaceMatrix) {
     VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
     uint32_t frameIndex = m_Engine->GetCurrentFrameIndex();   // ADD THIS
 
@@ -95,8 +107,11 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
     glm::mat4 proj = camera.GetProjectionMatrix(aspect);
 
     LightingUBO lighting{};
+    lighting.viewProj = proj * view;   // NEW
     lighting.sunDirection = glm::vec4(dayNightCycle.GetSunDirection(), 0.0f);
     lighting.sunColor = glm::vec4(dayNightCycle.GetSunColor(), dayNightCycle.GetAmbientIntensity());
+    lighting.lightSpaceMatrix = lightSpaceMatrix;
+
     memcpy(m_LightingUBOMapped[frameIndex], &lighting, sizeof(LightingUBO));
 
     // ADD — bind the lighting set once per frame too (set index 1); texture set (index 0) still bound per-draw below
@@ -143,10 +158,11 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
         //}
 
         if (meshComp.mesh->SubMeshes.empty()) {
-            MeshPushConstants pushConstants{};
-            pushConstants.mvp = mvp;
+            glm::mat4 model = transform.GetMatrix();   // just the entity's own model matrix, no view/proj combined in
 
-            pushConstants.baseColor = baseTint; // CHANGED — was glm::vec4(1.0f)
+            MeshPushConstants pushConstants{};
+            pushConstants.model = model;   // CHANGED from pushConstants.mvp = mvp;
+            pushConstants.baseColor = baseTint;
             if (isBlockedGhost) {
                 pushConstants.baseColor = glm::vec4(1.0f, 0.2f, 0.2f, 1.0f); // red override still wins over facing tint
             } else if (isGhost) {
@@ -164,8 +180,11 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
             vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshComp.mesh->Indices.size()), 1, 0, 0, 0);
         } else {
             for (const auto &sub : meshComp.mesh->SubMeshes) {
+                glm::mat4 model = transform.GetMatrix();   // just the entity's own model matrix, no view/proj combined in
+
                 MeshPushConstants pushConstants{};
-                pushConstants.mvp = mvp;
+                pushConstants.model = model;   // CHANGED from pushConstants.mvp = mvp;
+                pushConstants.baseColor = baseTint;
 
                 if (isBlockedGhost) {
                     pushConstants.baseColor = glm::vec4(1.0f, 0.2f, 0.2f, 1.0f);
@@ -242,30 +261,39 @@ void MeshRenderer::CreatePipeline() {
     texturePoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     vkCreateDescriptorPool(m_Engine->GetDevice(), &texturePoolInfo, nullptr, &m_TextureDescriptorPool);
 
-    // --- Set 1: lighting UBO (new, separate set) ---
+    // --- Set 1: lighting UBO + shadow map ---
     VkDescriptorSetLayoutBinding lightingBinding{};
-    lightingBinding.binding = 0;   // binding 0 WITHIN this set — sets are independently numbered
+    lightingBinding.binding = 0;
     lightingBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     lightingBinding.descriptorCount = 1;
-    lightingBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    lightingBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;   // CHANGED — vertex now needs lightSpaceMatrix too
+
+    VkDescriptorSetLayoutBinding shadowMapBinding{};                                            // NEW
+    shadowMapBinding.binding = 1;
+    shadowMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    shadowMapBinding.descriptorCount = 1;
+    shadowMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutBinding lightingBindings[] = { lightingBinding, shadowMapBinding };     // CHANGED — array of 2 now
 
     VkDescriptorSetLayoutCreateInfo lightingLayoutInfo{};
     lightingLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    lightingLayoutInfo.bindingCount = 1;
-    lightingLayoutInfo.pBindings = &lightingBinding;
+    lightingLayoutInfo.bindingCount = 2;                                                         // CHANGED — was 1
+    lightingLayoutInfo.pBindings = lightingBindings;                                             // CHANGED — was &lightingBinding
     vkCreateDescriptorSetLayout(m_Engine->GetDevice(), &lightingLayoutInfo, nullptr, &m_LightingDescriptorSetLayout);
 
-    VkDescriptorPoolSize lightingPoolSize{};
-    lightingPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    lightingPoolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT;
+    VkDescriptorPoolSize lightingPoolSizes[2]{};                                                 // CHANGED — was single poolSize
+    lightingPoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    lightingPoolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT;
+    lightingPoolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    lightingPoolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT;
 
     VkDescriptorPoolCreateInfo lightingPoolInfo{};
     lightingPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    lightingPoolInfo.poolSizeCount = 1;
-    lightingPoolInfo.pPoolSizes = &lightingPoolSize;
+    lightingPoolInfo.poolSizeCount = 2;                                                          // CHANGED — was 1
+    lightingPoolInfo.pPoolSizes = lightingPoolSizes;                                              // CHANGED
     lightingPoolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
     vkCreateDescriptorPool(m_Engine->GetDevice(), &lightingPoolInfo, nullptr, &m_LightingDescriptorPool);
-
 
     VkDescriptorSetLayout setLayouts[] = { m_TextureDescriptorSetLayout, m_LightingDescriptorSetLayout };
 

@@ -9,6 +9,8 @@
 class VulkanEngine;
 class QuadRenderer;
 class SkinnedMeshRenderer;
+class ShadowMap;
+class ShadowMapRenderer;
 class ImGuiVulkanUtil;
 class AudioEngine;
 //class ResourceManager;
@@ -32,6 +34,7 @@ public:
     //ResourceManager *GetResourceManager() const { return m_ResourceManager.get(); }
     MeshRenderer *GetMeshRenderer() const { return m_MeshRenderer.get(); }
     SkinnedMeshRenderer *GetSkinnedMeshRenderer() const { return m_SkinnedMeshRenderer.get(); }
+    ShadowMapRenderer* GetShadowMapRenderer() const { return m_ShadowMapRenderer.get(); }
     QuadRenderer *GetQuadRenderer() const { return m_QuadRenderer.get(); }
     DebugLineRenderer *GetDebugLineRenderer() const { return m_DebugLineRenderer.get(); }
     DebugUI* GetDebugUI() const;
@@ -44,6 +47,8 @@ private:
     //std::unique_ptr<ResourceManager> m_ResourceManager;
     std::unique_ptr<MeshRenderer> m_MeshRenderer;
     std::unique_ptr<SkinnedMeshRenderer> m_SkinnedMeshRenderer;
+    std::unique_ptr<ShadowMap> m_ShadowMap;
+    std::unique_ptr<ShadowMapRenderer> m_ShadowMapRenderer;
     std::unique_ptr<QuadRenderer> m_QuadRenderer;
     std::unique_ptr<DebugLineRenderer> m_DebugLineRenderer;
 	std::unique_ptr<ImGuiVulkanUtil> m_ImGuiVulkanUtil;

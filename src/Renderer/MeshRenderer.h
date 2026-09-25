@@ -5,7 +5,7 @@
 #include "../Game/Camera3D.h"
 #include "../Components/Texture.h"
 #include "../Components/DayNightCycle.h"
-
+#include "ShadowMap.h"
 class VulkanEngine;
 class Mesh;
 
@@ -15,8 +15,8 @@ class MeshRenderer {
 public:
     MeshRenderer(VulkanEngine* m_Engine);
     ~MeshRenderer();
-    void Init();
-    void Render(entt::registry& registry, const Camera3D& camera, bool wireframe, DayNightCycle& dayNightCycle);
+    void Init(ShadowMap* shadowMap);
+    void Render(entt::registry& registry, const Camera3D& camera, bool wireframe, DayNightCycle& dayNightCycle, const glm::mat4& lightSpaceMatrix);
     void Shutdown();
 
     VkDescriptorSetLayout GetTextureDescriptorSetLayout() const { return m_TextureDescriptorSetLayout; }
@@ -46,7 +46,7 @@ private:
     VkDeviceMemory m_LightingUBOMemory[MAX_FRAMES_IN_FLIGHT];
     void* m_LightingUBOMapped[MAX_FRAMES_IN_FLIGHT];
     VkDescriptorSet m_LightingDescriptorSets[MAX_FRAMES_IN_FLIGHT];
-
+    ShadowMap* m_ShadowMap = nullptr;
 
     VkFormat m_SwapChainImageFormat = VK_FORMAT_UNDEFINED;
 
@@ -55,8 +55,8 @@ private:
     bool m_MeshUploaded = false;
 
     struct MeshPushConstants {
-        glm::mat4 mvp;
-        glm::vec4 baseColor;   // NEW
+        glm::mat4 model;
+        glm::vec4 baseColor;
     };
     bool m_initialized = false;
 

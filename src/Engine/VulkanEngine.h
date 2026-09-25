@@ -6,6 +6,8 @@
 #include <optional>
 #include <string>
 #include <glm/glm.hpp>
+#include <functional>
+
 class VulkanEngine {
 public:
     VulkanEngine(); //constructor
@@ -14,7 +16,7 @@ public:
     void Init(const char *appName = "Vulkan App", uint32_t width = 1280, uint32_t height = 720);
     void Shutdown();
 
-    bool BeginFrame(); // Returns false if should skip frame
+    bool BeginFrame(const std::function<void(VkCommandBuffer)>& preRenderPass = nullptr);
     void EndFrame();
     bool ShouldClose() const;
     void PollEvents() const;

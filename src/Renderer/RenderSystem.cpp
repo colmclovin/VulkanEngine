@@ -2,6 +2,8 @@
 #include "QuadRenderer.h"
 #include "MeshRenderer.h"
 #include "SkinnedMeshRenderer.h"
+#include "ShadowMap.h"
+#include "ShadowMapRenderer.h"
 #include "DebugLineRenderer.h"
 #include "ImGuiVulkanUtil.h"
 #include "../Engine/VulkanEngine.h"
@@ -13,6 +15,7 @@
 #include "../Components/LightingUBO.h"
 #include "../Components/DayNightCycle.h"
 #include <glm/glm.hpp>
+
 
 RenderSystem::RenderSystem(VulkanEngine *engine) : m_Engine(engine) {
 }
@@ -27,11 +30,22 @@ void RenderSystem::Init() {
     m_QuadRenderer = std::make_unique<QuadRenderer>(m_Engine);
     m_QuadRenderer->Init();
     
+
+    m_ShadowMap = std::make_unique<ShadowMap>();
+    m_ShadowMap->Create(m_Engine, 2048);
+
+    m_ShadowMapRenderer = std::make_unique<ShadowMapRenderer>(m_Engine);
+    m_ShadowMapRenderer->Init();
+
+
     m_MeshRenderer = std::make_unique<MeshRenderer>(m_Engine);
-    m_MeshRenderer->Init();
+    m_MeshRenderer->Init(m_ShadowMap.get());
 
     m_SkinnedMeshRenderer = std::make_unique<SkinnedMeshRenderer>(m_Engine);
-    m_SkinnedMeshRenderer->Init();
+    m_SkinnedMeshRenderer->Init(m_ShadowMap.get());
+
+
+
 
     m_DebugLineRenderer = std::make_unique<DebugLineRenderer>(m_Engine);
     m_DebugLineRenderer->Init();
@@ -49,21 +63,25 @@ void RenderSystem::Init() {
 PauseMenuAction RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState, bool isPaused, bool& showOptionsInPause, DayNightCycle& dayNightCycle) {
     m_Engine->SetClearColor(settings.clearColor);   // NEW
 
-    
+    glm::vec3 focusPoint = registry.valid(m_PlayerEntity) ? registry.get<TransformComponent>(m_PlayerEntity).Position : glm::vec3(0.0f);
+    glm::mat4 lightSpaceMatrix = dayNightCycle.GetLightSpaceMatrix(focusPoint, 100.0f);
+
 
     // Render the frame using the quad renderer
-    if (!m_Engine->BeginFrame()) {
-        ImGui::EndFrame();
-        return PauseMenuAction::None; // FIXED — must return a value matching the declared return type
+    bool began = m_Engine->BeginFrame([&](VkCommandBuffer cmd) {
+        m_ShadowMapRenderer->Render(registry, *m_ShadowMap, lightSpaceMatrix);
+        });
 
+    if (!began) {
+        return PauseMenuAction::None;
     }
     
     
     m_ImGuiVulkanUtil->NewFrame();                              // MOVED — now always runs against up-to-date window state
     m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine, m_PlayerEntity, m_InspectedEntity, selectedItem, techState);
 
-    m_MeshRenderer->Render(registry, camera, settings.wireframeMode , dayNightCycle);
-    m_SkinnedMeshRenderer->Render(registry, camera, settings.wireframeMode, dayNightCycle);
+    m_MeshRenderer->Render(registry, camera, settings.wireframeMode , dayNightCycle, lightSpaceMatrix);
+    m_SkinnedMeshRenderer->Render(registry, camera, settings.wireframeMode, dayNightCycle, lightSpaceMatrix);
     m_QuadRenderer->Render(registry);
 
     PauseMenuAction pauseAction = PauseMenuAction::None;
@@ -128,6 +146,9 @@ void RenderSystem::Shutdown() {
     if (m_SkinnedMeshRenderer) {
         m_SkinnedMeshRenderer->Shutdown();
     }
+    if (m_ShadowMapRenderer) m_ShadowMapRenderer->Shutdown();
+    if (m_ShadowMap) m_ShadowMap->Destroy(m_Engine->GetDevice());
+
 
     m_initialized = false;
     std::cout << "RenderSystem shut down" << std::endl;

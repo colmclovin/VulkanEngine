@@ -4,6 +4,7 @@
 #include <entt/entt.hpp>
 #include <memory>
 #include "../Components/DayNightCycle.h"
+#include "ShadowMap.h"
 
 class VulkanEngine;
 class Camera3D;
@@ -12,8 +13,8 @@ class Texture;
 class SkinnedMeshRenderer {
 public:
     SkinnedMeshRenderer(VulkanEngine *engine);
-    void Init();
-    void Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle& dayNightCycle);
+    void Init(ShadowMap* shadowMap);
+    void Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle& dayNightCycle, const glm::mat4& lightSpaceMatrix);
     void Shutdown();
 
 private:
@@ -40,7 +41,7 @@ private:
     VkBuffer m_LightingUBOBuffers[MAX_FRAMES_IN_FLIGHT];
     VkDeviceMemory m_LightingUBOMemory[MAX_FRAMES_IN_FLIGHT];
     void* m_LightingUBOMapped[MAX_FRAMES_IN_FLIGHT];
-
+    ShadowMap* m_ShadowMap = nullptr;
     bool m_initialized = false;
 
 

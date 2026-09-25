@@ -4,7 +4,7 @@
 class DayNightCycle {
 public:
     void Update(float deltaTime);
-
+    glm::mat4 GetLightSpaceMatrix(glm::vec3 focusPoint, float orthoSize = 50.0f, float nearPlane = 1.0f, float farPlane = 200.0f) const;
     glm::vec3 GetSunDirection() const;
     glm::vec3 GetSunColor() const;
     float GetAmbientIntensity() const;

@@ -23,6 +23,8 @@
     <None Include="Shaders\debugline.frag" />
     <None Include="Shaders\skinned.vert" />
     <None Include="Shaders\skinned.frag" />
+    <None Include="Shaders\shadow.vert" />
+    <None Include="Shaders\shadow.frag" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Main.cpp">
@@ -176,6 +178,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Components\FogOfWarMap.h">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\ShadowMap.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\ShadowMapRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -409,6 +417,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Components\LightingUBO.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Components\PointLightComponent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\ShadowMap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\ShadowMapRenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

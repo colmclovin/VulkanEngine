@@ -363,7 +363,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     // Game::HandleIsoInput
     float scrollDelta = m_VulkanEngine->GetScrollDelta();
     if (scrollDelta != 0.0f && !ImGui::GetIO().WantCaptureMouse) {
-        std::cout << "process iso zoom " << scrollDelta * m_Settings.isoZoomSpeed << std::endl;
+        //std::cout << "process iso zoom " << scrollDelta * m_Settings.isoZoomSpeed << std::endl;
         m_Camera->ProcessIsoZoom(scrollDelta * m_Settings.isoZoomSpeed);
     }
     m_VulkanEngine->ResetScrollDelta();

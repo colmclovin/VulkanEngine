@@ -14,10 +14,11 @@
 #include "../Components/LightingUBO.h"
 #include "../Components/Animator.h"
 #include <iostream>
-
+#include "ShadowMap.h"
 SkinnedMeshRenderer::SkinnedMeshRenderer(VulkanEngine *engine) : m_Engine(engine) {}
 
-void SkinnedMeshRenderer::Init() {
+void SkinnedMeshRenderer::Init(ShadowMap* shadowMap) {
+    m_ShadowMap = shadowMap;
     CreatePipeline();
     CreateUniformBuffers();
 
@@ -54,7 +55,15 @@ void SkinnedMeshRenderer::Init() {
         lightingBufferInfo.offset = 0;
         lightingBufferInfo.range = sizeof(LightingUBO);
 
-        VkWriteDescriptorSet writes[3]{};
+        VkDescriptorImageInfo shadowMapInfo{};   // ADD THIS — was missing
+        shadowMapInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        shadowMapInfo.imageView = m_ShadowMap->GetImageView();
+        shadowMapInfo.sampler = m_ShadowMap->GetSampler();
+
+
+        VkWriteDescriptorSet writes[4]{};
+
+
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[0].dstSet = m_DescriptorSets[i];
         writes[0].dstBinding = 0;
@@ -76,7 +85,14 @@ void SkinnedMeshRenderer::Init() {
         writes[2].descriptorCount = 1;
         writes[2].pBufferInfo = &lightingBufferInfo;
 
-        vkUpdateDescriptorSets(m_Engine->GetDevice(), 3, writes, 0, nullptr);
+        writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;   // NEW
+        writes[3].dstSet = m_DescriptorSets[i];
+        writes[3].dstBinding = 3;
+        writes[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[3].descriptorCount = 1;
+        writes[3].pImageInfo = &shadowMapInfo;
+
+        vkUpdateDescriptorSets(m_Engine->GetDevice(), 4, writes, 0, nullptr);
     }
     m_initialized = true;
     std::cout << "Skinned Mesh Renderer initialized" << std::endl;
@@ -121,14 +137,20 @@ void SkinnedMeshRenderer::CreatePipeline() {
     lightingBinding.binding = 2;   // check this doesn't collide with your existing sampler binding
     lightingBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     lightingBinding.descriptorCount = 1;
-    lightingBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    lightingBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;   // must include BOTH
+
+    VkDescriptorSetLayoutBinding shadowMapBinding{};   // NEW
+    shadowMapBinding.binding = 3;
+    shadowMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    shadowMapBinding.descriptorCount = 1;
+    shadowMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
 
-    VkDescriptorSetLayoutBinding bindings[] = { uboBinding, samplerBinding, lightingBinding };
+    VkDescriptorSetLayoutBinding bindings[] = { uboBinding, samplerBinding, lightingBinding, shadowMapBinding };
 
     VkDescriptorSetLayoutCreateInfo setLayoutInfo{};
     setLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    setLayoutInfo.bindingCount = 3;
+    setLayoutInfo.bindingCount = 4;
     setLayoutInfo.pBindings = bindings;
     vkCreateDescriptorSetLayout(m_Engine->GetDevice(), &setLayoutInfo, nullptr, &m_DescriptorSetLayout);
 
@@ -137,7 +159,7 @@ void SkinnedMeshRenderer::CreatePipeline() {
     poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
     poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT;
+    poolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
 
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -272,21 +294,9 @@ void SkinnedMeshRenderer::CreatePipeline() {
     std::cout << "Skinned Mesh Renderer pipelines created successfully" << std::endl;
 }
 
-void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle& dayNightCycle) {
+void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle& dayNightCycle, const glm::mat4& lightSpaceMatrix) {
     VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
     uint32_t frameIndex = m_Engine->GetCurrentFrameIndex();
-
-
-    LightingUBO lighting{};
-    lighting.sunDirection = glm::vec4(dayNightCycle.GetSunDirection(), 0.0f);
-    lighting.sunColor = glm::vec4(dayNightCycle.GetSunColor(), dayNightCycle.GetAmbientIntensity());
-    memcpy(m_LightingUBOMapped[frameIndex], &lighting, sizeof(LightingUBO));
-
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout,
-        0, 1, &m_DescriptorSets[frameIndex], 0, nullptr);
-
-    VkPipeline pipelineToUse = wireframe ? m_WireframePipeline : m_Pipeline;
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
 
     VkExtent2D extent = m_Engine->GetSwapChainExtent();
     float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
@@ -298,6 +308,22 @@ void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camer
 
     glm::mat4 view = camera.GetActiveViewMatrix();
     glm::mat4 proj = camera.GetProjectionMatrix(aspect);
+
+    LightingUBO lighting{};
+    lighting.viewProj = proj * view;   // is this line actually present?
+    lighting.sunDirection = glm::vec4(dayNightCycle.GetSunDirection(), 0.0f);
+    lighting.sunColor = glm::vec4(dayNightCycle.GetSunColor(), dayNightCycle.GetAmbientIntensity());
+    lighting.lightSpaceMatrix = lightSpaceMatrix;
+    memcpy(m_LightingUBOMapped[frameIndex], &lighting, sizeof(LightingUBO));
+
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout,
+        0, 1, &m_DescriptorSets[frameIndex], 0, nullptr);
+
+    VkPipeline pipelineToUse = wireframe ? m_WireframePipeline : m_Pipeline;
+    if (pipelineToUse != VK_NULL_HANDLE) {
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineToUse);
+    }
+    
 
     auto view3D = registry.view<TransformComponent, SkinnedMeshComponent>();
     for (auto entity : view3D) {
@@ -311,7 +337,7 @@ void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camer
         BoneMatrixUBO uboData{};
         for (auto &m : uboData.boneMatrices)
             m = glm::mat4(1.0f);
-
+        
         if (!meshComp.mesh->animations.empty() && registry.any_of<AnimationComponent>(entity)) {
             auto &anim = registry.get<AnimationComponent>(entity);
             if (anim.currentClipIndex >= 0 && anim.currentClipIndex < (int)meshComp.mesh->animations.size()) {
@@ -322,7 +348,9 @@ void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camer
                     uboData.boneMatrices[i] = pose[i];
                 }
             }
+
         }
+        
 
         memcpy(m_BoneUBOMapped[frameIndex], &uboData, sizeof(BoneMatrixUBO));
 
@@ -337,17 +365,16 @@ void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camer
         vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
         vkCmdBindIndexBuffer(commandBuffer, meshComp.mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-        glm::mat4 mvp = proj * view * transform.GetMatrix();
+      
 
         struct {
-            glm::mat4 mvp;
+            glm::mat4 model;
             glm::vec4 baseColor;
         } pushConstants;
-        pushConstants.mvp = mvp;
+        pushConstants.model = transform.GetMatrix();   // CHANGED — just the model matrix, no view/proj baked in
         pushConstants.baseColor = glm::vec4(1.0f);
 
         vkCmdPushConstants(commandBuffer, m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushConstants), &pushConstants);
-
         vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshComp.mesh->Indices.size()), 1, 0, 0, 0);
     }
 }

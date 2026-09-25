@@ -152,6 +152,8 @@
     <None Include="compile_shaders.ps1" />
     <None Include="Shaders\debugline.frag" />
     <None Include="Shaders\debugline.vert" />
+    <None Include="Shaders\shadow.frag" />
+    <None Include="Shaders\shadow.vert" />
     <None Include="Shaders\skinned.frag" />
     <None Include="Shaders\skinned.vert" />
   </ItemGroup>
@@ -206,6 +208,8 @@
     <ClCompile Include="src\Renderer\QuadRenderer.cpp" />
     <ClCompile Include="src\Renderer\RenderSystem.cpp" />
     <ClCompile Include="src\Components\TerrainRaycast.cpp" />
+    <ClCompile Include="src\Renderer\ShadowMap.cpp" />
+    <ClCompile Include="src\Renderer\ShadowMapRenderer.cpp" />
     <ClCompile Include="src\Renderer\SkinnedMeshRenderer.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -248,6 +252,7 @@
     <ClInclude Include="src\Components\PlacementSystem.h" />
     <ClInclude Include="src\Components\PlayerAnimationSystem.h" />
     <ClInclude Include="src\Components\PlayerComponent.h" />
+    <ClInclude Include="src\Components\PointLightComponent.h" />
     <ClInclude Include="src\Components\PowerComponent.h" />
     <ClInclude Include="src\Components\PowerSystem.h" />
     <ClInclude Include="src\Components\ResourceMap.h" />
@@ -285,6 +290,8 @@
     <ClInclude Include="src\Renderer\QuadRenderer.h" />
     <ClInclude Include="src\Renderer\RenderSystem.h" />
     <ClInclude Include="src\Components\TerrainRaycast.h" />
+    <ClInclude Include="src\Renderer\ShadowMap.h" />
+    <ClInclude Include="src\Renderer\ShadowMapRenderer.h" />
     <ClInclude Include="src\Renderer\SkinnedMeshRenderer.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
