@@ -10,7 +10,7 @@ std::unordered_map<ItemId, std::shared_ptr<Mesh>> ItemDatabase::s_MeshCache;
 void ItemDatabase::Init() {
 	s_Items[ItemId::Wood] = { "Wood", 999, "Assets/Models/Wood.glb" };
     s_Items[ItemId::StoneOre] = { "Stone Ore", 999, "Assets/Models/StoneOre.glb" };
-    s_Items[ItemId::Stone] = { "Stone", 999, "Assets/Models/Stone.glb" };
+    s_Items[ItemId::StoneBricks] = { "Stone Bricks", 999, "Assets/Models/StoneBricks.glb" };
 	s_Items[ItemId::CopperOre] = { "Copper Ore", 999, "Assets/Models/CopperOre.glb" };
     s_Items[ItemId::CopperPlate] = { "Copper Plate", 999, "Assets/Models/CopperPlate.glb" };
     s_Items[ItemId::UraniumOre] = { "Uranium Ore", 999, "Assets/Models/UraniumOre.glb" };

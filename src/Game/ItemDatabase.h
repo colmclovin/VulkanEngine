@@ -13,7 +13,7 @@ enum class ItemId {
 	None,
 	Wood,
 	StoneOre,
-	Stone,
+	StoneBricks,
 	CopperOre,
 	CopperPlate,
 	UraniumOre,
