@@ -7,6 +7,7 @@
 #include <stdexcept>
 #include <glm/glm.hpp>
 #include "../Components/Components.h"
+#include "../Components/LightingUBO.h"
 
 MeshRenderer::MeshRenderer(VulkanEngine* engine) : m_Engine(engine) {
 }
@@ -15,13 +16,58 @@ MeshRenderer::~MeshRenderer() {
     Shutdown();
 }
 
-void MeshRenderer::Init() {
+void MeshRenderer::Init(ShadowMap* shadowMap) {
     std::cout << "Initializing Mesh Renderer..." << std::endl;
-    
+    m_ShadowMap = shadowMap;
 
 
 
     CreatePipeline();
+    CreateUniformBuffers();
+
+
+
+    VkDescriptorSetLayout lightingLayouts[MAX_FRAMES_IN_FLIGHT];
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) lightingLayouts[i] = m_LightingDescriptorSetLayout;
+
+    VkDescriptorSetAllocateInfo lightingAllocInfo{};
+    lightingAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    lightingAllocInfo.descriptorPool = m_LightingDescriptorPool;
+    lightingAllocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+    lightingAllocInfo.pSetLayouts = lightingLayouts;
+    vkAllocateDescriptorSets(m_Engine->GetDevice(), &lightingAllocInfo, m_LightingDescriptorSets);
+
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        VkDescriptorBufferInfo lightingBufferInfo{};
+        lightingBufferInfo.buffer = m_LightingUBOBuffers[i];
+        lightingBufferInfo.offset = 0;
+        lightingBufferInfo.range = sizeof(LightingUBO);
+
+        VkDescriptorImageInfo shadowMapInfo{};                              // NEW
+        shadowMapInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        shadowMapInfo.imageView = shadowMap->GetImageView();
+        shadowMapInfo.sampler = shadowMap->GetSampler();
+
+        VkWriteDescriptorSet writes[2]{};                                    // CHANGED — was a single write
+        writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[0].dstSet = m_LightingDescriptorSets[i];
+        writes[0].dstBinding = 0;
+        writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writes[0].descriptorCount = 1;
+        writes[0].pBufferInfo = &lightingBufferInfo;
+
+        writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;            // NEW
+        writes[1].dstSet = m_LightingDescriptorSets[i];
+        writes[1].dstBinding = 1;
+        writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[1].descriptorCount = 1;
+        writes[1].pImageInfo = &shadowMapInfo;
+
+        vkUpdateDescriptorSets(m_Engine->GetDevice(), 2, writes, 0, nullptr);   // CHANGED — count 2, was 1
+    }
+
+
+
 
     TextureData whitePixel;
     whitePixel.width = 1;
@@ -40,8 +86,9 @@ void MeshRenderer::Init() {
     std::cout << "Mesh Renderer initialized" << std::endl;
 }
 
-void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool wireframe) {
+void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle& dayNightCycle, const glm::mat4& lightSpaceMatrix) {
     VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
+    uint32_t frameIndex = m_Engine->GetCurrentFrameIndex();   // ADD THIS
 
     VkPipeline pipelineToUse = wireframe ? m_WireframePipeline : m_Pipeline;
     if (pipelineToUse != VK_NULL_HANDLE) {
@@ -58,6 +105,20 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
 
     glm::mat4 view = camera.GetActiveViewMatrix();
     glm::mat4 proj = camera.GetProjectionMatrix(aspect);
+
+    LightingUBO lighting{};
+    lighting.viewProj = proj * view;   // NEW
+    lighting.sunDirection = glm::vec4(dayNightCycle.GetSunDirection(), 0.0f);
+    lighting.sunColor = glm::vec4(dayNightCycle.GetSunColor(), dayNightCycle.GetAmbientIntensity());
+    lighting.lightSpaceMatrix = lightSpaceMatrix;
+
+    memcpy(m_LightingUBOMapped[frameIndex], &lighting, sizeof(LightingUBO));
+
+    // ADD — bind the lighting set once per frame too (set index 1); texture set (index 0) still bound per-draw below
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout,
+        1, 1, &m_LightingDescriptorSets[frameIndex], 0, nullptr);
+
+
 
     auto view3D = registry.view<TransformComponent, MeshComponent>();
     for (auto entity : view3D) {
@@ -91,16 +152,17 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
             else
                 baseTint = glm::vec4(1.0f, 0.3f, 0.3f, 1.0f); // -Z: red
         }
-        if (registry.any_of<BeltComponent>(entity)) {
-            auto &belt = registry.get<BeltComponent>(entity);
-            std::cout << "Entity has BeltComponent, direction: (" << belt.direction.x << "," << belt.direction.z << ")" << std::endl;
-        }
+        //if (registry.any_of<BeltComponent>(entity)) {
+        //    auto &belt = registry.get<BeltComponent>(entity);
+        //    std::cout << "Entity has BeltComponent, direction: (" << belt.direction.x << "," << belt.direction.z << ")" << std::endl;
+        //}
 
         if (meshComp.mesh->SubMeshes.empty()) {
-            MeshPushConstants pushConstants{};
-            pushConstants.mvp = mvp;
+            glm::mat4 model = transform.GetMatrix();   // just the entity's own model matrix, no view/proj combined in
 
-            pushConstants.baseColor = baseTint; // CHANGED — was glm::vec4(1.0f)
+            MeshPushConstants pushConstants{};
+            pushConstants.model = model;   // CHANGED from pushConstants.mvp = mvp;
+            pushConstants.baseColor = baseTint;
             if (isBlockedGhost) {
                 pushConstants.baseColor = glm::vec4(1.0f, 0.2f, 0.2f, 1.0f); // red override still wins over facing tint
             } else if (isGhost) {
@@ -118,8 +180,11 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
             vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshComp.mesh->Indices.size()), 1, 0, 0, 0);
         } else {
             for (const auto &sub : meshComp.mesh->SubMeshes) {
+                glm::mat4 model = transform.GetMatrix();   // just the entity's own model matrix, no view/proj combined in
+
                 MeshPushConstants pushConstants{};
-                pushConstants.mvp = mvp;
+                pushConstants.model = model;   // CHANGED from pushConstants.mvp = mvp;
+                pushConstants.baseColor = baseTint;
 
                 if (isBlockedGhost) {
                     pushConstants.baseColor = glm::vec4(1.0f, 0.2f, 0.2f, 1.0f);
@@ -130,6 +195,7 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
                     pushConstants.baseColor = (sub.materialIndex >= 0 && sub.materialIndex < (int)meshComp.mesh->Materials.size()) ? meshComp.mesh->Materials[sub.materialIndex].baseColor : glm::vec4(1.0f);
                     if (isGhost) pushConstants.baseColor.a = 0.4f;
                 }
+                
 
                 if (m_PipelineLayout != VK_NULL_HANDLE) {
                     vkCmdPushConstants(commandBuffer, m_PipelineLayout,
@@ -148,6 +214,19 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
     }
 }
 
+void MeshRenderer::CreateUniformBuffers() {
+
+
+    VkDeviceSize lightingBufferSize = sizeof(LightingUBO);
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        m_Engine->CreateBuffer(lightingBufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+            m_LightingUBOBuffers[i], m_LightingUBOMemory[i]);
+        vkMapMemory(m_Engine->GetDevice(), m_LightingUBOMemory[i], 0, lightingBufferSize, 0, &m_LightingUBOMapped[i]);
+    }
+
+}
+
 
 void MeshRenderer::CreatePipeline() {
     std::cout << "Creating Mesh Renderer pipeline..." << std::endl;
@@ -157,26 +236,76 @@ void MeshRenderer::CreatePipeline() {
     pushConstantRange.offset = 0;
     pushConstantRange.size = sizeof(MeshPushConstants);
 
-   /* // Pipeline layout (no descriptor sets, just push constants)
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 0;
-    pipelineLayoutInfo.pSetLayouts = nullptr;
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-    */
 
-       VkDescriptorSetLayoutBinding samplerBinding{};
+    VkDescriptorSetLayoutBinding samplerBinding{};
     samplerBinding.binding = 0;
     samplerBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     samplerBinding.descriptorCount = 1;
     samplerBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    VkDescriptorSetLayoutCreateInfo setLayoutInfo{};
-    setLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    setLayoutInfo.bindingCount = 1;
-    setLayoutInfo.pBindings = &samplerBinding;
-    vkCreateDescriptorSetLayout(m_Engine->GetDevice(), &setLayoutInfo, nullptr, &m_TextureDescriptorSetLayout);
+    VkDescriptorSetLayoutCreateInfo textureLayoutInfo{};
+    textureLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    textureLayoutInfo.bindingCount = 1;             // back to 1 — just the sampler, not merged with lighting
+    textureLayoutInfo.pBindings = &samplerBinding;
+    vkCreateDescriptorSetLayout(m_Engine->GetDevice(), &textureLayoutInfo, nullptr, &m_TextureDescriptorSetLayout);
+
+    VkDescriptorPoolSize texturePoolSize{};
+    texturePoolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    texturePoolSize.descriptorCount = 256;   // however many unique textured materials you expect
+
+    VkDescriptorPoolCreateInfo texturePoolInfo{};
+    texturePoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    texturePoolInfo.poolSizeCount = 1;
+    texturePoolInfo.pPoolSizes = &texturePoolSize;
+    texturePoolInfo.maxSets = 256;
+    texturePoolInfo.flags = VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
+    vkCreateDescriptorPool(m_Engine->GetDevice(), &texturePoolInfo, nullptr, &m_TextureDescriptorPool);
+
+    // --- Set 1: lighting UBO + shadow map ---
+    VkDescriptorSetLayoutBinding lightingBinding{};
+    lightingBinding.binding = 0;
+    lightingBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    lightingBinding.descriptorCount = 1;
+    lightingBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;   // CHANGED — vertex now needs lightSpaceMatrix too
+
+    VkDescriptorSetLayoutBinding shadowMapBinding{};                                            // NEW
+    shadowMapBinding.binding = 1;
+    shadowMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    shadowMapBinding.descriptorCount = 1;
+    shadowMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    VkDescriptorSetLayoutBinding lightingBindings[] = { lightingBinding, shadowMapBinding };     // CHANGED — array of 2 now
+
+    VkDescriptorSetLayoutCreateInfo lightingLayoutInfo{};
+    lightingLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    lightingLayoutInfo.bindingCount = 2;                                                         // CHANGED — was 1
+    lightingLayoutInfo.pBindings = lightingBindings;                                             // CHANGED — was &lightingBinding
+    vkCreateDescriptorSetLayout(m_Engine->GetDevice(), &lightingLayoutInfo, nullptr, &m_LightingDescriptorSetLayout);
+
+    VkDescriptorPoolSize lightingPoolSizes[2]{};                                                 // CHANGED — was single poolSize
+    lightingPoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    lightingPoolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT;
+    lightingPoolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    lightingPoolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT;
+
+    VkDescriptorPoolCreateInfo lightingPoolInfo{};
+    lightingPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    lightingPoolInfo.poolSizeCount = 2;                                                          // CHANGED — was 1
+    lightingPoolInfo.pPoolSizes = lightingPoolSizes;                                              // CHANGED
+    lightingPoolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
+    vkCreateDescriptorPool(m_Engine->GetDevice(), &lightingPoolInfo, nullptr, &m_LightingDescriptorPool);
+
+    VkDescriptorSetLayout setLayouts[] = { m_TextureDescriptorSetLayout, m_LightingDescriptorSetLayout };
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 2;
+    pipelineLayoutInfo.pSetLayouts = setLayouts;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
+    vkCreatePipelineLayout(m_Engine->GetDevice(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout);
+
+
 
     VkDescriptorPoolSize poolSize{};
     poolSize.type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -199,13 +328,7 @@ void MeshRenderer::CreatePipeline() {
     samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
     vkCreateSampler(m_Engine->GetDevice(), &samplerInfo, nullptr, &m_DefaultSampler);
 
-    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
-    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &m_TextureDescriptorSetLayout; // NEW
-    pipelineLayoutInfo.pushConstantRangeCount = 1;
-    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-    vkCreatePipelineLayout(m_Engine->GetDevice(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout);
+
 
 
     if (vkCreatePipelineLayout(m_Engine->GetDevice(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout) != VK_SUCCESS) {
@@ -374,6 +497,36 @@ void MeshRenderer::Shutdown() {
     if (m_PipelineLayout != VK_NULL_HANDLE) {
         vkDestroyPipelineLayout(device, m_PipelineLayout, nullptr);
     }
+    // NEW — descriptor infrastructure
+        if (m_TextureDescriptorPool != VK_NULL_HANDLE) {
+            vkDestroyDescriptorPool(device, m_TextureDescriptorPool, nullptr);
+        }
+    if (m_TextureDescriptorSetLayout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device, m_TextureDescriptorSetLayout, nullptr);
+    }
+    if (m_LightingDescriptorPool != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(device, m_LightingDescriptorPool, nullptr);
+    }
+    if (m_LightingDescriptorSetLayout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device, m_LightingDescriptorSetLayout, nullptr);
+    }
+
+    // NEW — default texture + sampler
+    if (m_DefaultTexture) {
+        m_DefaultTexture->DestroyGPUResources(device);
+    }
+    if (m_DefaultSampler != VK_NULL_HANDLE) {
+        vkDestroySampler(device, m_DefaultSampler, nullptr);
+    }
+
+    // NEW — lighting UBOs, one per frame-in-flight
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        if (m_LightingUBOBuffers[i] != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device, m_LightingUBOBuffers[i], nullptr);
+            vkFreeMemory(device, m_LightingUBOMemory[i], nullptr);
+        }
+    }
+
     m_initialized = false;
     std::cout << "Mesh Renderer shut down" << std::endl;
 }

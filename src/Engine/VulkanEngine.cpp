@@ -89,13 +89,13 @@ void VulkanEngine::CreateWindow(const char* title) {
    glfwSetScrollCallback(m_Window, [](GLFWwindow *window, double xoffset, double yoffset) {
         auto engine = reinterpret_cast<VulkanEngine *>(glfwGetWindowUserPointer(window));
         engine->m_ScrollDelta += static_cast<float>(yoffset);
-        std::cout << "Scroll callback: " << engine->m_ScrollDelta << std::endl;
+        //std::cout << "Scroll callback: " << engine->m_ScrollDelta << std::endl;
     });
     std::cout << "Framebuffer resized: " << m_WindowWidth << "x" << m_WindowHeight << std::endl;
 }
 
 
-bool VulkanEngine::BeginFrame() {
+bool VulkanEngine::BeginFrame(const std::function<void(VkCommandBuffer)>& preRenderPass) {
     vkWaitForFences(m_Device, 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
 
     VkResult result = vkAcquireNextImageKHR(m_Device, m_SwapChain, UINT64_MAX,
@@ -120,6 +120,9 @@ bool VulkanEngine::BeginFrame() {
     }
     VkCommandBuffer cmd = m_CommandBuffers[m_CurrentFrame];
 
+    if (preRenderPass) {
+        preRenderPass(cmd);
+    }
 
     VkRenderingAttachmentInfo depthAttachment{};
     depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;

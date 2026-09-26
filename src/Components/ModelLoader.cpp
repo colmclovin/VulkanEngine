@@ -319,6 +319,11 @@ void ModelLoader::ProcessSkinnedMesh(const aiScene *scene, aiMesh *aiMeshData, c
         for (size_t b = 0; b < boneData.size() && b < 4; b++) {
             vertex.boneIndices[static_cast<int>(b)] = boneData[b].first;
             vertex.boneWeights[static_cast<int>(b)] = boneData[b].second;
+            if (i == 0) {
+                float sum = vertex.boneWeights.x + vertex.boneWeights.y + vertex.boneWeights.z + vertex.boneWeights.w;
+                std::cout << "Vertex 0 weights: " << vertex.boneWeights.x << "," << vertex.boneWeights.y << ","
+                    << vertex.boneWeights.z << "," << vertex.boneWeights.w << " sum=" << sum << std::endl;
+            }
         }
 
         outMesh.Vertices.push_back(vertex);

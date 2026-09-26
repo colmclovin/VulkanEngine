@@ -1,14 +1,21 @@
-// skinned.vert
 #version 450
 
 layout(push_constant) uniform PushConstants {
-    mat4 mvp;
+    mat4 model;
     vec4 baseColor;
 } pc;
 
 layout(binding = 0) uniform BoneMatrices {
     mat4 boneMatrices[64];
 } bones;
+
+layout(binding = 2) uniform LightingData {
+    mat4 viewProj;
+    vec4 sunDirection;
+    vec4 sunColor;
+    mat4 lightSpaceMatrix;
+    int numPointLights;
+} lighting;
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
@@ -21,6 +28,7 @@ layout(location = 0) out vec3 fragNormal;
 layout(location = 1) out vec2 fragTexCoord;
 layout(location = 2) out vec3 fragColor;
 layout(location = 3) out vec4 fragBaseColor;
+layout(location = 4) out vec4 fragPosLightSpace;
 
 void main() {
     mat4 skinMatrix =
@@ -30,10 +38,13 @@ void main() {
         bones.boneMatrices[inBoneIndices.w] * inBoneWeights.w;
 
     vec4 skinnedPos = skinMatrix * vec4(inPosition, 1.0);
-    gl_Position = pc.mvp * skinnedPos;
+    vec4 worldPos = pc.model * skinnedPos;
 
-    fragNormal = mat3(skinMatrix) * inNormal;
+    gl_Position = lighting.viewProj * worldPos;
+
+    fragNormal = mat3(pc.model) * mat3(skinMatrix) * inNormal;
     fragTexCoord = inTexCoord;
     fragColor = inColor;
     fragBaseColor = pc.baseColor;
+    fragPosLightSpace = lighting.lightSpaceMatrix * worldPos;
 }

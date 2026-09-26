@@ -67,7 +67,7 @@ void Camera3D::ProcessMouseMovement(float xOffset, float yOffset, bool constrain
 void Camera3D::ProcessIsoZoom(float deltaDistance) {
     isoDistance -= deltaDistance;
     isoDistance = std::clamp(isoDistance, 1.0f, 100.0f);
-    std::cout << "orbit distance: " << isoDistance << std::endl;
+    //std::cout << "orbit distance: " << isoDistance << std::endl;
 }
 
 
