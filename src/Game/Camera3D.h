@@ -41,6 +41,7 @@ public:
     float GetZoom() const { return zoom; }
     enum class Mode { FreeFly, Isometric };
     float GetIsoYaw() const { return isoYaw; }
+    float GetIsoDistance() const { return isoDistance; }
     void SetMode(Mode mode) { m_Mode = mode; }
     Mode GetMode() const { return m_Mode; }
     void SetIsoTarget(glm::vec3 pos) { isoTarget = pos; }

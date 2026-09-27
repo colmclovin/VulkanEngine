@@ -8,7 +8,10 @@
 #include "PlacementGrid.h"
 #include "../Game/FuelDatabase.h"
 #include "../Engine/VulkanEngine.h"
-
+#include "../Components/DepletionMap.h"
+#include "../Game/OreDepositMap.h"
+#include "../Game/OreDatabase.h"
+#include "../Components/PlacementGrid.h"
 entt::entity InteractionSystem::FindNearestInteractable(entt::registry &registry, glm::vec3 playerPos, float range) {
     entt::entity closest = entt::null;
     float closestDist = std::numeric_limits<float>::max();
@@ -41,7 +44,8 @@ entt::entity InteractionSystem::FindNearestPickup(entt::registry &registry, glm:
     return closest;
 }
 
-void InteractionSystem::Mine(entt::registry &registry, entt::entity target, entt::entity player, AudioEventSystem *audio, VulkanEngine *engine, MeshRenderer *meshRenderer) {
+void InteractionSystem::Mine(entt::registry &registry, entt::entity target, entt::entity player, AudioEventSystem *audio,
+                             VulkanEngine *engine, MeshRenderer *meshRenderer, PlacementGrid &placementGrid, float cellSize) {
     if (!registry.valid(target) || !registry.any_of<HarvestableComponent>(target)) return;
 
     auto &harvest = registry.get<HarvestableComponent>(target);
@@ -73,6 +77,8 @@ void InteractionSystem::Mine(entt::registry &registry, entt::entity target, entt
             registry.emplace<MeshComponent>(pickupEntity, dropMesh);
         }
     if (harvest.health <= 0.0f) {
+        GridCoord coord = PlacementGrid::WorldToGrid(targetTransform.Position, cellSize);
+        placementGrid.Unregister(coord);
         registry.destroy(target);
     }
 }
@@ -109,47 +115,43 @@ bool InteractionSystem::TryMineGround(ResourceMap &resourceMap, entt::registry &
     return true;
 }
 
-bool InteractionSystem::TryMineAtCursor(entt::registry &registry, ResourceMap &resourceMap, entt::entity player,
+bool InteractionSystem::TryMineAtCursor(entt::registry &registry, DepletionMap &depletionMap, entt::entity player,
                                         glm::vec3 rayOrigin, glm::vec3 rayDir, const TerrainSettings &terrainSettings,
-                                        float maxRange, AudioEventSystem *audio, VulkanEngine *engine, MeshRenderer *meshRenderer) {
+                                        float maxRange, AudioEventSystem *audio, VulkanEngine *engine, MeshRenderer *meshRenderer,
+                                        PlacementGrid &placementGrid) {
     auto &playerTransform = registry.get<TransformComponent>(player);
 
-    std::cout << "rayOrigin: " << rayOrigin.x << "," << rayOrigin.y << "," << rayOrigin.z << std::endl;
-    std::cout << "rayDir: " << rayDir.x << "," << rayDir.y << "," << rayDir.z << std::endl;
-
-entt::entity target = FindEntityAlongRay(registry, rayOrigin, rayDir, 100.0f); // generous ray cap, not maxRange
+    entt::entity target = FindEntityAlongRay(registry, rayOrigin, rayDir, 100.0f);
     if (registry.valid(target)) {
         float dist = glm::length(registry.get<TransformComponent>(target).Position - playerTransform.Position);
-        if (dist <= maxRange) { // THIS is the real gameplay range check
-            Mine(registry, target, player, audio, engine, meshRenderer);
+        if (dist <= maxRange) {
+            Mine(registry, target, player, audio, engine, meshRenderer, placementGrid, terrainSettings.cellSize);
             return true;
-        
         }
-    } else {
-        std::cout << "No entity found along ray" << std::endl;
     }
 
     glm::vec3 groundHit = TerrainRaycast::RaycastToTerrain(rayOrigin, rayDir, terrainSettings);
     float groundDist = glm::length(groundHit - playerTransform.Position);
-    std::cout << "groundHit: " << groundHit.x << "," << groundHit.y << "," << groundHit.z
-              << "  groundDist: " << groundDist << " (maxRange " << maxRange << ")" << std::endl;
 
-    if (groundDist <= maxRange) {
-        ResourceCell *cell = resourceMap.GetCellAtWorldPos(groundHit.x, groundHit.z);
-        if (cell) {
-            std::cout << "Cell found, resource: " << static_cast<int>(cell->resource) << " amount: " << cell->amount << std::endl;
-        } else {
-            std::cout << "No cell at that position (out of grid bounds?)" << std::endl;
+if (groundDist <= maxRange) {
+        auto deposit = OreDepositMap::GetDepositAt(groundHit.x, groundHit.z, terrainSettings.seed);
+        std::cout << "Ground hit at (" << groundHit.x << "," << groundHit.z << "): "
+                  << (deposit ? ("deposit found: item=" + std::to_string(static_cast<int>(deposit->item)) + " amount=" + std::to_string(deposit->amount)) : "no deposit") << std::endl;
+
+        if (deposit) {
+            int cellX = static_cast<int>(std::round(groundHit.x));
+            int cellZ = static_cast<int>(std::round(groundHit.z));
+            float remaining = depletionMap.GetRemainingFraction(cellX, cellZ);
+            std::cout << "  remaining fraction: " << remaining << std::endl;
+
+            if (remaining > 0.0f) {
+                auto &inventory = registry.get<InventoryComponent>(player);
+                inventory.AddItem(deposit->item, 1);
+                depletionMap.Deplete(cellX, cellZ, 1.0f, deposit->amount);
+                audio->Trigger(AudioEvent::OreCollected);
+                return true;
+            }
         }
-        if (cell && cell->resource != ItemId::None) {
-            auto &inventory = registry.get<InventoryComponent>(player);
-            inventory.AddItem(cell->resource, 1);
-            resourceMap.ExtractFromCell(cell, 10.0f);
-            audio->Trigger(AudioEvent::OreCollected);
-            return true;
-        }
-    } else {
-        std::cout << "Ground hit out of range" << std::endl;
     }
 
     return false;

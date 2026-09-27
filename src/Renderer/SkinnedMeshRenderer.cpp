@@ -94,6 +94,31 @@ void SkinnedMeshRenderer::Init(ShadowMap* shadowMap) {
 
         vkUpdateDescriptorSets(m_Engine->GetDevice(), 4, writes, 0, nullptr);
     }
+    VkDescriptorSetLayout shadowLayouts[MAX_FRAMES_IN_FLIGHT] = { m_ShadowDescriptorSetLayout, m_ShadowDescriptorSetLayout };
+    VkDescriptorSetAllocateInfo shadowAllocInfo{};
+    shadowAllocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    shadowAllocInfo.descriptorPool = m_ShadowDescriptorPool;
+    shadowAllocInfo.descriptorSetCount = MAX_FRAMES_IN_FLIGHT;
+    shadowAllocInfo.pSetLayouts = shadowLayouts;
+    vkAllocateDescriptorSets(m_Engine->GetDevice(), &shadowAllocInfo, m_ShadowDescriptorSets);
+
+    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        VkDescriptorBufferInfo shadowBoneBufferInfo{};
+        shadowBoneBufferInfo.buffer = m_BoneUBOBuffers[i]; // SAME buffer the main pipeline already writes each frame
+        shadowBoneBufferInfo.offset = 0;
+        shadowBoneBufferInfo.range = sizeof(BoneMatrixUBO);
+
+        VkWriteDescriptorSet shadowWrite{};
+        shadowWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        shadowWrite.dstSet = m_ShadowDescriptorSets[i];
+        shadowWrite.dstBinding = 0;
+        shadowWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        shadowWrite.descriptorCount = 1;
+        shadowWrite.pBufferInfo = &shadowBoneBufferInfo;
+
+        vkUpdateDescriptorSets(m_Engine->GetDevice(), 1, &shadowWrite, 0, nullptr);
+    }
+
     m_initialized = true;
     std::cout << "Skinned Mesh Renderer initialized" << std::endl;
 }
@@ -291,10 +316,145 @@ void SkinnedMeshRenderer::CreatePipeline() {
     vkDestroyShaderModule(m_Engine->GetDevice(), fragModule, nullptr);
     vkDestroyShaderModule(m_Engine->GetDevice(), vertModule, nullptr);
 
+
+
+
+        VkDescriptorSetLayoutBinding shadowUboBinding{};
+    shadowUboBinding.binding = 0;
+    shadowUboBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    shadowUboBinding.descriptorCount = 1;
+    shadowUboBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+    VkDescriptorSetLayoutCreateInfo shadowSetLayoutInfo{};
+    shadowSetLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    shadowSetLayoutInfo.bindingCount = 1;
+    shadowSetLayoutInfo.pBindings = &shadowUboBinding;
+    vkCreateDescriptorSetLayout(m_Engine->GetDevice(), &shadowSetLayoutInfo, nullptr, &m_ShadowDescriptorSetLayout);
+
+    VkDescriptorPoolSize shadowPoolSize{};
+    shadowPoolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    shadowPoolSize.descriptorCount = MAX_FRAMES_IN_FLIGHT;
+
+    VkDescriptorPoolCreateInfo shadowPoolInfo{};
+    shadowPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    shadowPoolInfo.poolSizeCount = 1;
+    shadowPoolInfo.pPoolSizes = &shadowPoolSize;
+    shadowPoolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
+    vkCreateDescriptorPool(m_Engine->GetDevice(), &shadowPoolInfo, nullptr, &m_ShadowDescriptorPool);
+
+    VkPushConstantRange shadowPushRange{};
+    shadowPushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    shadowPushRange.offset = 0;
+    shadowPushRange.size = sizeof(glm::mat4) * 2; // model + lightSpaceMatrix
+
+    VkPipelineLayoutCreateInfo shadowPipelineLayoutInfo{};
+    shadowPipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    shadowPipelineLayoutInfo.setLayoutCount = 1;
+    shadowPipelineLayoutInfo.pSetLayouts = &m_ShadowDescriptorSetLayout;
+    shadowPipelineLayoutInfo.pushConstantRangeCount = 1;
+    shadowPipelineLayoutInfo.pPushConstantRanges = &shadowPushRange;
+    vkCreatePipelineLayout(m_Engine->GetDevice(), &shadowPipelineLayoutInfo, nullptr, &m_ShadowPipelineLayout);
+
+    // Load the new shadow shaders
+    auto shadowVertCode = m_Engine->ReadFile("Shaders/shadow_skinned_vert.spv");
+    auto shadowFragCode = m_Engine->ReadFile("Shaders/shadow_skinned_frag.spv");
+    VkShaderModule shadowVertModule = m_Engine->CreateShaderModule(shadowVertCode);
+    VkShaderModule shadowFragModule = m_Engine->CreateShaderModule(shadowFragCode);
+
+    VkPipelineShaderStageCreateInfo shadowVertStage{};
+    shadowVertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shadowVertStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    shadowVertStage.module = shadowVertModule;
+    shadowVertStage.pName = "main";
+
+    VkPipelineShaderStageCreateInfo shadowFragStage{};
+    shadowFragStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    shadowFragStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    shadowFragStage.module = shadowFragModule;
+    shadowFragStage.pName = "main";
+
+    VkPipelineShaderStageCreateInfo shadowStages[] = { shadowVertStage, shadowFragStage };
+
+    // Reuse SkinnedVertex's real binding/attribute layout — same vertex buffer as the main pipeline uses
+    auto shadowBindingDesc = SkinnedVertex::getBindingDescription();
+    auto shadowAttrDescs = SkinnedVertex::getAttributeDescriptions();
+
+    VkPipelineVertexInputStateCreateInfo shadowVertexInputInfo{};
+    shadowVertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    shadowVertexInputInfo.vertexBindingDescriptionCount = 1;
+    shadowVertexInputInfo.pVertexBindingDescriptions = &shadowBindingDesc;
+    shadowVertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(shadowAttrDescs.size());
+    shadowVertexInputInfo.pVertexAttributeDescriptions = shadowAttrDescs.data();
+
+    VkPipelineInputAssemblyStateCreateInfo shadowInputAssembly{};
+    shadowInputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    shadowInputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    VkPipelineViewportStateCreateInfo shadowViewportState{};
+    shadowViewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    shadowViewportState.viewportCount = 1;
+    shadowViewportState.scissorCount = 1;
+
+    VkDynamicState shadowDynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo shadowDynamicState{};
+    shadowDynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    shadowDynamicState.dynamicStateCount = 2;
+    shadowDynamicState.pDynamicStates = shadowDynamicStates;
+
+    VkPipelineRasterizationStateCreateInfo shadowRasterizer{};
+    shadowRasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    shadowRasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    shadowRasterizer.lineWidth = 1.0f;
+    shadowRasterizer.cullMode = VK_CULL_MODE_FRONT_BIT; // same peter-panning/acne trick as the static shadow pipeline
+    shadowRasterizer.depthBiasEnable = VK_TRUE;
+
+    VkPipelineMultisampleStateCreateInfo shadowMultisampling{};
+    shadowMultisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    shadowMultisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineDepthStencilStateCreateInfo shadowDepthStencil{};
+    shadowDepthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    shadowDepthStencil.depthTestEnable = VK_TRUE;
+    shadowDepthStencil.depthWriteEnable = VK_TRUE;
+    shadowDepthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+
+    VkPipelineColorBlendStateCreateInfo shadowColorBlending{};
+    shadowColorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    shadowColorBlending.attachmentCount = 0; // depth-only, no color output
+
+    VkPipelineRenderingCreateInfo shadowRenderingInfo{};
+    shadowRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    shadowRenderingInfo.colorAttachmentCount = 0;
+    shadowRenderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT; // must match ShadowMap's format
+
+    VkGraphicsPipelineCreateInfo shadowPipelineInfo{};
+    shadowPipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    shadowPipelineInfo.pNext = &shadowRenderingInfo;
+    shadowPipelineInfo.stageCount = 2;
+    shadowPipelineInfo.pStages = shadowStages;
+    shadowPipelineInfo.pVertexInputState = &shadowVertexInputInfo;
+    shadowPipelineInfo.pInputAssemblyState = &shadowInputAssembly;
+    shadowPipelineInfo.pViewportState = &shadowViewportState;
+    shadowPipelineInfo.pRasterizationState = &shadowRasterizer;
+    shadowPipelineInfo.pMultisampleState = &shadowMultisampling;
+    shadowPipelineInfo.pDepthStencilState = &shadowDepthStencil;
+    shadowPipelineInfo.pColorBlendState = &shadowColorBlending;
+    shadowPipelineInfo.pDynamicState = &shadowDynamicState;
+    shadowPipelineInfo.layout = m_ShadowPipelineLayout;
+    shadowPipelineInfo.renderPass = VK_NULL_HANDLE;
+
+    if (vkCreateGraphicsPipelines(m_Engine->GetDevice(), VK_NULL_HANDLE, 1, &shadowPipelineInfo, nullptr, &m_ShadowPipeline) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create skinned shadow pipeline");
+    }
+
+    vkDestroyShaderModule(m_Engine->GetDevice(), shadowFragModule, nullptr);
+    vkDestroyShaderModule(m_Engine->GetDevice(), shadowVertModule, nullptr);
+
+
     std::cout << "Skinned Mesh Renderer pipelines created successfully" << std::endl;
 }
 
-void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle& dayNightCycle, const glm::mat4& lightSpaceMatrix) {
+void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle &dayNightCycle, const glm::mat4 &lightSpaceMatrix, const std::vector<PointLight> &activeLights) {
     VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
     uint32_t frameIndex = m_Engine->GetCurrentFrameIndex();
 
@@ -314,6 +474,10 @@ void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camer
     lighting.sunDirection = glm::vec4(dayNightCycle.GetSunDirection(), 0.0f);
     lighting.sunColor = glm::vec4(dayNightCycle.GetSunColor(), dayNightCycle.GetAmbientIntensity());
     lighting.lightSpaceMatrix = lightSpaceMatrix;
+    lighting.numPointLights = static_cast<int>(activeLights.size());
+    for (size_t i = 0; i < activeLights.size(); i++) {
+        lighting.pointLights[i] = activeLights[i];
+    }
     memcpy(m_LightingUBOMapped[frameIndex], &lighting, sizeof(LightingUBO));
 
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout,
@@ -379,6 +543,38 @@ void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camer
     }
 }
 
+void SkinnedMeshRenderer::RenderShadowPass(entt::registry &registry, const glm::mat4 &lightSpaceMatrix) {
+    VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
+    uint32_t frameIndex = m_Engine->GetCurrentFrameIndex();
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_ShadowPipeline);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_ShadowPipelineLayout,
+                            0, 1, &m_ShadowDescriptorSets[frameIndex], 0, nullptr);
+
+    auto view = registry.view<TransformComponent, SkinnedMeshComponent>();
+    for (auto entity : view) {
+        auto &transform = view.get<TransformComponent>(entity);
+        auto &meshComp = view.get<SkinnedMeshComponent>(entity);
+        if (!meshComp.mesh || !meshComp.mesh->IsUploaded()) continue;
+
+        struct {
+            glm::mat4 model;
+            glm::mat4 lightSpaceMatrix;
+        } pushConstants;
+        pushConstants.model = transform.GetMatrix();
+        pushConstants.lightSpaceMatrix = lightSpaceMatrix;
+
+        vkCmdPushConstants(commandBuffer, m_ShadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(pushConstants), &pushConstants);
+
+        VkBuffer vertexBuffers[] = { meshComp.mesh->vertexBuffer };
+        VkDeviceSize offsets[] = { 0 };
+        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+        vkCmdBindIndexBuffer(commandBuffer, meshComp.mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshComp.mesh->Indices.size()), 1, 0, 0, 0);
+    }
+}
+
+
 void SkinnedMeshRenderer::Shutdown() {
     VkDevice device = m_Engine->GetDevice();
     if (!m_initialized) {
@@ -400,6 +596,18 @@ void SkinnedMeshRenderer::Shutdown() {
     }
     if (m_DescriptorSetLayout != VK_NULL_HANDLE) {
         vkDestroyDescriptorSetLayout(device, m_DescriptorSetLayout, nullptr);
+    }
+    if (m_ShadowPipeline != VK_NULL_HANDLE) {
+        vkDestroyPipeline(device, m_ShadowPipeline, nullptr);
+    }
+    if (m_ShadowPipelineLayout != VK_NULL_HANDLE) {
+        vkDestroyPipelineLayout(device, m_ShadowPipelineLayout, nullptr);
+    }
+    if (m_ShadowDescriptorPool != VK_NULL_HANDLE) {
+        vkDestroyDescriptorPool(device, m_ShadowDescriptorPool, nullptr);
+    }
+    if (m_ShadowDescriptorSetLayout != VK_NULL_HANDLE) {
+        vkDestroyDescriptorSetLayout(device, m_ShadowDescriptorSetLayout, nullptr);
     }
 
     if (m_DefaultTexture) {

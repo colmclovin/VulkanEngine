@@ -6,6 +6,8 @@
 #include "../Components/Texture.h"
 #include "../Components/DayNightCycle.h"
 #include "ShadowMap.h"
+#include "../Components/PointLightComponent.h"
+#include "../Components/LightingUBO.h"
 class VulkanEngine;
 class Mesh;
 
@@ -16,7 +18,7 @@ public:
     MeshRenderer(VulkanEngine* m_Engine);
     ~MeshRenderer();
     void Init(ShadowMap* shadowMap);
-    void Render(entt::registry& registry, const Camera3D& camera, bool wireframe, DayNightCycle& dayNightCycle, const glm::mat4& lightSpaceMatrix);
+    void Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle &dayNightCycle, const glm::mat4 &lightSpaceMatrix, const std::vector<PointLight> &activeLights);
     void Shutdown();
 
     VkDescriptorSetLayout GetTextureDescriptorSetLayout() const { return m_TextureDescriptorSetLayout; }

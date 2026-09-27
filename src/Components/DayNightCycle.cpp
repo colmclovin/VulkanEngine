@@ -16,18 +16,24 @@ glm::vec3 DayNightCycle::GetSunDirection() const {
 }
 
 glm::vec3 DayNightCycle::GetSunColor() const {
-    float height = GetSunDirection().y;   // -1 (below horizon) to 1 (overhead)
+    float height = GetSunDirection().y; // -1 (below horizon) to 1 (overhead)
 
-    if (height > 0.3f) {
-        return glm::vec3(1.0f, 0.95f, 0.85f);   // daylight, warm white
-    }
-    else if (height > -0.1f) {
-        // sunrise/sunset transition — blend toward orange
-        float t = (height + 0.1f) / 0.4f;
-        return glm::mix(glm::vec3(1.0f, 0.5f, 0.3f), glm::vec3(1.0f, 0.95f, 0.85f), t);
-    }
-    else {
-        return glm::vec3(0.15f, 0.2f, 0.4f);   // night, cool dim blue
+    glm::vec3 dayColor(1.0f, 0.95f, 0.85f);
+    glm::vec3 sunsetColor(1.0f, 0.5f, 0.3f);
+    glm::vec3 nightColor(0.15f, 0.2f, 0.4f);
+
+    if (height > 0.2f) {
+        // Full daylight, with a gentle blend toward sunset as we approach the threshold
+        float t = glm::clamp((height - 0.2f) / 0.3f, 0.0f, 1.0f); // ramps up over a wider band
+        return glm::mix(sunsetColor, dayColor, t);
+    } else if (height > -0.2f) {
+        // Sunrise/sunset band, blending toward night
+        float t = glm::clamp((height + 0.2f) / 0.4f, 0.0f, 1.0f);
+        return glm::mix(nightColor, sunsetColor, t);
+    } else {
+        // Deep night — could still blend further toward nightColor if you want more gradation
+        float t = glm::clamp((height + 0.4f) / 0.2f, 0.0f, 1.0f);
+        return glm::mix(nightColor * 0.7f, nightColor, t); // slightly darker at true midnight
     }
 }
 

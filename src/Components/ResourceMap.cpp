@@ -1,6 +1,6 @@
 #include "ResourceMap.h"
 #include <FastNoiseLite.h>
-
+#include "../Game/OreDepositMap.h"
 
 
 void ResourceMap::Generate(int gridWidth, int gridDepth, float cellSize, int seed) {
@@ -9,31 +9,16 @@ void ResourceMap::Generate(int gridWidth, int gridDepth, float cellSize, int see
     m_CellSize = cellSize;
     m_Cells.assign(static_cast<size_t>(gridWidth) * gridDepth, ResourceCell{});
 
-    FastNoiseLite regionNoise;
-    regionNoise.SetSeed(seed + 1000);
-    regionNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    regionNoise.SetFrequency(0.02f);
-
-    FastNoiseLite densityNoise;
-    densityNoise.SetSeed(seed + 3000);
-    densityNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    densityNoise.SetFrequency(0.3f);
-
     for (int z = 0; z < gridDepth; z++) {
         for (int x = 0; x < gridWidth; x++) {
-            glm::vec2 warped = DomainWarp(static_cast<float>(x), static_cast<float>(z), seed); // CHANGED
-            float regionValue = regionNoise.GetNoise(warped.x, warped.y); // CHANGED — sample warped coords
-            RegionType region = DetermineRegion(regionValue);
+            float worldX = x * cellSize;
+            float worldZ = z * cellSize;
 
+            auto deposit = OreDepositMap::GetDepositAt(worldX, worldZ, seed);
             ResourceCell &cell = m_Cells[z * gridWidth + x];
-
-            if (region == RegionType::IronDeposit || region == RegionType::CopperDeposit || region == RegionType::CoalDeposit) {
-                float density = densityNoise.GetNoise(static_cast<float>(x), static_cast<float>(z)); // density stays unwarped — fine detail within a region
-                if (density > -0.2f) {
-                    cell.resource = (region == RegionType::IronDeposit) ? ItemId::IronOre : (region == RegionType::CopperDeposit) ? ItemId::CopperOre :
-                                                                                                                                    ItemId::Coal;
-                    cell.amount = 500.0f;
-                }
+            if (deposit) {
+                cell.resource = deposit->item;
+                cell.amount = deposit->amount;
             }
         }
     }

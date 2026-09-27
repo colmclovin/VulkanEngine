@@ -40,7 +40,8 @@ void RecipeDatabase::Init() {
         });
     s_Recipes.push_back({
         "Furnace ",
-        { { ItemId::StoneBricks, 10 }, { ItemId::IronPlate, 5 } },
+        { { ItemId::CopperPlate, 1 }, { ItemId::IronPlate, 1 } },
+        //{ { ItemId::StoneBricks, 10 }, { ItemId::IronPlate, 5 } },
         { { ItemId::Furnace, 1 } },  
         1.0f
         });

@@ -18,3 +18,4 @@
 #include "PowerComponent.h"
 #include "SkinnedMeshComponent.h"
 #include "AnimationComponent.h"
+#include "PointLightComponent.h"

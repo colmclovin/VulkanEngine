@@ -5,7 +5,8 @@
 #include <memory>
 #include "../Components/DayNightCycle.h"
 #include "ShadowMap.h"
-
+#include "../Components/PointLightComponent.h"
+#include "../Components/LightingUBO.h"
 class VulkanEngine;
 class Camera3D;
 class Texture;
@@ -14,7 +15,8 @@ class SkinnedMeshRenderer {
 public:
     SkinnedMeshRenderer(VulkanEngine *engine);
     void Init(ShadowMap* shadowMap);
-    void Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle& dayNightCycle, const glm::mat4& lightSpaceMatrix);
+    void Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle& dayNightCycle, const glm::mat4& lightSpaceMatrix, const std::vector<PointLight>& activeLights);
+    void RenderShadowPass(entt::registry &registry, const glm::mat4 &lightSpaceMatrix);
     void Shutdown();
 
 private:
@@ -43,6 +45,13 @@ private:
     void* m_LightingUBOMapped[MAX_FRAMES_IN_FLIGHT];
     ShadowMap* m_ShadowMap = nullptr;
     bool m_initialized = false;
+
+
+    VkPipeline m_ShadowPipeline = VK_NULL_HANDLE;
+    VkPipelineLayout m_ShadowPipelineLayout = VK_NULL_HANDLE;
+    VkDescriptorSetLayout m_ShadowDescriptorSetLayout = VK_NULL_HANDLE; // just bone UBO, binding 0
+    VkDescriptorPool m_ShadowDescriptorPool = VK_NULL_HANDLE;
+    VkDescriptorSet m_ShadowDescriptorSets[MAX_FRAMES_IN_FLIGHT];
 
 
     std::shared_ptr<Texture> m_DefaultTexture;

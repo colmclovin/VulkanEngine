@@ -56,6 +56,8 @@ void SaveManager::SaveGame(const std::string &path, entt::registry &registry, en
             entityJson["data"] = registry.get<FurnaceComponent>(entity);
             if (registry.any_of<MachineInventoryComponent>(entity))
                 entityJson["inventory"] = registry.get<MachineInventoryComponent>(entity);
+            if (registry.any_of<PointLightComponent>(entity)) // NEW
+                entityJson["pointLight"] = registry.get<PointLightComponent>(entity);
         } else if (registry.any_of<AssemblerComponent>(entity)) {
             entityJson["type"] = "Assembler";
             entityJson["data"] = registry.get<AssemblerComponent>(entity);
@@ -141,10 +143,7 @@ bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, en
     }
 
     auto terrainMesh = TerrainGenerator::GenerateHeightmapTerrain(
-            settings.terrain.gridWidth, settings.terrain.gridDepth,
-            settings.terrain.cellSize, settings.terrain.heightScale,
-            settings.terrain.noiseScale, settings.terrain.seed,
-            resourceMap); // uses the ALREADY-restored resource map for correct color tinting
+            settings.terrain, resourceMap); // uses the ALREADY-restored resource map for correct color tinting
 
     auto terrainEntity = registry.create();
     registry.emplace<TransformComponent>(terrainEntity);
@@ -169,6 +168,8 @@ bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, en
             registry.emplace<FurnaceComponent>(entity, entityJson["data"].get<FurnaceComponent>());
             if (entityJson.contains("inventory"))
                 registry.emplace<MachineInventoryComponent>(entity, entityJson["inventory"].get<MachineInventoryComponent>());
+            if (entityJson.contains("pointLight")) // NEW
+                registry.emplace<PointLightComponent>(entity, entityJson["pointLight"].get<PointLightComponent>());
             auto mesh = ItemDatabase::GetWorldMesh(ItemId::Furnace, engine, meshRenderer);
             if (mesh) registry.emplace<MeshComponent>(entity, mesh);
         } else if (type == "Assembler") {

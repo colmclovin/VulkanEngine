@@ -26,7 +26,7 @@ void PlacementSystem::Update(entt::registry& registry, entt::entity player, Came
     glm::vec3 boundsHalfExtents = def->footprintHalfExtents; // you'll need this on PlaceableDef, see below
     auto coveredCells = PlacementGrid::GetCoveredCells(ghostPos, boundsHalfExtents, gridSize);
     bool blocked = placementGrid.IsAreaOccupied(coveredCells);
-    std::cout << "Ghost at grid (" << coord.x << "," << coord.z << ") blocked=" << blocked << std::endl;
+    //std::cout << "Ghost at grid (" << coord.x << "," << coord.z << ") blocked=" << blocked << std::endl;
 
 
     glm::vec3 facing = GetFacingFromRotation();
@@ -100,6 +100,7 @@ void PlacementSystem::TryConfirmPlacement(entt::registry &registry, entt::entity
                 registry.emplace<MachineInventoryComponent>(m_GhostEntity, MachineInventoryComponent{
                                                                                    { MachineSlot{} }, { MachineSlot{} } });
                 registry.emplace<PowerConsumerComponent>(m_GhostEntity, PowerConsumerComponent{ 5.0f, false }); // NEW
+                registry.emplace<PointLightComponent>(m_GhostEntity, PointLightComponent{ glm::vec3(1.0f, 0.5f, 0.0f), 5.0f, 8.0f, false });
             } else if (m_PendingItem == ItemId::Assembler) {
                 registry.emplace<AssemblerComponent>(m_GhostEntity);
                 registry.emplace<MachineInventoryComponent>(m_GhostEntity, MachineInventoryComponent{

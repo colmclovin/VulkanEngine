@@ -23,14 +23,16 @@ layout(location = 1) out vec2 fragTexCoord;
 layout(location = 2) out vec3 fragColor;
 layout(location = 3) out vec4 fragBaseColor;
 layout(location = 4) out vec4 fragPosLightSpace;
+layout(location = 5) out vec3 fragWorldPos;
 
 void main() {
     vec4 worldPos = pc.model * vec4(inPosition, 1.0);
     gl_Position = lighting.viewProj * worldPos;
 
-    fragNormal = mat3(pc.model) * inNormal;   // also fixes normal transform — previously missing entirely
+    fragNormal = mat3(pc.model) * inNormal;
     fragTexCoord = inTexCoord;
     fragColor = inColor;
     fragBaseColor = pc.baseColor;
     fragPosLightSpace = lighting.lightSpaceMatrix * worldPos;
+    fragWorldPos = worldPos.xyz;   // ADD
 }

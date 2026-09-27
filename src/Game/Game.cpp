@@ -31,6 +31,8 @@
 #include "../Components/SkinnedMesh.h"
 #include "../Components/AnimationSystem.h"
 #include "../Components/PlayerAnimationSystem.h"
+#include "BiomeDatabase.h"
+#include "OreDepositMap.h"
 Game::Game() {
 
 }
@@ -92,8 +94,8 @@ void Game::Init() {
     m_PlacementSystem = std::make_unique<PlacementSystem>();
 
     FurnaceRecipeDatabase::Init();
-
-
+    OreDatabase::Init();
+    BiomeDatabase::Init();
 
     std::cout << "=== Initializing Engine ===" << std::endl;
     m_VulkanEngine = std::make_unique<VulkanEngine>();
@@ -144,7 +146,14 @@ void Game::CreateInitialEntities() {
     // Create initial game entities and components here
     std::cout << "Creating initial entities..." << std::endl;
 
-        
+        std::cout << "Terrain settings: gridWidth=" << m_Settings.terrain.gridWidth
+              << " gridDepth=" << m_Settings.terrain.gridDepth
+              << " cellSize=" << m_Settings.terrain.cellSize
+              << " heightScale=" << m_Settings.terrain.heightScale
+              << " noiseScale=" << m_Settings.terrain.noiseScale
+              << " seed=" << m_Settings.terrain.seed << std::endl;
+
+
         auto entity = m_Registry->create();
 
         auto &sprite = m_Registry->emplace<SpriteComponent>(entity);
@@ -154,8 +163,13 @@ void Game::CreateInitialEntities() {
         sprite.layer = 0;
         m_Registry->emplace<NameTag>(entity, "UI Background");
     
+        std::mt19937 rng(m_Settings.terrain.seed);
+        glm::vec3 spawnPos = WorldGenerator::FindSpawnPoint(m_Settings.terrain, m_Settings.terrain.seed, rng);
+
+
         m_PlayerEntity = m_Registry->create();
-        m_Registry->emplace<TransformComponent>(m_PlayerEntity);
+        auto &playerTransform = m_Registry->emplace<TransformComponent>(m_PlayerEntity);
+        playerTransform.Position = spawnPos;
         m_Registry->emplace<PlayerComponent>(m_PlayerEntity);
         m_Registry->emplace<InventoryComponent>(m_PlayerEntity);
 
@@ -170,19 +184,18 @@ void Game::CreateInitialEntities() {
 
 
         
-        auto terrainMesh = TerrainGenerator::GenerateHeightmapTerrain(
-            m_Settings.terrain.gridWidth, m_Settings.terrain.gridDepth,
-            m_Settings.terrain.cellSize, m_Settings.terrain.heightScale,
-            m_Settings.terrain.noiseScale, m_Settings.terrain.seed,
-            m_ResourceMap);
-
+       /* auto terrainMesh = TerrainGenerator::GenerateHeightmapTerrain(
+            m_Settings.terrain, m_ResourceMap);
+        std::cout << "Terrain mesh vertex count: " << terrainMesh->Vertices.size()
+                  << " index count: " << terrainMesh->Indices.size() << std::endl;
         m_TerrainEntity = m_Registry->create();
         m_Registry->emplace<TransformComponent>(m_TerrainEntity);
         m_Registry->emplace<MeshComponent>(m_TerrainEntity, terrainMesh);
         m_Registry->emplace<NameTag>(m_TerrainEntity, "Terrain");
 
         WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain, m_ResourceMap, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
-}
+        */
+        }
 void Game::HandleInput(float deltaTime) {
     GLFWwindow* window = m_VulkanEngine->GetWindow();
 
@@ -247,7 +260,6 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
 
     entt::entity machineTarget = InteractionSystem::FindMachineAlongRay(*m_Registry, rayOrigin, rayDir, 100.0f);
 
-
     bool pickupIsDown = glfwGetKey(window, GLFW_KEY_X) == GLFW_PRESS; // pick a free key
     bool rotatePlacedIsDown = glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS; // separate key from ghost-rotation R
     bool qIsDown = glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS;
@@ -270,6 +282,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     }
     if (interactIsDown && !interactWasDown) {
        
+ 
 
         if (m_Registry->valid(machineTarget)) {
             auto &machineTransform = m_Registry->get<TransformComponent>(machineTarget);
@@ -291,7 +304,10 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
                             fueledSomething = InteractionSystem::TryFuelFurnace(*m_Registry, machineTarget, m_PlayerEntity, selected, 1);
                         } else if (m_Registry->any_of<PowerGeneratorComponent>(machineTarget)) {
                             fueledSomething = InteractionSystem::TryFuelGenerator(*m_Registry, machineTarget, m_PlayerEntity, selected, 1);
+                        } else if (m_Registry->any_of<MinerComponent>(machineTarget)) {
+                            fueledSomething = InteractionSystem::TryFuelMiner(*m_Registry, machineTarget, m_PlayerEntity, selected, 1);
                         }
+                       
                         if (!fueledSomething) {
                             InteractionSystem::TryInsertIntoMachine(*m_Registry, machineTarget, m_PlayerEntity, selected, 1);
                         }
@@ -299,10 +315,12 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
                 }
             }
         } else {
-            InteractionSystem::TryMineAtCursor(*m_Registry, m_ResourceMap, m_PlayerEntity,
-                                               rayOrigin, rayDir, m_Settings.terrain, interactRange, m_AudioEvents.get(), m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
+            InteractionSystem::TryMineAtCursor(*m_Registry, m_DepletionMap, m_PlayerEntity,
+                                               rayOrigin, rayDir, m_Settings.terrain, interactRange, m_AudioEvents.get(),
+                                               m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_PlacementGrid);
         }
     }
+    
     if (inspectIsDown && !inspectWasDown && !ImGui::GetIO().WantCaptureMouse) {
         double mx, my;
         glfwGetCursorPos(window, &mx, &my);
@@ -401,6 +419,9 @@ void Game::MovePlayer(glm::vec3 direction, float deltaTime) {
 	else {
 		transform.Position += (forward * direction.z + right * direction.x) * player.moveSpeed * deltaTime;
 	}
+
+    auto sample = TerrainGenerator::SampleTerrain(transform.Position.x, transform.Position.z, m_Settings.terrain, m_DepletionMap);
+    transform.Position.y = sample.height;
 }
 
 void Game::HandleFreeFlyInput(GLFWwindow* window, float deltaTime) {
@@ -443,7 +464,7 @@ void Game::Update(float deltaTime) {
         }
     }
 
-    if (m_RenderSystem->GetDebugUI()->ConsumeRegenerateRequest()) {
+   /* if (m_RenderSystem->GetDebugUI()->ConsumeRegenerateRequest()) {
         m_VulkanEngine->WaitIdle();
 
         auto oldTerrainMesh = m_Registry->get<MeshComponent>(m_TerrainEntity).mesh;
@@ -453,17 +474,14 @@ void Game::Update(float deltaTime) {
             m_Settings.terrain.cellSize, m_Settings.terrain.seed);
 
         auto newTerrainMesh = TerrainGenerator::GenerateHeightmapTerrain(
-            m_Settings.terrain.gridWidth, m_Settings.terrain.gridDepth,
-            m_Settings.terrain.cellSize, m_Settings.terrain.heightScale,
-            m_Settings.terrain.noiseScale, m_Settings.terrain.seed,
-            m_ResourceMap);
+            m_Settings.terrain, m_ResourceMap);
 
         m_Registry->replace<MeshComponent>(m_TerrainEntity, newTerrainMesh);
 
         WorldGenerator::ClearHarvestables(*m_Registry);
         WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain, m_ResourceMap, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
     }
-
+    */
     if (m_Registry->valid(m_PlayerEntity)) {
         auto &transform = m_Registry->get<TransformComponent>(m_PlayerEntity);
         m_CurrentTarget = InteractionSystem::FindNearestInteractable(*m_Registry, transform.Position, 20.0f); // 3 unit range
@@ -489,10 +507,12 @@ void Game::Update(float deltaTime) {
 
 
     if (m_Registry->valid(m_PlayerEntity)) {
-        auto &transform = m_Registry->get<TransformComponent>(m_PlayerEntity);
-        glm::vec3 velocity = (transform.Position - m_LastPlayerPosition) / deltaTime;
+        auto &playerTransform = m_Registry->get<TransformComponent>(m_PlayerEntity);
+        glm::vec3 velocity = (playerTransform.Position - m_LastPlayerPosition) / deltaTime;
         //PlayerAnimationSystem::Update(*m_Registry, m_PlayerEntity, velocity);
-        m_LastPlayerPosition = transform.Position;
+        m_ChunkManager.Update(*m_Registry, playerTransform.Position, m_Settings.terrain,
+                              m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.seed, m_DepletionMap, m_PlacementGrid);
+        m_LastPlayerPosition = playerTransform.Position;
     }
 
     AnimationSystem::Update(*m_Registry, deltaTime);

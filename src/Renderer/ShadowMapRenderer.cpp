@@ -126,10 +126,10 @@ void ShadowMapRenderer::CreatePipeline() {
     vkDestroyShaderModule(m_Engine->GetDevice(), vertModule, nullptr);
 }
 
-void ShadowMapRenderer::Render(entt::registry& registry, ShadowMap& shadowMap, const glm::mat4& lightSpaceMatrix) {
+// ShadowMapRenderer.cpp
+void ShadowMapRenderer::BeginShadowPass(ShadowMap &shadowMap) {
     VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
 
-    // Transition the shadow map to a layout we can render depth into
     VkImageMemoryBarrier toDepth{};
     toDepth.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     toDepth.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -142,10 +142,9 @@ void ShadowMapRenderer::Render(entt::registry& registry, ShadowMap& shadowMap, c
     toDepth.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 
     vkCmdPipelineBarrier(commandBuffer,
-        VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-        0, 0, nullptr, 0, nullptr, 1, &toDepth);
+                         VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &toDepth);
 
-    // --- Depth-only render pass ---
     VkRenderingAttachmentInfo depthAttachment{};
     depthAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     depthAttachment.imageView = shadowMap.GetImageView();
@@ -156,25 +155,28 @@ void ShadowMapRenderer::Render(entt::registry& registry, ShadowMap& shadowMap, c
 
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-    renderingInfo.renderArea = { {0, 0}, {shadowMap.GetResolution(), shadowMap.GetResolution()} };
+    renderingInfo.renderArea = { { 0, 0 }, { shadowMap.GetResolution(), shadowMap.GetResolution() } };
     renderingInfo.layerCount = 1;
     renderingInfo.colorAttachmentCount = 0;
     renderingInfo.pDepthAttachment = &depthAttachment;
 
     vkCmdBeginRendering(commandBuffer, &renderingInfo);
 
-    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
-
     VkViewport viewport{ 0, 0, (float)shadowMap.GetResolution(), (float)shadowMap.GetResolution(), 0, 1 };
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-    VkRect2D scissor{ {0,0}, {shadowMap.GetResolution(), shadowMap.GetResolution()} };
+    VkRect2D scissor{ { 0, 0 }, { shadowMap.GetResolution(), shadowMap.GetResolution() } };
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+}
+
+void ShadowMapRenderer::RenderStatic(entt::registry &registry, const glm::mat4 &lightSpaceMatrix) {
+    VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_Pipeline);
 
     auto view = registry.view<TransformComponent, MeshComponent>();
     for (auto entity : view) {
-        auto& transform = view.get<TransformComponent>(entity);
-        auto& meshComp = view.get<MeshComponent>(entity);
-        if (!meshComp.mesh || !meshComp.mesh->IsUploaded()) continue;   // skip anything not already uploaded
+        auto &transform = view.get<TransformComponent>(entity);
+        auto &meshComp = view.get<MeshComponent>(entity);
+        if (!meshComp.mesh || !meshComp.mesh->IsUploaded()) continue;
 
         glm::mat4 lightSpaceMVP = lightSpaceMatrix * transform.GetMatrix();
         vkCmdPushConstants(commandBuffer, m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &lightSpaceMVP);
@@ -185,10 +187,12 @@ void ShadowMapRenderer::Render(entt::registry& registry, ShadowMap& shadowMap, c
         vkCmdBindIndexBuffer(commandBuffer, meshComp.mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
         vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshComp.mesh->Indices.size()), 1, 0, 0, 0);
     }
+}
 
+void ShadowMapRenderer::EndShadowPass(ShadowMap &shadowMap) {
+    VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
     vkCmdEndRendering(commandBuffer);
 
-    // --- Transition shadow map: DEPTH_ATTACHMENT_OPTIMAL -> SHADER_READ_ONLY_OPTIMAL, for sampling in the main pass ---
     VkImageMemoryBarrier toShaderRead{};
     toShaderRead.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     toShaderRead.oldLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
@@ -201,9 +205,8 @@ void ShadowMapRenderer::Render(entt::registry& registry, ShadowMap& shadowMap, c
     toShaderRead.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
     vkCmdPipelineBarrier(commandBuffer,
-        VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-        0, 0, nullptr, 0, nullptr, 1, &toShaderRead);
-
+                         VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+                         0, 0, nullptr, 0, nullptr, 1, &toShaderRead);
 }
 
 void ShadowMapRenderer::Shutdown() {

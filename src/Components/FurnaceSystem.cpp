@@ -5,6 +5,8 @@
 #include "MachineInventoryComponent.h"
 #include "../Game/FuelDatabase.h"
 #include "PowerComponent.h"
+#include "Components.h"
+#include <iostream>
 
 void FurnaceSystem::Update(entt::registry &registry, float deltaTime) {
     auto view = registry.view<FurnaceComponent, MachineInventoryComponent>();
@@ -31,6 +33,12 @@ void FurnaceSystem::Update(entt::registry &registry, float deltaTime) {
             consumer.wantsPower = furnace.isCooking || couldStartCooking;
         }
 
+        if (registry.any_of<PointLightComponent>(entity)) {
+            auto &light = registry.get<PointLightComponent>(entity);
+            light.active = furnace.isCooking;
+            //std::cout << "Furnace light active: " << light.active << " (isCooking: " << furnace.isCooking << ")" << std::endl;
+
+        }
 
         if (!furnace.isCooking) {
             // Need fuel available before starting a new cook cycle
@@ -71,6 +79,7 @@ void FurnaceSystem::Update(entt::registry &registry, float deltaTime) {
                 if (inSlot.count == 0) inSlot.item = ItemId::None;
 
                 furnace.isCooking = true;
+                
                 furnace.cookTimer = recipe->cookTime;
                 furnace.currentOutput = recipe->output;
                 break;

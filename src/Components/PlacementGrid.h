@@ -27,7 +27,7 @@ public:
 
     entt::entity GetEntityAt(GridCoord coord) const {
         auto it = m_Occupancy.find(coord);
-        std::cout << "Lookup (" << coord.x << "," << coord.z << ") -> " << (it != m_Occupancy.end() ? "FOUND" : "not found") << std::endl;
+      //  std::cout << "Lookup (" << coord.x << "," << coord.z << ") -> " << (it != m_Occupancy.end() ? "FOUND" : "not found") << std::endl;
         return it != m_Occupancy.end() ? it->second : entt::null;
 
     }

@@ -140,7 +140,32 @@ if exist "Shaders\shadow.frag" (
 ) else (
 	echo WARNING: shadow.frag not found
 )
-
+REM Compile shadow skinned vertex shader
+if exist "Shaders\shadow_skinned.vert" (
+	echo Compiling shadow skinned vertex shader...
+	glslc Shaders\shadow_skinned.vert -o Shaders\shadow_skinned_vert.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Shadow skinned vertex shader compiled successfully
+	) else (
+		echo   Shadow skinned vertex shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: shadow_skinned.vert not found
+)
+REM Compile shadow skinned fragment shader
+if exist "Shaders\shadow_skinned.frag" (
+	echo Compiling shadow skinned fragment shader...
+	glslc Shaders\shadow_skinned.frag -o Shaders\shadow_skinned_frag.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Shadow skinned fragment shader compiled successfully
+	) else (
+		echo   Shadow skinned fragment shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: shadow_skinned.frag not found
+)
 
 echo.
 echo Shader compilation complete!

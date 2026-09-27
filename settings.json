@@ -22,7 +22,7 @@
         "gridDepth": 100,
         "gridWidth": 100,
         "heightScale": 0.20000000298023224,
-        "noiseScale": 0.0989999994635582,
+        "noiseScale": 0.00989999994635582,
         "seed": 2143
     },
     "wireframeMode": false

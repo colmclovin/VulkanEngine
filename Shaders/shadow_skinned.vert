@@ -1,21 +1,14 @@
+// shadow_skinned.vert
 #version 450
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
-    vec4 baseColor;
+    mat4 lightSpaceMatrix;
 } pc;
 
 layout(binding = 0) uniform BoneMatrices {
     mat4 boneMatrices[64];
 } bones;
-
-layout(binding = 2) uniform LightingData {
-    mat4 viewProj;
-    vec4 sunDirection;
-    vec4 sunColor;
-    mat4 lightSpaceMatrix;
-    int numPointLights;
-} lighting;
 
 layout(location = 0) in vec3 inPosition;
 layout(location = 1) in vec3 inNormal;
@@ -23,14 +16,6 @@ layout(location = 2) in vec2 inTexCoord;
 layout(location = 3) in vec3 inColor;
 layout(location = 4) in ivec4 inBoneIndices;
 layout(location = 5) in vec4 inBoneWeights;
-
-layout(location = 0) out vec3 fragNormal;
-layout(location = 1) out vec2 fragTexCoord;
-layout(location = 2) out vec3 fragColor;
-layout(location = 3) out vec4 fragBaseColor;
-layout(location = 4) out vec4 fragPosLightSpace;
-layout(location = 5) out vec3 fragWorldPos;
-
 
 void main() {
     mat4 skinMatrix =
@@ -42,13 +27,5 @@ void main() {
     vec4 skinnedPos = skinMatrix * vec4(inPosition, 1.0);
     vec4 worldPos = pc.model * skinnedPos;
 
-    gl_Position = lighting.viewProj * worldPos;
-
-    fragNormal = mat3(pc.model) * mat3(skinMatrix) * inNormal;
-    fragTexCoord = inTexCoord;
-    fragColor = inColor;
-    fragBaseColor = pc.baseColor;
-    fragPosLightSpace = lighting.lightSpaceMatrix * worldPos;
-    fragWorldPos = worldPos.xyz;
-
+    gl_Position = pc.lightSpaceMatrix * worldPos;
 }

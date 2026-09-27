@@ -64,12 +64,31 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry &registry, Camera3D &ca
     m_Engine->SetClearColor(settings.clearColor);   // NEW
 
     glm::vec3 focusPoint = registry.valid(m_PlayerEntity) ? registry.get<TransformComponent>(m_PlayerEntity).Position : glm::vec3(0.0f);
-    glm::mat4 lightSpaceMatrix = dayNightCycle.GetLightSpaceMatrix(focusPoint, 100.0f);
+    float dynamicOrthoSize = glm::clamp(camera.GetIsoDistance() * 3.0f, 50.0f, 300.0f); // scale with zoom, whatever your camera exposes
+    glm::mat4 lightSpaceMatrix = dayNightCycle.GetLightSpaceMatrix(focusPoint, dynamicOrthoSize);
 
+    std::vector<PointLight> activeLights;
+    auto lightView = registry.view<TransformComponent, PointLightComponent>();
+    for (auto entity : lightView) {
+        auto &lightComp = lightView.get<PointLightComponent>(entity);
+        if (!lightComp.active) continue;
+        auto &transform = lightView.get<TransformComponent>(entity);
 
+        PointLight pl;
+        pl.position = glm::vec4(transform.Position, lightComp.range);
+        pl.color = glm::vec4(lightComp.color, lightComp.intensity);
+        activeLights.push_back(pl);
+        if (activeLights.size() >= MAX_POINT_LIGHTS) break;
+        std::cout << "Light gathered at position: " << transform.Position.x << "," << transform.Position.y << "," << transform.Position.z
+                  << " range: " << lightComp.range << std::endl;
+    }
+    //std::cout << "Active point lights this frame: " << activeLights.size() << std::endl;
     // Render the frame using the quad renderer
     bool began = m_Engine->BeginFrame([&](VkCommandBuffer cmd) {
-        m_ShadowMapRenderer->Render(registry, *m_ShadowMap, lightSpaceMatrix);
+        m_ShadowMapRenderer->BeginShadowPass(*m_ShadowMap);
+        m_ShadowMapRenderer->RenderStatic(registry, lightSpaceMatrix);
+        m_SkinnedMeshRenderer->RenderShadowPass(registry, lightSpaceMatrix); // NEW
+        m_ShadowMapRenderer->EndShadowPass(*m_ShadowMap);
         });
 
     if (!began) {
@@ -80,8 +99,8 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry &registry, Camera3D &ca
     m_ImGuiVulkanUtil->NewFrame();                              // MOVED — now always runs against up-to-date window state
     m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine, m_PlayerEntity, m_InspectedEntity, selectedItem, techState);
 
-    m_MeshRenderer->Render(registry, camera, settings.wireframeMode , dayNightCycle, lightSpaceMatrix);
-    m_SkinnedMeshRenderer->Render(registry, camera, settings.wireframeMode, dayNightCycle, lightSpaceMatrix);
+    m_MeshRenderer->Render(registry, camera, settings.wireframeMode, dayNightCycle, lightSpaceMatrix, activeLights);
+    m_SkinnedMeshRenderer->Render(registry, camera, settings.wireframeMode, dayNightCycle, lightSpaceMatrix, activeLights);
     m_QuadRenderer->Render(registry);
 
     PauseMenuAction pauseAction = PauseMenuAction::None;

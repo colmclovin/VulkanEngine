@@ -154,6 +154,8 @@
     <None Include="Shaders\debugline.vert" />
     <None Include="Shaders\shadow.frag" />
     <None Include="Shaders\shadow.vert" />
+    <None Include="Shaders\shadow_skinned.frag" />
+    <None Include="Shaders\shadow_skinned.vert" />
     <None Include="Shaders\skinned.frag" />
     <None Include="Shaders\skinned.vert" />
   </ItemGroup>
@@ -172,6 +174,7 @@
     <ClCompile Include="src\Components\AssemblerSystem.cpp" />
     <ClCompile Include="src\Components\BeltSystem.cpp" />
     <ClCompile Include="src\Components\DayNightCycle.cpp" />
+    <ClCompile Include="src\Components\DepletionMap.cpp" />
     <ClCompile Include="src\Components\FogOfWarMap.h" />
     <ClCompile Include="src\Components\FurnaceSystem.cpp" />
     <ClCompile Include="src\Components\GameSettings.cpp" />
@@ -189,12 +192,17 @@
     <ClCompile Include="src\Components\Texture.cpp" />
     <ClCompile Include="src\Components\TextureLoader.cpp" />
     <ClCompile Include="src\Components\WorldGenerator.cpp" />
+    <ClCompile Include="src\Game\BiomeDatabase.cpp" />
+    <ClCompile Include="src\Game\BiomeMap.cpp" />
     <ClCompile Include="src\Game\Camera3D.cpp" />
+    <ClCompile Include="src\Game\ChunkManager.cpp" />
     <ClCompile Include="src\Game\CraftingSystem.cpp" />
     <ClCompile Include="src\Game\FuelDatabase.cpp" />
     <ClCompile Include="src\Game\FurnaceRecipeDatabase.cpp" />
     <ClCompile Include="src\Game\Game.cpp" />
     <ClCompile Include="src\Game\ItemDatabase.cpp" />
+    <ClCompile Include="src\Game\OreDatabase.cpp" />
+    <ClCompile Include="src\Game\OreDepositMap.cpp" />
     <ClCompile Include="src\Game\PlaceableDatabase.cpp" />
     <ClCompile Include="src\Game\RecipeDatabase.cpp" />
     <ClCompile Include="src\Game\TechDatabase.cpp" />
@@ -227,8 +235,10 @@
     <ClInclude Include="src\Components\BeltSystem.h" />
     <ClInclude Include="src\Components\BoneMatrixUBO.h" />
     <ClInclude Include="src\Components\BoundsComponent.h" />
+    <ClInclude Include="src\Components\Chunk.h" />
     <ClInclude Include="src\Components\Components.h" />
     <ClInclude Include="src\Components\DayNightCycle.h" />
+    <ClInclude Include="src\Components\DepletionMap.h" />
     <ClInclude Include="src\Components\FurnaceComponent.h" />
     <ClInclude Include="src\Components\FurnaceSystem.h" />
     <ClInclude Include="src\Components\GameSettings.h" />
@@ -269,12 +279,18 @@
     <ClInclude Include="src\Components\Vertex.h" />
     <ClInclude Include="src\Components\WorldGenerator.h" />
     <ClInclude Include="src\Engine\VulkanEngine.h" />
+    <ClInclude Include="src\Game\BiomeDatabase.h" />
+    <ClInclude Include="src\Game\BiomeMap.h" />
     <ClInclude Include="src\Game\Camera3D.h" />
+    <ClInclude Include="src\Components\ChunkCoord.h" />
+    <ClInclude Include="src\Game\ChunkManager.h" />
     <ClInclude Include="src\Game\CraftingSystem.h" />
     <ClInclude Include="src\Game\FuelDatabase.h" />
     <ClInclude Include="src\Game\FurnaceRecipeDatabase.h" />
     <ClInclude Include="src\Game\Game.h" />
     <ClInclude Include="src\Game\ItemDatabase.h" />
+    <ClInclude Include="src\Game\OreDatabase.h" />
+    <ClInclude Include="src\Game\OreDepositMap.h" />
     <ClInclude Include="src\Game\Recipe.h" />
     <ClInclude Include="src\Game\RecipeDatabase.h" />
     <ClInclude Include="src\Game\TechDatabase.h" />

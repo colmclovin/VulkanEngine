@@ -11,7 +11,8 @@
 #include "../Components/PlacementGrid.h"
 #include "TechState.h"
 #include "../Components/DayNightCycle.h"
-
+#include "ChunkManager.h"
+#include "../Components/DepletionMap.h"
 class TerrainGenerator;
 class VulkanEngine;
 class RenderSystem;
@@ -81,7 +82,7 @@ private:
     char m_NewGameNameBuffer[64] = "MyWorld";
     glm::vec3 m_LastPlayerPosition = glm::vec3(0.0f);
     void RefreshSaveList();
-
+    ChunkManager m_ChunkManager;
     entt::entity m_PlayerEntity = entt::null;
     entt::entity m_TerrainEntity = entt::null;
     entt::entity m_CurrentTarget = entt::null;
@@ -89,7 +90,7 @@ private:
     bool m_FirstMouse = true;
     double m_LastMouseX = 0.0, m_LastMouseY = 0.0;
     DayNightCycle m_DayNightCycle;
-
+    DepletionMap m_DepletionMap;
     bool m_IsRunning = false;
     bool m_Initialized = false;
     entt::entity m_InspectedEntity = entt::null;

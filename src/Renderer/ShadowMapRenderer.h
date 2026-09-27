@@ -11,7 +11,9 @@ class ShadowMapRenderer {
 public:
     ShadowMapRenderer(VulkanEngine* engine);
     void Init();
-    void Render(entt::registry& registry, ShadowMap& shadowMap, const glm::mat4& lightSpaceMatrix);
+    void BeginShadowPass(ShadowMap &shadowMap);
+    void RenderStatic(entt::registry &registry, const glm::mat4 &lightSpaceMatrix);
+    void EndShadowPass(ShadowMap &shadowMap);
     void Shutdown();
 
 private:

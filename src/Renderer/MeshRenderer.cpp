@@ -86,7 +86,7 @@ void MeshRenderer::Init(ShadowMap* shadowMap) {
     std::cout << "Mesh Renderer initialized" << std::endl;
 }
 
-void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle& dayNightCycle, const glm::mat4& lightSpaceMatrix) {
+void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle &dayNightCycle, const glm::mat4 &lightSpaceMatrix, const std::vector<PointLight> &activeLights) {
     VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
     uint32_t frameIndex = m_Engine->GetCurrentFrameIndex();   // ADD THIS
 
@@ -111,7 +111,10 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
     lighting.sunDirection = glm::vec4(dayNightCycle.GetSunDirection(), 0.0f);
     lighting.sunColor = glm::vec4(dayNightCycle.GetSunColor(), dayNightCycle.GetAmbientIntensity());
     lighting.lightSpaceMatrix = lightSpaceMatrix;
-
+    lighting.numPointLights = static_cast<int>(activeLights.size());
+    for (size_t i = 0; i < activeLights.size(); i++) {
+        lighting.pointLights[i] = activeLights[i];
+    }
     memcpy(m_LightingUBOMapped[frameIndex], &lighting, sizeof(LightingUBO));
 
     // ADD — bind the lighting set once per frame too (set index 1); texture set (index 0) still bound per-draw below
