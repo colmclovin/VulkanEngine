@@ -17,4 +17,10 @@ public:
     static void ScatterTreesInChunk(entt::registry &registry, ChunkCoord coord, float chunkWorldSize,
                                     const TerrainSettings &terrainSettings, VulkanEngine *engine, MeshRenderer *meshRenderer,
                                     std::vector<entt::entity> &outTreeEntities, PlacementGrid &placementGrid);
+    static std::shared_ptr<Mesh> GetTreeMeshCache(VulkanEngine *engine, MeshRenderer *meshRenderer);
+
+private:
+    static std::shared_ptr<Mesh> s_TreeMeshCache; // NEW — loaded once, shared by every chunk
+
+
 };

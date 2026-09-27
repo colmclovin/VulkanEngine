@@ -166,6 +166,34 @@ if exist "Shaders\shadow_skinned.frag" (
 ) else (
 	echo WARNING: shadow_skinned.frag not found
 )
+REM Compile shadow skinned vertex shader
+if exist "Shaders\mesh_instanced.vert" (
+	echo Compiling mesh instanced vertex shader...
+	glslc Shaders\mesh_instanced.vert -o Shaders\mesh_instanced_vert.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Mesh Instanced vertex shader compiled successfully
+	) else (
+		echo   Mesh Instanced vertex shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: mesh_instanced.vert not found
+)
+REM Compile mesh instanced fragment shader
+if exist "Shaders\mesh_instanced.frag" (
+	echo Compiling mesh instanced fragment shader...
+	glslc Shaders\mesh_instanced.frag -o Shaders\mesh_instanced_frag.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Mesh Instanced fragment shader compiled successfully
+	) else (
+		echo   Mesh Instanced fragment shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: mesh_instanced.frag not found
+)
+
+
 
 echo.
 echo Shader compilation complete!

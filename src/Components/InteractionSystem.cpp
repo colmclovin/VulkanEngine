@@ -47,7 +47,7 @@ entt::entity InteractionSystem::FindNearestPickup(entt::registry &registry, glm:
 void InteractionSystem::Mine(entt::registry &registry, entt::entity target, entt::entity player, AudioEventSystem *audio,
                              VulkanEngine *engine, MeshRenderer *meshRenderer, PlacementGrid &placementGrid, float cellSize) {
     if (!registry.valid(target) || !registry.any_of<HarvestableComponent>(target)) return;
-
+    std::cout << "Mine() registry address: " << &registry << std::endl;
     auto &harvest = registry.get<HarvestableComponent>(target);
     auto &inventory = registry.get<InventoryComponent>(player);
 
@@ -67,19 +67,34 @@ void InteractionSystem::Mine(entt::registry &registry, entt::entity target, entt
 
 
         auto pickupEntity = registry.create();
+        std::cout << "Pickup created, storage count: " << registry.storage<entt::entity>().size() << std::endl;
+        size_t liveCount3 = 0;
+        for (auto entity : registry.storage<entt::entity>()) {
+            liveCount3++;
+        }
+        std::cout << "  [verified] live entity count: " << liveCount3 << std::endl;
         auto &pickupTransform = registry.emplace<TransformComponent>(pickupEntity);
         pickupTransform.Position = targetTransform.Position + offset;
 		pickupTransform.Scale = glm::vec3(0.3f); 
         registry.emplace<PickupComponent>(pickupEntity, PickupComponent{ harvest.yieldItem, harvest.yieldOnDestroy });
         // TODO: give it a small mesh (a dropped-item model) via MeshComponent once you have one
-        auto dropMesh = ItemDatabase::GetWorldMesh(harvest.yieldItem, engine, meshRenderer);   // CHANGED — looked up, not stored
+        auto dropMesh = ItemDatabase::GetWorldMesh(harvest.yieldItem, engine, meshRenderer);
         if (dropMesh) {
             registry.emplace<MeshComponent>(pickupEntity, dropMesh);
         }
     if (harvest.health <= 0.0f) {
         GridCoord coord = PlacementGrid::WorldToGrid(targetTransform.Position, cellSize);
         placementGrid.Unregister(coord);
+        std::cout << "About to destroy tree, target valid? " << registry.valid(target) << std::endl;
         registry.destroy(target);
+        std::cout << "After destroy, target valid? " << registry.valid(target) << std::endl;
+        std::cout << "Tree destroyed, storage count: " << registry.storage<entt::entity>().size() << std::endl;
+        size_t liveCount2 = 0;
+        for (auto entity : registry.storage<entt::entity>()) {
+            liveCount2++;
+        }
+        std::cout << "  [verified] live entity count: " << liveCount2 << std::endl;
+
     }
 }
 
@@ -92,7 +107,16 @@ void InteractionSystem::CollectPickup(entt::registry &registry, entt::entity pic
     int leftover = inventory.AddItem(pickupComp.item, pickupComp.count);
     if (leftover == 0) {
         // Fully picked up
+        std::cout << "About to destroy pickup, pickup valid? " << registry.valid(pickup) << std::endl;
         registry.destroy(pickup);
+        std::cout << "After destroy, pickup valid? " << registry.valid(pickup) << std::endl;
+        std::cout << "Pickup collected, storage count: " << registry.storage<entt::entity>().size() << std::endl;
+      
+        size_t liveCount = 0;
+        for (auto entity : registry.storage<entt::entity>()) {
+            liveCount++;
+        }
+        std::cout << "  [verified] live entity count: " << liveCount << std::endl;
         audio->Trigger(AudioEvent::OreCollected); // rename to something generic like ItemPickup later
     } else {
         pickupComp.count = leftover; // partial pickup if inventory was nearly full

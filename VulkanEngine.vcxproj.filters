@@ -27,6 +27,8 @@
     <None Include="Shaders\shadow.frag" />
     <None Include="Shaders\shadow_skinned.frag" />
     <None Include="Shaders\shadow_skinned.vert" />
+    <None Include="Shaders\mesh_Instanced.vert" />
+    <None Include="Shaders\mesh_instanced.frag" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Main.cpp">

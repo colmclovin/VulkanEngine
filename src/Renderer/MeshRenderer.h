@@ -23,9 +23,14 @@ public:
 
     VkDescriptorSetLayout GetTextureDescriptorSetLayout() const { return m_TextureDescriptorSetLayout; }
     VkDescriptorSet AllocateTextureDescriptorSet(VkImageView imageView, VkSampler sampler);
+    struct InstanceData {
+        glm::mat4 model;
+        glm::vec4 tintColor;
+    };
 
 private:
-
+    void DrawSingleEntity(entt::registry &registry, entt::entity entity, VkCommandBuffer commandBuffer,
+                          const glm::mat4 &view, const glm::mat4 &proj);
     void CreateUniformBuffers();
     void CreatePipeline();
     std::shared_ptr<Texture> m_DefaultTexture;
@@ -52,6 +57,24 @@ private:
 
     VkFormat m_SwapChainImageFormat = VK_FORMAT_UNDEFINED;
 
+    static VkVertexInputBindingDescription GetInstanceBindingDescription();
+    static std::array<VkVertexInputAttributeDescription, 5> GetInstanceAttributeDescriptions(); // mat4 = 4 vec4 slots + 1 tint
+
+    void CreateInstancedPipeline();
+    void EnsureInstanceBufferCapacity(size_t instanceCount);
+    void DrawInstancedGroup(entt::registry &registry, Mesh *mesh, const std::vector<entt::entity> &entities,
+                            VkCommandBuffer commandBuffer);
+
+    VkPipeline m_InstancedPipeline = VK_NULL_HANDLE;
+    VkPipelineLayout m_InstancedPipelineLayout = VK_NULL_HANDLE;
+
+    VkBuffer m_InstanceBuffer = VK_NULL_HANDLE;
+    VkDeviceMemory m_InstanceBufferMemory = VK_NULL_HANDLE;
+    void *m_InstanceBufferMapped = nullptr;
+    size_t m_InstanceBufferCapacity = 0; // in number of InstanceData elements
+
+    static constexpr size_t INSTANCING_THRESHOLD = 4;
+    size_t m_InstanceBufferWriteOffset = 0; // reset to 0 at the start of each Render() call
     // Shared Mesh for all models
     Mesh* m_MeshMesh = nullptr;
     bool m_MeshUploaded = false;

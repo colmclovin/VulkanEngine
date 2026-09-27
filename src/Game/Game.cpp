@@ -97,6 +97,8 @@ void Game::Init() {
     OreDatabase::Init();
     BiomeDatabase::Init();
 
+    m_ChunkManager.StartWorkerThread(m_Settings.terrain, m_Settings.terrain.seed);
+
     std::cout << "=== Initializing Engine ===" << std::endl;
     m_VulkanEngine = std::make_unique<VulkanEngine>();
     m_VulkanEngine->Init("Game", 1280, 720);
@@ -460,6 +462,7 @@ void Game::Update(float deltaTime) {
         m_Camera->SetIsoTarget(transform.Position);
         entt::entity nearbyPickup = InteractionSystem::FindNearestPickup(*m_Registry, transform.Position, 1.0f); // small radius
         if (m_Registry->valid(nearbyPickup)) {
+            std::cout << "Game::Update registry address: " << m_Registry.get() << std::endl;
             InteractionSystem::CollectPickup(*m_Registry, nearbyPickup, m_PlayerEntity, m_AudioEvents.get());
         }
     }
@@ -525,7 +528,8 @@ void Game::Render() {
 }
 void Game::Shutdown() {
     std::cout << "=== Shutting Down Game ===" << std::endl;
-	
+    m_ChunkManager.StopWorkerThread();
+
     std::cout << "=== Saving Settings ===" << std::endl;
     m_Settings.SaveToFile("settings.json");
     std::cout << "=== Settings Saved ===" << std::endl;

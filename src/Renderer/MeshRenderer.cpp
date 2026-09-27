@@ -8,6 +8,7 @@
 #include <glm/glm.hpp>
 #include "../Components/Components.h"
 #include "../Components/LightingUBO.h"
+#include <unordered_map>
 
 MeshRenderer::MeshRenderer(VulkanEngine* engine) : m_Engine(engine) {
 }
@@ -23,6 +24,7 @@ void MeshRenderer::Init(ShadowMap* shadowMap) {
 
 
     CreatePipeline();
+    CreateInstancedPipeline();
     CreateUniformBuffers();
 
 
@@ -88,7 +90,8 @@ void MeshRenderer::Init(ShadowMap* shadowMap) {
 
 void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle &dayNightCycle, const glm::mat4 &lightSpaceMatrix, const std::vector<PointLight> &activeLights) {
     VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
-    uint32_t frameIndex = m_Engine->GetCurrentFrameIndex();   // ADD THIS
+    uint32_t frameIndex = m_Engine->GetCurrentFrameIndex(); // ADD THIS
+    m_InstanceBufferWriteOffset = 0;
 
     VkPipeline pipelineToUse = wireframe ? m_WireframePipeline : m_Pipeline;
     if (pipelineToUse != VK_NULL_HANDLE) {
@@ -107,7 +110,7 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
     glm::mat4 proj = camera.GetProjectionMatrix(aspect);
 
     LightingUBO lighting{};
-    lighting.viewProj = proj * view;   // NEW
+    lighting.viewProj = proj * view; // NEW
     lighting.sunDirection = glm::vec4(dayNightCycle.GetSunDirection(), 0.0f);
     lighting.sunColor = glm::vec4(dayNightCycle.GetSunColor(), dayNightCycle.GetAmbientIntensity());
     lighting.lightSpaceMatrix = lightSpaceMatrix;
@@ -119,103 +122,124 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
 
     // ADD — bind the lighting set once per frame too (set index 1); texture set (index 0) still bound per-draw below
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout,
-        1, 1, &m_LightingDescriptorSets[frameIndex], 0, nullptr);
+                            1, 1, &m_LightingDescriptorSets[frameIndex], 0, nullptr);
 
-
-
+    std::unordered_map<Mesh *, std::vector<entt::entity>> meshGroups;
     auto view3D = registry.view<TransformComponent, MeshComponent>();
     for (auto entity : view3D) {
-        auto &transform = view3D.get<TransformComponent>(entity);
         auto &meshComp = view3D.get<MeshComponent>(entity);
-
         if (!meshComp.mesh) continue;
         meshComp.mesh->UploadToGPU(m_Engine);
+        meshGroups[meshComp.mesh.get()].push_back(entity);
+    }
 
-        VkBuffer vertexBuffers[] = { meshComp.mesh->vertexBuffer };
-        VkDeviceSize offsets[] = { 0 };
-        vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-        vkCmdBindIndexBuffer(commandBuffer, meshComp.mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+ size_t totalInstancedCount = 0;
+    for (auto &[meshPtr, entities] : meshGroups) {
+        if (entities.size() >= INSTANCING_THRESHOLD) totalInstancedCount += entities.size();
+    }
+    if (totalInstancedCount > 0) {
+        EnsureInstanceBufferCapacity(totalInstancedCount);
+    }
+    m_InstanceBufferWriteOffset = 0;
 
-        glm::mat4 mvp = proj * view * transform.GetMatrix();
-
-        // Ghost state — computed once per entity, used by both branches below
-        bool isGhost = registry.any_of<GhostComponent>(entity);
-        bool isBlockedGhost = isGhost && registry.get<GhostComponent>(entity).blocked;
-
-        // Determine base color: belt facing tint, or default white for everything else
-        glm::vec4 baseTint = glm::vec4(1.0f);
-        if (registry.any_of<BeltComponent>(entity)) {
-            auto &belt = registry.get<BeltComponent>(entity);
-            if (belt.direction.x > 0.5f)
-                baseTint = glm::vec4(0.2f, 0.6f, 1.0f, 1.0f); // +X: blue
-            else if (belt.direction.x < -0.5f)
-                baseTint = glm::vec4(1.0f, 0.6f, 0.2f, 1.0f); // -X: orange
-            else if (belt.direction.z > 0.5f)
-                baseTint = glm::vec4(0.2f, 1.0f, 0.4f, 1.0f); // +Z: green
-            else
-                baseTint = glm::vec4(1.0f, 0.3f, 0.3f, 1.0f); // -Z: red
+    for (auto &[meshPtr, entities] : meshGroups) {
+        if (entities.size() >= INSTANCING_THRESHOLD) {
+            DrawInstancedGroup(registry, meshPtr, entities, commandBuffer);
+        } else {
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineToUse);
+            for (auto entity : entities) {
+                DrawSingleEntity(registry, entity, commandBuffer, view, proj);
+            }
         }
-        //if (registry.any_of<BeltComponent>(entity)) {
-        //    auto &belt = registry.get<BeltComponent>(entity);
-        //    std::cout << "Entity has BeltComponent, direction: (" << belt.direction.x << "," << belt.direction.z << ")" << std::endl;
-        //}
+    }
+}
 
-        if (meshComp.mesh->SubMeshes.empty()) {
-            glm::mat4 model = transform.GetMatrix();   // just the entity's own model matrix, no view/proj combined in
+void MeshRenderer::DrawSingleEntity(entt::registry &registry, entt::entity entity, VkCommandBuffer commandBuffer,
+                                    const glm::mat4 &view, const glm::mat4 &proj) {
+    auto &transform = registry.get<TransformComponent>(entity);
+    auto &meshComp = registry.get<MeshComponent>(entity);
+
+    if (!meshComp.mesh) return;
+    meshComp.mesh->UploadToGPU(m_Engine);
+
+    VkBuffer vertexBuffers[] = { meshComp.mesh->vertexBuffer };
+    VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    vkCmdBindIndexBuffer(commandBuffer, meshComp.mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout,
+                            1, 1, &m_LightingDescriptorSets[m_Engine->GetCurrentFrameIndex()], 0, nullptr);
+
+
+    bool isGhost = registry.any_of<GhostComponent>(entity);
+    bool isBlockedGhost = isGhost && registry.get<GhostComponent>(entity).blocked;
+
+    glm::vec4 baseTint = glm::vec4(1.0f);
+    if (registry.any_of<BeltComponent>(entity)) {
+        auto &belt = registry.get<BeltComponent>(entity);
+        if (belt.direction.x > 0.5f)
+            baseTint = glm::vec4(0.2f, 0.6f, 1.0f, 1.0f);
+        else if (belt.direction.x < -0.5f)
+            baseTint = glm::vec4(1.0f, 0.6f, 0.2f, 1.0f);
+        else if (belt.direction.z > 0.5f)
+            baseTint = glm::vec4(0.2f, 1.0f, 0.4f, 1.0f);
+        else
+            baseTint = glm::vec4(1.0f, 0.3f, 0.3f, 1.0f);
+    }
+
+    if (meshComp.mesh->SubMeshes.empty()) {
+        glm::mat4 model = transform.GetMatrix();
+
+        MeshPushConstants pushConstants{};
+        pushConstants.model = model;
+        pushConstants.baseColor = baseTint;
+        if (isBlockedGhost) {
+            pushConstants.baseColor = glm::vec4(1.0f, 0.2f, 0.2f, 1.0f);
+        } else if (isGhost) {
+            pushConstants.baseColor.a = 0.4f;
+        }
+
+        if (m_PipelineLayout != VK_NULL_HANDLE) {
+            vkCmdPushConstants(commandBuffer, m_PipelineLayout,
+                               VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &pushConstants);
+        }
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout,
+                                0, 1, &m_DefaultDescriptorSet, 0, nullptr);
+
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshComp.mesh->Indices.size()), 1, 0, 0, 0);
+    } else {
+        for (const auto &sub : meshComp.mesh->SubMeshes) {
+            glm::mat4 model = transform.GetMatrix();
 
             MeshPushConstants pushConstants{};
-            pushConstants.model = model;   // CHANGED from pushConstants.mvp = mvp;
+            pushConstants.model = model;
             pushConstants.baseColor = baseTint;
+
             if (isBlockedGhost) {
-                pushConstants.baseColor = glm::vec4(1.0f, 0.2f, 0.2f, 1.0f); // red override still wins over facing tint
-            } else if (isGhost) {
-                pushConstants.baseColor.a = 0.4f; // translucent, keeps whatever baseTint/facing color was set
+                pushConstants.baseColor = glm::vec4(1.0f, 0.2f, 0.2f, 1.0f);
+            } else if (registry.any_of<BeltComponent>(entity)) {
+                pushConstants.baseColor = baseTint;
+                if (isGhost) pushConstants.baseColor.a = 0.4f;
+            } else {
+                pushConstants.baseColor = (sub.materialIndex >= 0 && sub.materialIndex < (int)meshComp.mesh->Materials.size()) ? meshComp.mesh->Materials[sub.materialIndex].baseColor : glm::vec4(1.0f);
+                if (isGhost) pushConstants.baseColor.a = 0.4f;
             }
 
             if (m_PipelineLayout != VK_NULL_HANDLE) {
                 vkCmdPushConstants(commandBuffer, m_PipelineLayout,
                                    VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &pushConstants);
             }
-            // No submesh/material — always use the default white texture
+
+            VkDescriptorSet setToBind = (sub.materialIndex >= 0 && sub.materialIndex < (int)meshComp.mesh->Materials.size() && meshComp.mesh->Materials[sub.materialIndex].descriptorSet != VK_NULL_HANDLE) ? meshComp.mesh->Materials[sub.materialIndex].descriptorSet : m_DefaultDescriptorSet;
+
             vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout,
-                                    0, 1, &m_DefaultDescriptorSet, 0, nullptr);
+                                    0, 1, &setToBind, 0, nullptr);
 
-            vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshComp.mesh->Indices.size()), 1, 0, 0, 0);
-        } else {
-            for (const auto &sub : meshComp.mesh->SubMeshes) {
-                glm::mat4 model = transform.GetMatrix();   // just the entity's own model matrix, no view/proj combined in
-
-                MeshPushConstants pushConstants{};
-                pushConstants.model = model;   // CHANGED from pushConstants.mvp = mvp;
-                pushConstants.baseColor = baseTint;
-
-                if (isBlockedGhost) {
-                    pushConstants.baseColor = glm::vec4(1.0f, 0.2f, 0.2f, 1.0f);
-                } else if (registry.any_of<BeltComponent>(entity)) {
-                    pushConstants.baseColor = baseTint; // NEW — belts use facing tint instead of material color
-                    if (isGhost) pushConstants.baseColor.a = 0.4f;
-                } else {
-                    pushConstants.baseColor = (sub.materialIndex >= 0 && sub.materialIndex < (int)meshComp.mesh->Materials.size()) ? meshComp.mesh->Materials[sub.materialIndex].baseColor : glm::vec4(1.0f);
-                    if (isGhost) pushConstants.baseColor.a = 0.4f;
-                }
-                
-
-                if (m_PipelineLayout != VK_NULL_HANDLE) {
-                    vkCmdPushConstants(commandBuffer, m_PipelineLayout,
-                                       VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(MeshPushConstants), &pushConstants);
-                }
-
-                VkDescriptorSet setToBind = (sub.materialIndex >= 0 && sub.materialIndex < (int)meshComp.mesh->Materials.size() && meshComp.mesh->Materials[sub.materialIndex].descriptorSet != VK_NULL_HANDLE) ? meshComp.mesh->Materials[sub.materialIndex].descriptorSet : m_DefaultDescriptorSet;
-
-                vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout,
-                                        0, 1, &setToBind, 0, nullptr);
-
-
-                vkCmdDrawIndexed(commandBuffer, sub.indexCount, 1, sub.indexOffset, 0, 0);
-            }
+            vkCmdDrawIndexed(commandBuffer, sub.indexCount, 1, sub.indexOffset, 0, 0);
         }
     }
 }
+
 
 void MeshRenderer::CreateUniformBuffers() {
 
@@ -561,4 +585,232 @@ VkDescriptorSet MeshRenderer::AllocateTextureDescriptorSet(VkImageView imageView
 
     vkUpdateDescriptorSets(m_Engine->GetDevice(), 1, &write, 0, nullptr);
     return descriptorSet;
+}
+
+VkVertexInputBindingDescription MeshRenderer::GetInstanceBindingDescription() {
+    VkVertexInputBindingDescription binding{};
+    binding.binding = 1; // binding 1 — mesh vertices are binding 0
+    binding.stride = sizeof(InstanceData);
+    binding.inputRate = VK_VERTEX_INPUT_RATE_INSTANCE; // KEY — advances per INSTANCE, not per vertex
+    return binding;
+}
+
+std::array<VkVertexInputAttributeDescription, 5> MeshRenderer::GetInstanceAttributeDescriptions() {
+    std::array<VkVertexInputAttributeDescription, 5> attrs{};
+
+    // model matrix — 4 consecutive vec4 locations (continuing from wherever mesh vertex attributes left off)
+    attrs[0] = { 6, 1, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, model) + 0 * sizeof(glm::vec4) };
+    attrs[1] = { 7, 1, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, model) + 1 * sizeof(glm::vec4) };
+    attrs[2] = { 8, 1, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, model) + 2 * sizeof(glm::vec4) };
+    attrs[3] = { 9, 1, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, model) + 3 * sizeof(glm::vec4) };
+    attrs[4] = { 10, 1, VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(InstanceData, tintColor) };
+
+    return attrs;
+}
+
+void MeshRenderer::CreateInstancedPipeline() {
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    VkDescriptorSetLayout setLayouts[] = { m_TextureDescriptorSetLayout, m_LightingDescriptorSetLayout };
+    pipelineLayoutInfo.setLayoutCount = 2;
+    pipelineLayoutInfo.pSetLayouts = setLayouts;
+
+    VkPushConstantRange pushConstantRange{}; // ADD
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT; // ADD — only fragment stage needs it
+    pushConstantRange.offset = 0; // ADD
+    pushConstantRange.size = sizeof(glm::vec4); // ADD — just baseColor
+
+    pipelineLayoutInfo.pushConstantRangeCount = 1; // CHANGED — was 0
+    pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange; // ADD
+
+    vkCreatePipelineLayout(m_Engine->GetDevice(), &pipelineLayoutInfo, nullptr, &m_InstancedPipelineLayout);
+
+
+    auto vertCode = m_Engine->ReadFile("Shaders/mesh_instanced_vert.spv");
+    auto fragCode = m_Engine->ReadFile("Shaders/mesh_instanced_frag.spv");
+    VkShaderModule vertModule = m_Engine->CreateShaderModule(vertCode);
+    VkShaderModule fragModule = m_Engine->CreateShaderModule(fragCode);
+
+    VkPipelineShaderStageCreateInfo vertStage{};
+    vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertStage.module = vertModule;
+    vertStage.pName = "main";
+
+    VkPipelineShaderStageCreateInfo fragStage{};
+    fragStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    fragStage.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fragStage.module = fragModule;
+    fragStage.pName = "main";
+
+    VkPipelineShaderStageCreateInfo stages[] = { vertStage, fragStage };
+
+    // Two bindings: mesh vertices (0) + instance data (1)
+    auto meshBinding = Vertex::getBindingDescription();
+    auto meshAttrs = Vertex::getAttributeDescriptions();
+    auto instanceBinding = GetInstanceBindingDescription();
+    auto instanceAttrs = GetInstanceAttributeDescriptions();
+
+    VkVertexInputBindingDescription bindings[] = { meshBinding, instanceBinding };
+
+    std::vector<VkVertexInputAttributeDescription> allAttrs;
+    for (auto &a : meshAttrs)
+        allAttrs.push_back(a);
+    for (auto &a : instanceAttrs)
+        allAttrs.push_back(a);
+
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 2;
+    vertexInputInfo.pVertexBindingDescriptions = bindings;
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(allAttrs.size());
+    vertexInputInfo.pVertexAttributeDescriptions = allAttrs.data();
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount = 1;
+
+    VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = 2;
+    dynamicState.pDynamicStates = dynamicStates;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineColorBlendAttachmentState colorBlendAttachment{};
+    colorBlendAttachment.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+    colorBlendAttachment.blendEnable = VK_FALSE;
+
+    VkPipelineColorBlendStateCreateInfo colorBlending{};
+    colorBlending.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+    colorBlending.attachmentCount = 1;
+    colorBlending.pAttachments = &colorBlendAttachment;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+
+    VkFormat colorFormat = m_Engine->GetSwapChainFormat();
+    VkPipelineRenderingCreateInfo renderingInfo{};
+    renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachmentFormats = &colorFormat;
+    renderingInfo.depthAttachmentFormat = m_Engine->GetDepthFormat();
+
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.pNext = &renderingInfo;
+    pipelineInfo.stageCount = 2;
+    pipelineInfo.pStages = stages;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pColorBlendState = &colorBlending;
+    pipelineInfo.pDepthStencilState = &depthStencil;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.layout = m_InstancedPipelineLayout;
+    pipelineInfo.renderPass = VK_NULL_HANDLE;
+
+    if (vkCreateGraphicsPipelines(m_Engine->GetDevice(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_InstancedPipeline) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create instanced mesh pipeline");
+    }
+
+    vkDestroyShaderModule(m_Engine->GetDevice(), fragModule, nullptr);
+    vkDestroyShaderModule(m_Engine->GetDevice(), vertModule, nullptr);
+}
+void MeshRenderer::EnsureInstanceBufferCapacity(size_t instanceCount) {
+    if (instanceCount <= m_InstanceBufferCapacity) return;
+
+    m_Engine->WaitIdle(); // ensure no in-flight command buffer is still using the old buffer before destroying it
+
+    VkDevice device = m_Engine->GetDevice();
+    if (m_InstanceBuffer != VK_NULL_HANDLE) {
+        vkDestroyBuffer(device, m_InstanceBuffer, nullptr);
+        vkFreeMemory(device, m_InstanceBufferMemory, nullptr);
+    }
+
+    size_t newCapacity = std::max(instanceCount, m_InstanceBufferCapacity * 2);
+    VkDeviceSize bufferSize = newCapacity * sizeof(InstanceData);
+
+    m_Engine->CreateBuffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                           m_InstanceBuffer, m_InstanceBufferMemory);
+    vkMapMemory(device, m_InstanceBufferMemory, 0, bufferSize, 0, &m_InstanceBufferMapped);
+
+    m_InstanceBufferCapacity = newCapacity;
+}
+
+void MeshRenderer::DrawInstancedGroup(entt::registry &registry, Mesh *mesh, const std::vector<entt::entity> &entities,
+                                      VkCommandBuffer commandBuffer) {
+    std::vector<InstanceData> instances;
+    instances.reserve(entities.size());
+
+    for (auto entity : entities) {
+        auto &transform = registry.get<TransformComponent>(entity);
+        InstanceData data;
+        data.model = transform.GetMatrix();
+        data.tintColor = glm::vec4(1.0f);
+        instances.push_back(data);
+    }
+
+    size_t writeOffsetElements = m_InstanceBufferWriteOffset;
+    size_t writeOffsetBytes = writeOffsetElements * sizeof(InstanceData);
+    memcpy(static_cast<char *>(m_InstanceBufferMapped) + writeOffsetBytes,
+           instances.data(), instances.size() * sizeof(InstanceData));
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_InstancedPipeline);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_InstancedPipelineLayout,
+                            1, 1, &m_LightingDescriptorSets[m_Engine->GetCurrentFrameIndex()], 0, nullptr);
+
+    VkDeviceSize instanceBufferOffset = writeOffsetBytes;
+    VkBuffer vertexBuffers[] = { mesh->vertexBuffer, m_InstanceBuffer };
+    VkDeviceSize offsets[] = { 0, instanceBufferOffset };
+    vkCmdBindVertexBuffers(commandBuffer, 0, 2, vertexBuffers, offsets);
+    vkCmdBindIndexBuffer(commandBuffer, mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+    if (mesh->SubMeshes.empty()) {
+        glm::vec4 baseColor = glm::vec4(1.0f);
+        vkCmdPushConstants(commandBuffer, m_InstancedPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+                           0, sizeof(glm::vec4), &baseColor);
+
+        VkDescriptorSet setToBind = m_DefaultDescriptorSet;
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_InstancedPipelineLayout,
+                                0, 1, &setToBind, 0, nullptr);
+       // std::cout << "About to draw instanced, pipeline=" << m_InstancedPipeline << " layout=" << m_InstancedPipelineLayout << std::endl;
+        vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(mesh->Indices.size()), static_cast<uint32_t>(instances.size()), 0, 0, 0);
+    } else {
+        for (const auto &sub : mesh->SubMeshes) {
+            glm::vec4 subColor = (sub.materialIndex >= 0 && sub.materialIndex < (int)mesh->Materials.size()) ? mesh->Materials[sub.materialIndex].baseColor : glm::vec4(1.0f);
+            vkCmdPushConstants(commandBuffer, m_InstancedPipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT,
+                               0, sizeof(glm::vec4), &subColor);
+
+            VkDescriptorSet setToBind = (sub.materialIndex >= 0 && sub.materialIndex < (int)mesh->Materials.size() && mesh->Materials[sub.materialIndex].descriptorSet != VK_NULL_HANDLE) ? mesh->Materials[sub.materialIndex].descriptorSet : m_DefaultDescriptorSet;
+
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_InstancedPipelineLayout,
+                                    0, 1, &setToBind, 0, nullptr);
+            //std::cout << "About to draw instanced, pipeline=" << m_InstancedPipeline << " layout=" << m_InstancedPipelineLayout << std::endl;
+            vkCmdDrawIndexed(commandBuffer, sub.indexCount, static_cast<uint32_t>(instances.size()), sub.indexOffset, 0, 0);
+        }
+    }
+
+    m_InstanceBufferWriteOffset += instances.size(); // advance past this group's region for the next group
 }

@@ -152,6 +152,8 @@
     <None Include="compile_shaders.ps1" />
     <None Include="Shaders\debugline.frag" />
     <None Include="Shaders\debugline.vert" />
+    <None Include="Shaders\mesh_instanced.frag" />
+    <None Include="Shaders\mesh_Instanced.vert" />
     <None Include="Shaders\shadow.frag" />
     <None Include="Shaders\shadow.vert" />
     <None Include="Shaders\shadow_skinned.frag" />

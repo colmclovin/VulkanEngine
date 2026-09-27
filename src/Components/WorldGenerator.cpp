@@ -95,6 +95,10 @@ glm::vec3 WorldGenerator::FindSpawnPoint(const TerrainSettings &terrainSettings,
 
     return glm::vec3(worldWidth * 0.5f, TerrainGenerator::SampleHeight(worldWidth * 0.5f, worldDepth * 0.5f, terrainSettings), worldDepth * 0.5f);
 }
+
+std::shared_ptr<Mesh> WorldGenerator::s_TreeMeshCache = nullptr;
+
+
 void WorldGenerator::ScatterTreesInChunk(entt::registry &registry, ChunkCoord coord, float chunkWorldSize,
                                          const TerrainSettings &terrainSettings, VulkanEngine *engine, MeshRenderer *meshRenderer,
                                          std::vector<entt::entity> &outTreeEntities, PlacementGrid &placementGrid) {
@@ -108,8 +112,10 @@ void WorldGenerator::ScatterTreesInChunk(entt::registry &registry, ChunkCoord co
     treeJitterNoise.SetFrequency(0.4f);
 
     float sampleSpacing = 8.0f;
-    auto treeMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Tree.glb", engine, meshRenderer));
-
+    if (!s_TreeMeshCache) { // NEW — only load once, ever, for the lifetime of the program
+        s_TreeMeshCache = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Tree.glb", engine, meshRenderer));
+    }
+    auto treeMesh = s_TreeMeshCache; // CHANGED — reuse the cached instance instead of reloadings
     for (float x = 0.0f; x < chunkWorldSize; x += sampleSpacing) {
         for (float z = 0.0f; z < chunkWorldSize; z += sampleSpacing) {
             float worldX = chunkOriginX + x;
@@ -158,10 +164,17 @@ void WorldGenerator::ScatterTreesInChunk(entt::registry &registry, ChunkCoord co
             registry.emplace<HarvestableComponent>(entity, harvest);
             registry.emplace<NameTag>(entity, "Tree");
 
-            GridCoord coord = PlacementGrid::WorldToGrid(transform.Position, terrainSettings.cellSize);
-            placementGrid.Register(coord, entity);
+            GridCoord gridCoord = PlacementGrid::WorldToGrid(transform.Position, terrainSettings.cellSize); // renamed from `coord`
+            placementGrid.Register(gridCoord, entity);
 
             outTreeEntities.push_back(entity);
         }
     }
+}
+
+std::shared_ptr<Mesh> WorldGenerator::GetTreeMeshCache(VulkanEngine *engine, MeshRenderer *meshRenderer) {
+    if (!s_TreeMeshCache) {
+        s_TreeMeshCache = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Tree.glb", engine, meshRenderer));
+    }
+    return s_TreeMeshCache;
 }
