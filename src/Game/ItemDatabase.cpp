@@ -1,6 +1,6 @@
 #include "ItemDatabase.h"
-#include "../Components/Mesh.h"
-#include "../Components/ModelLoader.h"
+#include "../Rendering/Mesh.h"
+#include "../Rendering/ModelLoader.h"
 #include <stdexcept>
 #include <JSON/json.hpp>
 std::unordered_map<ItemId, ItemDef> ItemDatabase::s_Items;

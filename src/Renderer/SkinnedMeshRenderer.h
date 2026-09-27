@@ -1,12 +1,12 @@
 #pragma once
-#include "../Components/BoneMatrixUBO.h"
+#include "../Rendering/BoneMatrixUBO.h"
 #include <vulkan/vulkan.h>
 #include <entt/entt.hpp>
 #include <memory>
-#include "../Components/DayNightCycle.h"
+#include "../World/DayNightCycle.h"
 #include "ShadowMap.h"
 #include "../Components/PointLightComponent.h"
-#include "../Components/LightingUBO.h"
+#include "../Rendering/LightingUBO.h"
 class VulkanEngine;
 class Camera3D;
 class Texture;

@@ -10,10 +10,10 @@
 #include "../Audio/AudioEngine.h"
 #include "../Helpers/DebugUI.h"
 #include <iostream>
-#include "../Components/GameSettings.h"
+#include "../Utils/GameSettings.h"
 #include "../Components/Components.h"
-#include "../Components/LightingUBO.h"
-#include "../Components/DayNightCycle.h"
+#include "../Rendering/LightingUBO.h"
+#include "../World/DayNightCycle.h"
 #include <glm/glm.hpp>
 
 

@@ -3,11 +3,11 @@
 #include <glm/glm.hpp>
 #include <entt/entt.hpp>
 #include "../Game/Camera3D.h"
-#include "../Components/Texture.h"
-#include "../Components/DayNightCycle.h"
+#include "../Rendering/Texture.h"
+#include "../World/DayNightCycle.h"
 #include "ShadowMap.h"
 #include "../Components/PointLightComponent.h"
-#include "../Components/LightingUBO.h"
+#include "../Rendering/LightingUBO.h"
 class VulkanEngine;
 class Mesh;
 

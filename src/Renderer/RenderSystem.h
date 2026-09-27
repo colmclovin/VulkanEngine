@@ -4,7 +4,7 @@
 #include "../Game/ItemDatabase.h"
 #include "../Game/TechState.h"
 #include "../Helpers/PauseMenuAction.h"
-#include "../Components/DayNightCycle.h"
+#include "../World/DayNightCycle.h"
 
 class VulkanEngine;
 class QuadRenderer;

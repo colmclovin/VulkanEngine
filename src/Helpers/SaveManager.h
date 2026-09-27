@@ -1,6 +1,6 @@
 #pragma once
-#include "../Components/PlacementGrid.h"
-#include "../Components/ResourceMap.h"
+#include "../World/PlacementGrid.h"
+#include "../World/ResourceMap.h"
 #include "../Game/TechState.h"
 #include <entt/entt.hpp>
 #include <string>

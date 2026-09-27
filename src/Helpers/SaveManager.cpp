@@ -1,16 +1,16 @@
 #include "SaveManager.h"
 #include "../Components/Components.h"
-#include "../Components/GameSettings.h"
+#include "../Utils/GameSettings.h"
 #include "../Components/InventoryComponent.h"
-#include "../Components/ResourceMap.h"
-#include "../Components/PlacementGrid.h"
+#include "../World/ResourceMap.h"
+#include "../World/PlacementGrid.h"
 #include <fstream>
 #include <iostream>
 #include <JSON/json.hpp>
 #include "../Game/PlaceableDatabase.h"
-#include "../Components/ModelLoader.h"
-#include "../Components/Mesh.h"
-#include "../Components/TerrainGenerator.h"
+#include "../Rendering/ModelLoader.h"
+#include "../Rendering/Mesh.h"
+#include "../World/TerrainGenerator.h"
 #include "../Components/Components.h"
 using json = nlohmann::json;
 

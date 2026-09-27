@@ -1,13 +1,13 @@
 #include "MeshRenderer.h"
 #include <iostream>
-#include "../Components/Mesh.h"
-#include "../Components/Vertex.h"
+#include "../Rendering/Mesh.h"
+#include "../Rendering/Vertex.h"
 #include "../Engine/VulkanEngine.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <stdexcept>
 #include <glm/glm.hpp>
 #include "../Components/Components.h"
-#include "../Components/LightingUBO.h"
+#include "../Rendering/LightingUBO.h"
 #include <unordered_map>
 
 MeshRenderer::MeshRenderer(VulkanEngine* engine) : m_Engine(engine) {

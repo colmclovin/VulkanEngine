@@ -1,6 +1,6 @@
 #pragma once
 #include <memory>
-#include "Mesh.h"
+#include "../Rendering/Mesh.h"
 
 struct MeshComponent {
     // std::string meshFilePath;

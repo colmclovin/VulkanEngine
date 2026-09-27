@@ -1,0 +1,39 @@
+// InteractionSystem.h
+#pragma once
+#include <entt/entt.hpp>
+#include <glm/glm.hpp>
+#include "../World/ResourceMap.h"
+#include "../Utils/GameSettings.h"
+#include "../World/PlacementGrid.h"
+#include "../Engine/VulkanEngine.h"
+#include "../Renderer/MeshRenderer.h"
+#include "../World/DepletionMap.h"
+
+class AudioEventSystem;
+
+class InteractionSystem {
+public:
+	static entt::entity FindNearestInteractable(entt::registry &registry, glm::vec3 playerPos, float range);
+	static entt::entity FindNearestPickup(entt::registry &registry, glm::vec3 playerPos, float range);
+	static void CollectPickup(entt::registry &registry, entt::entity pickup, entt::entity player, AudioEventSystem *audio);
+	static void Mine(entt::registry &registry, entt::entity target, entt::entity player, AudioEventSystem *audio,
+					 VulkanEngine *engine, MeshRenderer *meshRenderer, PlacementGrid &placementGrid, float cellSize);
+	static bool TryMineGround(ResourceMap &resourceMap, entt::registry &registry, entt::entity player,
+							  glm::vec3 playerPos, glm::vec3 targetPos, float maxRange,
+							  float extractAmount, AudioEventSystem *audio);
+	static bool TryMineAtCursor(entt::registry &registry, DepletionMap &depletionMap, entt::entity player,
+								glm::vec3 rayOrigin, glm::vec3 rayDir, const TerrainSettings &terrainSettings,
+								float maxRange, AudioEventSystem *audio, VulkanEngine *engine, MeshRenderer *meshRenderer,
+								PlacementGrid &placementGrid);
+	static entt::entity FindEntityAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
+	static bool TryFuelMiner(entt::registry &registry, entt::entity minerEntity, entt::entity player, ItemId selectedItem, int amount);
+	static bool TryCollectMinerOutput(entt::registry &registry, entt::entity minerEntity, entt::entity player);
+	static entt::entity FindMinerAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
+	static entt::entity FindMachineAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
+	static bool TryInsertIntoMachine(entt::registry &registry, entt::entity machine, entt::entity player, ItemId item, int amount);
+	static bool TryCollectFromMachine(entt::registry &registry, entt::entity machine, entt::entity player);
+	static bool TryFuelFurnace(entt::registry &registry, entt::entity furnaceEntity, entt::entity player, ItemId selectedItem, int amount);
+	static bool TryRotateMachine(entt::registry &registry, entt::entity target);
+	static bool TryPickupMachine(entt::registry &registry, entt::entity target, entt::entity player, PlacementGrid &placementGrid, float gridSize);
+	static bool TryFuelGenerator(entt::registry &registry, entt::entity generatorEntity, entt::entity player, ItemId selectedItem, int amount);
+};

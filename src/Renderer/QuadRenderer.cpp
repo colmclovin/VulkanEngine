@@ -1,7 +1,7 @@
 #include "QuadRenderer.h"
 #include <iostream>
-#include "../Components/Mesh.h"
-#include "../Components/Vertex.h"
+#include "../Rendering/Mesh.h"
+#include "../Rendering/Vertex.h"
 #include "../Engine/VulkanEngine.h"
 #include <glm/gtc/matrix_transform.hpp>
 #include <stdexcept>

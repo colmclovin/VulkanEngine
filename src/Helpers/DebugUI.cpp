@@ -3,7 +3,7 @@
 #include <imgui.h>
 #include "../Components/Components.h"
 #include "../Game/Camera3D.h"
-#include "../Components/GameSettings.h"
+#include "../Utils/GameSettings.h"
 #include "../Audio/AudioEngine.h"
 #include "../Game/CraftingSystem.h"
 #include "../Game/RecipeDatabase.h"

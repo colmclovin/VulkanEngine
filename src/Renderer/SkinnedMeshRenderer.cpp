@@ -1,18 +1,18 @@
 // SkinnedMeshRenderer.cpp — key pieces
 #include "SkinnedMeshRenderer.h"
-#include "../Components/Texture.h"
-#include "../Components/TextureLoader.h"
+#include "../Rendering/Texture.h"
+#include "../Utils/TextureLoader.h"
 #include "../Engine/VulkanEngine.h"
 #include "../Game/Camera3D.h"
 #include "../Components/Components.h"
 #include "../Components/SkinnedMeshComponent.h"
-#include "../Components/SkinnedVertex.h"
-#include "../Components/SkinnedMesh.h"
+#include "../Rendering/SkinnedVertex.h"
+#include "../Rendering/SkinnedMesh.h"
 #include <cstring>
 #include <stdexcept>
-#include "../Components/BoneMatrixUBO.h"
-#include "../Components/LightingUBO.h"
-#include "../Components/Animator.h"
+#include "../Rendering/BoneMatrixUBO.h"
+#include "../Rendering/LightingUBO.h"
+#include "../Rendering/Animator.h"
 #include <iostream>
 #include "ShadowMap.h"
 SkinnedMeshRenderer::SkinnedMeshRenderer(VulkanEngine *engine) : m_Engine(engine) {}

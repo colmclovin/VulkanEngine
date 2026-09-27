@@ -2,8 +2,8 @@
 #include "ChunkManager.h"
 #include "../Engine/VulkanEngine.h"
 #include "../Components/Components.h"
-#include "../Components/TerrainGenerator.h"
-#include "../Components/WorldGenerator.h"
+#include "../World/TerrainGenerator.h"
+#include "../World/WorldGenerator.h"
 #include <iostream>
 #include <FastNoise/FastNoiseLite.h>
 #include "OreDepositMap.h"
