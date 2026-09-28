@@ -1,0 +1,237 @@
+{
+    "depletionMap": [
+        {
+            "remaining": 0.9900573492050171,
+            "x": 22,
+            "z": 7
+        },
+        {
+            "remaining": 0.9900851249694824,
+            "x": 32,
+            "z": -13
+        }
+    ],
+    "entities": [
+        {
+            "data": {
+                "cookTimer": 0.0,
+                "currentOutput": "None",
+                "fuelBuffer": 0,
+                "fuelRemaining": 0.0,
+                "isCooking": false,
+                "loadedFuelType": "None",
+                "powerUsage": 5.0,
+                "runningOnPower": false
+            },
+            "inventory": {
+                "inputs": [
+                    {
+                        "capacity": 100,
+                        "count": 0,
+                        "item": "None"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "capacity": 100,
+                        "count": 0,
+                        "item": "None"
+                    }
+                ]
+            },
+            "pointLight": {
+                "active": false,
+                "color": [
+                    1.0,
+                    0.5,
+                    0.0
+                ],
+                "intensity": 5.0,
+                "range": 8.0
+            },
+            "powerConsumer": {
+                "isPowered": false,
+                "powerRequired": 5.0,
+                "wantsPower": false
+            },
+            "transform": {
+                "Position": [
+                    -14.0,
+                    -0.30060112476348877,
+                    125.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.7071067690849304,
+                    0.0,
+                    0.7071067690849304
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "Furnace"
+        },
+        {
+            "data": {
+                "collectionRadius": 3.0,
+                "extractionRate": 1.0,
+                "fuelBuffer": 0,
+                "fuelRemaining": 0.0,
+                "loadedFuelType": "None",
+                "outputBuffer": 0,
+                "outputBufferCapacity": 50,
+                "outputInterval": 1.0,
+                "outputItem": "None",
+                "outputTimer": 0.0,
+                "powerUsage": 5.0,
+                "runningOnPower": false
+            },
+            "powerConsumer": {
+                "isPowered": false,
+                "powerRequired": 5.0,
+                "wantsPower": false
+            },
+            "transform": {
+                "Position": [
+                    -18.0,
+                    -0.2916586697101593,
+                    125.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.7071067690849304,
+                    0.0,
+                    0.7071067690849304
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "Miner"
+        }
+    ],
+    "player": {
+        "inventory": {
+            "capacity": 20,
+            "slots": [
+                {
+                    "count": 20,
+                    "item": "Wood"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                },
+                {
+                    "count": 0,
+                    "item": "None"
+                }
+            ]
+        },
+        "transform": {
+            "Position": [
+                -17.334388732910156,
+                -0.19901062548160553,
+                119.200439453125
+            ],
+            "Rotation": [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+            ],
+            "Scale": [
+                1.0,
+                1.0,
+                1.0
+            ]
+        }
+    },
+    "removedTreesMap": [
+        {
+            "chunkX": 0,
+            "chunkZ": 3,
+            "indices": [
+                0
+            ]
+        }
+    ],
+    "seed": 2143,
+    "techState": {
+        "techPoints": 0,
+        "unlocked": []
+    }
+}

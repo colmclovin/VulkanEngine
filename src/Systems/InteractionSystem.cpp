@@ -44,7 +44,7 @@ entt::entity InteractionSystem::FindNearestPickup(entt::registry &registry, glm:
 }
 
 void InteractionSystem::Mine(entt::registry &registry, entt::entity target, entt::entity player, AudioEventSystem *audio,
-							 VulkanEngine *engine, MeshRenderer *meshRenderer, PlacementGrid &placementGrid, float cellSize) {
+							 VulkanEngine *engine, MeshRenderer *meshRenderer, PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap, float cellSize) {
 	if (!registry.valid(target) || !registry.any_of<HarvestableComponent>(target)) return;
 	std::cout << "Mine() registry address: " << &registry << std::endl;
 	auto &harvest = registry.get<HarvestableComponent>(target);
@@ -84,6 +84,8 @@ void InteractionSystem::Mine(entt::registry &registry, entt::entity target, entt
 	if (harvest.health <= 0.0f) {
 		GridCoord coord = PlacementGrid::WorldToGrid(targetTransform.Position, cellSize);
 		placementGrid.Unregister(coord);
+        auto &origin = registry.get<TreeOriginComponent>(target);
+        removedTreesMap.MarkRemoved(origin.chunkCoord, origin.candidateIndex); // NEW
 		std::cout << "About to destroy tree, target valid? " << registry.valid(target) << std::endl;
 		registry.destroy(target);
 		std::cout << "After destroy, target valid? " << registry.valid(target) << std::endl;
@@ -141,14 +143,14 @@ bool InteractionSystem::TryMineGround(ResourceMap &resourceMap, entt::registry &
 bool InteractionSystem::TryMineAtCursor(entt::registry &registry, DepletionMap &depletionMap, entt::entity player,
 										glm::vec3 rayOrigin, glm::vec3 rayDir, const TerrainSettings &terrainSettings,
 										float maxRange, AudioEventSystem *audio, VulkanEngine *engine, MeshRenderer *meshRenderer,
-										PlacementGrid &placementGrid) {
+                                        PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap) {
 	auto &playerTransform = registry.get<TransformComponent>(player);
 
 	entt::entity target = FindEntityAlongRay(registry, rayOrigin, rayDir, 100.0f);
 	if (registry.valid(target)) {
 		float dist = glm::length(registry.get<TransformComponent>(target).Position - playerTransform.Position);
 		if (dist <= maxRange) {
-			Mine(registry, target, player, audio, engine, meshRenderer, placementGrid, terrainSettings.cellSize);
+			Mine(registry, target, player, audio, engine, meshRenderer, placementGrid, removedTreesMap, terrainSettings.cellSize);
 			return true;
 		}
 	}

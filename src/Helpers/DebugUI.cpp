@@ -49,7 +49,11 @@ void DebugUI::Draw(entt::registry &registry, RenderSystem *renderSystem, Camera3
 void DebugUI::DrawStats(entt::registry &registry) {
     ImGui::Text("Frame time: %.3f ms", 1000.0f / ImGui::GetIO().Framerate);
     ImGui::Text("Frame rate: %.3f fps", ImGui::GetIO().Framerate);
-    ImGui::Text("Total entities: %zu", registry.storage<entt::entity>().size());
+    size_t liveCount = 0;
+    for (auto entity : registry.storage<entt::entity>()) {
+        if (registry.valid(entity)) liveCount++;
+    }
+    ImGui::Text("Total entities: %zu", liveCount);
     ImGui::Checkbox("Show Demo Window", &m_ShowDemo);
 }
 void DebugUI::DrawInventory(entt::registry &registry, entt::entity player, ItemId &selectedItem) {
@@ -139,7 +143,8 @@ void DebugUI::DrawSettingsTab(Camera3D* camera, GameSettings& settings, AudioEng
     }
 
     if (ImGui::CollapsingHeader("Player", ImGuiTreeNodeFlags_DefaultOpen)) {
-        ImGui::SliderFloat("Move Speed##player", &settings.playerMoveSpeed, 0.5f, 20.0f);
+        ImGui::SliderFloat("Move Speed##player", &settings.playerMoveSpeed, 0.5f, 200.0f);
+        ImGui::SliderFloat("Run Speed##player", &settings.playerRunSpeed, 0.5f, 200.0f);
         // consumed directly by Game::MovePlayer each frame — see note below
     }
 

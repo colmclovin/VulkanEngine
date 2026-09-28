@@ -4,6 +4,7 @@
 #include "../Components/Components.h"
 #include "../World/TerrainGenerator.h"
 #include "../World/WorldGenerator.h"
+
 #include <iostream>
 #include <FastNoise/FastNoiseLite.h>
 #include "OreDepositMap.h"
@@ -16,7 +17,7 @@ ChunkCoord ChunkManager::WorldToChunkCoord(glm::vec3 worldPos) {
 }
 
 void ChunkManager::Update(entt::registry &registry, glm::vec3 playerPosition, const TerrainSettings &settings,
-                          VulkanEngine *engine, MeshRenderer *meshRenderer, int seed, DepletionMap &depletionMap, PlacementGrid &placementGrid) {
+                          VulkanEngine *engine, MeshRenderer *meshRenderer, int seed, DepletionMap &depletionMap, PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap) {
     ChunkCoord playerChunk = WorldToChunkCoord(playerPosition);
 
     std::vector<ChunkCoord> desiredChunks;
@@ -40,7 +41,7 @@ void ChunkManager::Update(entt::registry &registry, glm::vec3 playerPosition, co
     }
 
     // Turn any finished background work into real entities/GPU resources
-    ProcessCompletedChunks(registry, engine, meshRenderer, placementGrid);
+    ProcessCompletedChunks(registry, engine, meshRenderer, placementGrid, removedTreesMap);
 
     // Unload chunks no longer in range — unchanged
     std::vector<ChunkCoord> toUnload;
@@ -231,7 +232,7 @@ void ChunkManager::WorkerLoop(TerrainSettings settings, int seed) {
 }
 
 
-void ChunkManager::ProcessCompletedChunks(entt::registry &registry, VulkanEngine *engine, MeshRenderer *meshRenderer, PlacementGrid &placementGrid) {
+void ChunkManager::ProcessCompletedChunks(entt::registry &registry, VulkanEngine *engine, MeshRenderer *meshRenderer, PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap) {
     const int MAX_PER_FRAME = 2;
 
     for (int i = 0; i < MAX_PER_FRAME; i++) {
@@ -258,12 +259,20 @@ void ChunkManager::ProcessCompletedChunks(entt::registry &registry, VulkanEngine
         registry.emplace<NameTag>(chunk.terrainEntity, "Chunk_" + std::to_string(result.coord.x) + "_" + std::to_string(result.coord.z));
 
         auto treeMesh = WorldGenerator::GetTreeMeshCache(engine, meshRenderer); // needs a small accessor, see below
+        int index = 0;
         for (auto &candidate : result.treeCandidates) {
+            if (removedTreesMap.IsRemoved(result.coord, index)) {
+                index++;
+                continue;
+            } // NEW — skip, don't spawn
+
             auto entity = registry.create();
             auto &transform = registry.emplace<TransformComponent>(entity);
             transform.Position = candidate.position;
             registry.emplace<MeshComponent>(entity, treeMesh);
             registry.emplace<BoundsComponent>(entity, BoundsComponent{ glm::vec3(0.5f, 2.0f, 0.5f) });
+            registry.emplace<TreeOriginComponent>(entity, TreeOriginComponent{ result.coord, index }); // NEW
+            
 
             HarvestableComponent harvest;
             harvest.yieldItem = ItemId::Wood;
@@ -278,6 +287,7 @@ void ChunkManager::ProcessCompletedChunks(entt::registry &registry, VulkanEngine
             placementGrid.Register(gridCoord, entity);
 
             chunk.treeEntities.push_back(entity);
+            index++;
         }
 
         chunk.isGenerated = true;
@@ -423,4 +433,52 @@ std::vector<ChunkManager::TreeCandidate> ChunkManager::GenerateTreeCandidatesOnl
     }
 
     return candidates;
+}
+
+void ChunkManager::RequestInitialChunksBlocking(glm::vec3 playerPos, const TerrainSettings &settings,
+                                                VulkanEngine *engine, MeshRenderer *meshRenderer, int seed,
+                                                DepletionMap &depletionMap, RemovedTreesMap &removedTreesMap,
+                                                entt::registry &registry, PlacementGrid &placementGrid) {
+    ChunkCoord playerChunk = WorldToChunkCoord(playerPos);
+    std::vector<ChunkCoord> desired;
+    for (int dz = -LOAD_RADIUS_CHUNKS; dz <= LOAD_RADIUS_CHUNKS; dz++)
+        for (int dx = -LOAD_RADIUS_CHUNKS; dx <= LOAD_RADIUS_CHUNKS; dx++)
+            desired.push_back({ playerChunk.x + dx, playerChunk.z + dz });
+
+    for (auto &coord : desired) {
+        std::lock_guard<std::mutex> lock(m_RequestMutex);
+        m_InFlightRequests.insert(coord);
+        m_PendingRequests.push(coord);
+        m_RequestCV.notify_one();
+    }
+
+    while (m_LoadedChunks.size() < desired.size()) {
+        ProcessCompletedChunks(registry, engine, meshRenderer, placementGrid, removedTreesMap);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10)); // avoid busy-spinning
+    }
+}
+void ChunkManager::BeginInitialLoad(glm::vec3 playerPos, const TerrainSettings &settings, int seed) {
+    ChunkCoord playerChunk = WorldToChunkCoord(playerPos);
+    std::vector<ChunkCoord> desired;
+    for (int dz = -LOAD_RADIUS_CHUNKS; dz <= LOAD_RADIUS_CHUNKS; dz++)
+        for (int dx = -LOAD_RADIUS_CHUNKS; dx <= LOAD_RADIUS_CHUNKS; dx++)
+            desired.push_back({ playerChunk.x + dx, playerChunk.z + dz });
+
+    m_InitialLoadTarget = desired.size();
+
+    for (auto &coord : desired) {
+        std::lock_guard<std::mutex> lock(m_RequestMutex);
+        m_InFlightRequests.insert(coord);
+        m_PendingRequests.push(coord);
+        m_RequestCV.notify_one();
+    }
+}
+
+bool ChunkManager::IsInitialLoadComplete() const {
+    return m_LoadedChunks.size() >= m_InitialLoadTarget;
+}
+
+float ChunkManager::GetInitialLoadProgress() const {
+    if (m_InitialLoadTarget == 0) return 1.0f;
+    return glm::clamp((float)m_LoadedChunks.size() / (float)m_InitialLoadTarget, 0.0f, 1.0f);
 }

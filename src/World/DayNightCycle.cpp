@@ -12,8 +12,14 @@ void DayNightCycle::Update(float deltaTime) {
 
 glm::vec3 DayNightCycle::GetSunDirection() const {
 	float angle = m_TimeOfDay * glm::two_pi<float>() - glm::half_pi<float>();
-	return glm::normalize(glm::vec3(5.0f, sin(angle), cos(angle)));   // pure arc in the Y-Z plane
+    // Sun arcs across the sky rising in one direction, setting in the opposite —
+    // both a horizontal axis (X) and height (Y) vary together, producing a true overhead arc.
+    float height = sin(angle);
+    float horizontal = cos(angle);
+
+    return glm::normalize(glm::vec3(horizontal, height, 0.0f)); // sweeps across X, not fixed at 0
 }
+
 
 glm::vec3 DayNightCycle::GetSunColor() const {
 	float height = GetSunDirection().y; // -1 (below horizon) to 1 (overhead)
@@ -39,7 +45,7 @@ glm::vec3 DayNightCycle::GetSunColor() const {
 
 float DayNightCycle::GetAmbientIntensity() const {
 	float height = GetSunDirection().y;
-	return glm::clamp(0.15f + height * 0.35f, 0.05f, 0.5f);   // dimmer ambient at night, brighter at noon
+	return glm::clamp(0.15f + height * 0.35f, 0.05f, 0.2f);   // dimmer ambient at night, brighter at noon
 }
 
 glm::mat4 DayNightCycle::GetLightSpaceMatrix(glm::vec3 focusPoint, float orthoSize, float nearPlane, float farPlane) const {

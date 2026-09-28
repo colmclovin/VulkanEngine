@@ -19,3 +19,4 @@
 #include "SkinnedMeshComponent.h"
 #include "AnimationComponent.h"
 #include "PointLightComponent.h"
+#include "TreeOriginComponent.h"

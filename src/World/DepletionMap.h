@@ -9,6 +9,9 @@ public:
 
 	const std::unordered_map<GridCoord, float, GridCoordHash> &GetAll() const { return m_Depleted; }
 	void LoadFrom(const std::unordered_map<GridCoord, float, GridCoordHash> &data) { m_Depleted = data; }
+    void SetRemainingFraction(int cellX, int cellZ, float fraction) {
+        m_Depleted[{ cellX, cellZ }] = fraction;
+    }
 
 private:
 	std::unordered_map<GridCoord, float, GridCoordHash> m_Depleted; // stores remaining FRACTION (1.0 = full, 0.0 = empty)

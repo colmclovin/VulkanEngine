@@ -109,7 +109,7 @@ void WorldGenerator::ScatterTreesInChunk(entt::registry &registry, ChunkCoord co
 	treeJitterNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
 	treeJitterNoise.SetFrequency(0.4f);
 
-	float sampleSpacing = 8.0f;
+	float sampleSpacing = 2.0f;
 	if (!s_TreeMeshCache) { // NEW — only load once, ever, for the lifetime of the program
 		s_TreeMeshCache = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Tree.glb", engine, meshRenderer));
 	}

@@ -247,6 +247,7 @@
     <ClInclude Include="src\Components\SkinnedMeshComponent.h" />
     <ClInclude Include="src\Components\SpriteComponent.h" />
     <ClInclude Include="src\Components\TransformComponent.h" />
+    <ClInclude Include="src\Components\TreeOriginComponent.h" />
     <ClInclude Include="src\Engine\VulkanEngine.h" />
     <ClInclude Include="src\Game\BiomeDatabase.h" />
     <ClInclude Include="src\Game\BiomeMap.h" />
@@ -307,6 +308,7 @@
     <ClInclude Include="src\World\DepletionMap.h" />
     <ClInclude Include="src\World\FogOfWarMap.h" />
     <ClInclude Include="src\World\PlacementGrid.h" />
+    <ClInclude Include="src\World\RemovedTreesMap.h" />
     <ClInclude Include="src\World\ResourceMap.h" />
     <ClInclude Include="src\World\TerrainGenerator.h" />
     <ClInclude Include="src\World\TerrainRaycast.h" />

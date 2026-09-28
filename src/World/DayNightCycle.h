@@ -10,7 +10,7 @@ public:
 	float GetAmbientIntensity() const;
 	float GetTimeOfDay() const { return m_TimeOfDay; }   // 0.0 - 1.0, 0 = midnight, 0.5 = noon
 
-	float dayLengthSeconds = 500.0f;   // how long a full day takes in real seconds — tune to taste
+	float dayLengthSeconds = 60.0f;   // how long a full day takes in real seconds — tune to taste
 
 private:
 	float m_TimeOfDay = 0.25f;   // start at sunrise-ish

@@ -4,7 +4,7 @@
 #include "ShadowMap.h"
 #include "../Components/Components.h"
 #include <stdexcept>
-
+#include <iostream>
 ShadowMapRenderer::ShadowMapRenderer(VulkanEngine* engine) : m_Engine(engine) {}
 
 void ShadowMapRenderer::Init() {
@@ -80,7 +80,7 @@ void ShadowMapRenderer::CreatePipeline() {
     rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizer.lineWidth = 1.0f;
-    rasterizer.cullMode = VK_CULL_MODE_FRONT_BIT;   // front-face culling for shadow pass reduces peter-panning/acne — common trick
+    rasterizer.cullMode = VK_CULL_MODE_NONE; // front-face culling for shadow pass reduces peter-panning/acne — common trick
     rasterizer.depthBiasEnable = VK_TRUE;            // we'll tune bias constants once we see artifacts
 
     VkPipelineMultisampleStateCreateInfo multisampling{};
@@ -177,6 +177,7 @@ void ShadowMapRenderer::RenderStatic(entt::registry &registry, const glm::mat4 &
         auto &transform = view.get<TransformComponent>(entity);
         auto &meshComp = view.get<MeshComponent>(entity);
         if (!meshComp.mesh || !meshComp.mesh->IsUploaded()) continue;
+ 
 
         glm::mat4 lightSpaceMVP = lightSpaceMatrix * transform.GetMatrix();
         vkCmdPushConstants(commandBuffer, m_PipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &lightSpaceMVP);

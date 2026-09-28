@@ -64,9 +64,10 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry &registry, Camera3D &ca
     m_Engine->SetClearColor(settings.clearColor);   // NEW
 
     glm::vec3 focusPoint = registry.valid(m_PlayerEntity) ? registry.get<TransformComponent>(m_PlayerEntity).Position : glm::vec3(0.0f);
-    float dynamicOrthoSize = glm::clamp(camera.GetIsoDistance() * 3.0f, 50.0f, 300.0f); // scale with zoom, whatever your camera exposes
-    glm::mat4 lightSpaceMatrix = dayNightCycle.GetLightSpaceMatrix(focusPoint, dynamicOrthoSize);
-
+   
+    float dynamicOrthoSize = glm::clamp(camera.GetIsoDistance() * 3.0f, 100.0f, 500.0f);
+    glm::mat4 lightSpaceMatrix = dayNightCycle.GetLightSpaceMatrix(focusPoint, 500.0f, 1.0f, 1000.0f);
+   
     std::vector<PointLight> activeLights;
     auto lightView = registry.view<TransformComponent, PointLightComponent>();
     for (auto entity : lightView) {

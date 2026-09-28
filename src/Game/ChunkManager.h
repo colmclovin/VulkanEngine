@@ -7,6 +7,7 @@
 #include <unordered_map>
 #include "../World/DepletionMap.h"
 #include "../World/PlacementGrid.h"
+#include "../World/RemovedTreesMap.h"
 #include "../Rendering/Vertex.h"
 #include <thread>
 #include <mutex>
@@ -24,7 +25,7 @@ class ChunkManager {
 public:
     static constexpr float CHUNK_WORLD_SIZE = 32.0f; // world units per chunk edge
     static constexpr int CHUNK_VERTEX_RESOLUTION = 32; // vertices per chunk edge (independent of world cellSize)
-    static constexpr int LOAD_RADIUS_CHUNKS = 6; // how many chunks around the player stay loaded
+    static constexpr int LOAD_RADIUS_CHUNKS = 11; // how many chunks around the player stay loaded
 
     struct ChunkGenerationJob {
         ChunkCoord coord;
@@ -46,16 +47,43 @@ public:
     };
     void StartWorkerThread(const TerrainSettings &settings, int seed);
     void StopWorkerThread();
-    void ProcessCompletedChunks(entt::registry &registry, VulkanEngine *engine, MeshRenderer *meshRenderer, PlacementGrid &placementGrid);
+    void ProcessCompletedChunks(entt::registry &registry, VulkanEngine *engine, MeshRenderer *meshRenderer, PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap);
 
     void Update(entt::registry &registry, glm::vec3 playerPosition, const TerrainSettings &settings,
-                VulkanEngine *engine, MeshRenderer *meshRenderer, int seed, DepletionMap &depletionMap, PlacementGrid &placementGrid);
+                VulkanEngine *engine, MeshRenderer *meshRenderer, int seed, DepletionMap &depletionMap, PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap);
     void OnResourceDepleted(entt::registry &registry, glm::vec3 worldPos, const TerrainSettings &settings,
                             VulkanEngine *engine, MeshRenderer *meshRenderer, DepletionMap &depletionMap);
     static ChunkCoord WorldToChunkCoord(glm::vec3 worldPos);
     void RegenerateChunkMesh(Chunk &chunk, const TerrainSettings &settings, const DepletionMap &depletionMap);
 
+    void RequestInitialChunksBlocking(glm::vec3 playerPos, const TerrainSettings &settings,
+                                                    VulkanEngine *engine, MeshRenderer *meshRenderer, int seed,
+                                                    DepletionMap &depletionMap, RemovedTreesMap &removedTreesMap,
+                                                    entt::registry &registry, PlacementGrid &placementGrid);
+    void BeginInitialLoad(glm::vec3 playerPos, const TerrainSettings &settings, int seed);
+    bool IsInitialLoadComplete() const;
+    float GetInitialLoadProgress() const;
+
+
+   
+    void Reset() {
+        m_LoadedChunks.clear();
+        {
+            std::lock_guard<std::mutex> lock(m_RequestMutex);
+            while (!m_PendingRequests.empty())
+                m_PendingRequests.pop();
+            m_InFlightRequests.clear();
+            m_AwaitingProcessing.clear();
+        }
+        {
+            std::lock_guard<std::mutex> lock(m_ResultMutex);
+            while (!m_CompletedResults.empty())
+                m_CompletedResults.pop();
+        }
+    }
+
 private:
+    size_t m_InitialLoadTarget = 0;
     void GenerateChunk(ChunkCoord coord, entt::registry &registry, const TerrainSettings &settings,
                        VulkanEngine *engine, MeshRenderer *meshRenderer, int seed, DepletionMap &depletionMap, PlacementGrid &placementGrid);
     void UnloadChunk(ChunkCoord coord, entt::registry &registry, VulkanEngine *engine);

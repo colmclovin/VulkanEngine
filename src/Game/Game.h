@@ -13,6 +13,7 @@
 #include "../World/DayNightCycle.h"
 #include "ChunkManager.h"
 #include "../World/DepletionMap.h"
+#include "../World/RemovedTreesMap.h"
 class TerrainGenerator;
 class VulkanEngine;
 class RenderSystem;
@@ -30,6 +31,7 @@ enum class GameState {
     Playing,
     Paused,
     GameOver,
+    Loading,
 };
 
 class Game {
@@ -70,11 +72,12 @@ private:
     }
     GameState m_State = GameState::MainMenu;
     std::string m_CurrentSaveName; // which save file is active, once in Playing state
-
+    RemovedTreesMap m_RemovedTreesMap;
     void RunMainMenu();
     void StartNewGame(const std::string &saveName);
     void LoadExistingGame(const std::string &saveName);
     void RunPauseMenu();
+    void RunLoadingScreen();
     void QuitToMenu(); // for later, if you add a "return to menu" option mid-game
     bool m_ShowOptionsInPause = false;
     bool m_ShowOptionsInMenu = false;
@@ -94,4 +97,5 @@ private:
     bool m_IsRunning = false;
     bool m_Initialized = false;
     entt::entity m_InspectedEntity = entt::null;
+    float m_LoadingProgress = 0.0f; // 0.0 to 1.0
 };

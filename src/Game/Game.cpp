@@ -73,7 +73,16 @@ void Game::Run() {
             Render();
         } else if (m_State == GameState::Paused) {
             RunPauseMenu(); // renders the frozen last frame + pause UI on top, no gameplay update
+        } else if (m_State == GameState::Loading) {
+        m_ChunkManager.ProcessCompletedChunks(*m_Registry, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(),
+                                              m_PlacementGrid, m_RemovedTreesMap);
+
+        RunLoadingScreen(); // renders progress bar
+
+        if (m_ChunkManager.IsInitialLoadComplete()) {
+            m_State = GameState::Playing;
         }
+    }
     }
 
     Shutdown();
@@ -319,7 +328,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
         } else {
             InteractionSystem::TryMineAtCursor(*m_Registry, m_DepletionMap, m_PlayerEntity,
                                                rayOrigin, rayDir, m_Settings.terrain, interactRange, m_AudioEvents.get(),
-                                               m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_PlacementGrid);
+                                               m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_PlacementGrid, m_RemovedTreesMap);
         }
     }
     
@@ -347,15 +356,17 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
 
   
     if (saveIsDown && !saveWasDown) {
-        SaveManager::SaveGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, m_PlayerEntity, m_ResourceMap, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
+        SaveManager::SaveGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, m_PlayerEntity, m_ResourceMap, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_DepletionMap, m_RemovedTreesMap);
     }
     saveWasDown = saveIsDown;
     if (loadIsDown && !loadWasDown) {
         m_Registry->clear();
         m_PlacementGrid = PlacementGrid{};
+        m_DepletionMap = DepletionMap{};
+        m_RemovedTreesMap = RemovedTreesMap{};
 
         entt::entity loadedPlayer;
-        if (SaveManager::LoadGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, loadedPlayer, m_ResourceMap, m_PlacementGrid, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer())) {
+        if (SaveManager::LoadGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, loadedPlayer, m_ResourceMap, m_PlacementGrid, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_DepletionMap, m_RemovedTreesMap)) {
             m_PlayerEntity = loadedPlayer;
         }
     }
@@ -409,7 +420,8 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
 void Game::MovePlayer(glm::vec3 direction, float deltaTime) {
     auto& transform = m_Registry->get<TransformComponent>(m_PlayerEntity);
     auto& player = m_Registry->get<PlayerComponent>(m_PlayerEntity);
-
+    player.moveSpeed = m_Settings.playerMoveSpeed; // copied ONCE at creation
+    player.runSpeed = m_Settings.playerRunSpeed;
     // Move relative to the camera's current facing, same axis logic as the old iso pan —
     // so "forward" is always "up the screen" regardless of which 45° snap we're on.
     float camYaw = m_Camera->GetIsoYaw();   // needs a small getter — see below
@@ -514,7 +526,7 @@ void Game::Update(float deltaTime) {
         glm::vec3 velocity = (playerTransform.Position - m_LastPlayerPosition) / deltaTime;
         //PlayerAnimationSystem::Update(*m_Registry, m_PlayerEntity, velocity);
         m_ChunkManager.Update(*m_Registry, playerTransform.Position, m_Settings.terrain,
-                              m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.seed, m_DepletionMap, m_PlacementGrid);
+                              m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.seed, m_DepletionMap, m_PlacementGrid, m_RemovedTreesMap);
         m_LastPlayerPosition = playerTransform.Position;
     }
 
@@ -576,26 +588,30 @@ void Game::StartNewGame(const std::string &saveName) {
     m_Registry->clear();
     m_PlacementGrid = PlacementGrid{};
     m_TechState = TechState{};
-
+    m_ChunkManager.Reset();
     CreateInitialEntities(); // existing world-gen path: player, terrain, WorldGenerator::ScatterTrees, etc.
 
     m_CurrentSaveName = saveName;
-    SaveManager::SaveGame("Saves/" + saveName + ".json", *m_Registry, m_PlayerEntity, m_ResourceMap, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer()); // save immediately so the file exists
+    SaveManager::SaveGame("Saves/" + saveName + ".json", *m_Registry, m_PlayerEntity, m_ResourceMap, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_DepletionMap, m_RemovedTreesMap); // save immediately so the file exists
 
-    m_State = GameState::Playing;
+   m_ChunkManager.BeginInitialLoad(m_Registry->get<TransformComponent>(m_PlayerEntity).Position,
+                                    m_Settings.terrain, m_Settings.terrain.seed);
+    m_State = GameState::Loading; // CHANGED — was Playing
 }
 
 void Game::LoadExistingGame(const std::string &saveName) {
     m_Registry->clear();
     m_PlacementGrid = PlacementGrid{};
-
+    m_ChunkManager.Reset();
     entt::entity loadedPlayer;
     bool success = SaveManager::LoadGame("Saves/" + saveName + ".json", *m_Registry, loadedPlayer,
-                                         m_ResourceMap, m_PlacementGrid, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
+                                         m_ResourceMap, m_PlacementGrid, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_DepletionMap, m_RemovedTreesMap);
     if (success) {
         m_PlayerEntity = loadedPlayer;
         m_CurrentSaveName = saveName;
-        m_State = GameState::Playing;
+        m_ChunkManager.BeginInitialLoad(m_Registry->get<TransformComponent>(m_PlayerEntity).Position,
+                                        m_Settings.terrain, m_Settings.terrain.seed);
+        m_State = GameState::Loading; // CHANGED — was Playing
     } else {
         std::cerr << "Failed to load save: " << saveName << std::endl;
         // stay in MainMenu, maybe show an error message
@@ -679,11 +695,13 @@ void Game::RunPauseMenu() {
         m_State = GameState::Playing;
         break;
     case PauseMenuAction::SaveGame:
-        SaveManager::SaveGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, m_PlayerEntity, m_ResourceMap, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
+        SaveManager::SaveGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, m_PlayerEntity, m_ResourceMap, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_DepletionMap, m_RemovedTreesMap);
         break;
     case PauseMenuAction::QuitToMenu:
         m_Registry->clear();
         m_PlacementGrid = PlacementGrid{};
+        m_DepletionMap = DepletionMap{};
+        m_RemovedTreesMap = RemovedTreesMap{};
         m_State = GameState::MainMenu;
         break;
     case PauseMenuAction::QuitGame:
@@ -692,4 +710,22 @@ void Game::RunPauseMenu() {
     default:
         break;
     }
+}
+void Game::RunLoadingScreen() {
+    if (!m_VulkanEngine->BeginFrame()) return;
+    m_RenderSystem->GetImGuiUtil()->NewFrame();
+
+    ImGuiIO &io = ImGui::GetIO();
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::SetNextWindowSize(ImVec2(400, 100));
+    ImGui::Begin("Loading", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar);
+
+    ImGui::Text("Generating world...");
+    float progress = m_ChunkManager.GetInitialLoadProgress();
+    ImGui::ProgressBar(progress, ImVec2(-1, 30));
+
+    ImGui::End();
+
+    m_RenderSystem->GetImGuiUtil()->RenderDrawData(m_VulkanEngine->GetCurrentCommandBuffer());
+    m_VulkanEngine->EndFrame();
 }

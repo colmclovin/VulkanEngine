@@ -22,7 +22,7 @@ public:
 
     // Matrix generation for graphics pipeline integration
     glm::mat4 GetViewMatrix() const;
-    glm::mat4 GetProjectionMatrix(float aspectRatio, float nearPlane = 0.1f, float farPlane = 1000.0f) const;
+    glm::mat4 GetProjectionMatrix(float aspectRatio, float nearPlane = 0.1f, float farPlane = 500.0f) const;
     glm::vec3 GetEyePosition() const;
     void ProcessIsoZoom(float deltaDistance);
 

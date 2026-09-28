@@ -15,8 +15,8 @@
     "isoPitch": 34.810001373291016,
     "isoRotateSpeed": 13.664999961853027,
     "isoZoomSpeed": 2.068000078201294,
-    "playerMoveSpeed": 20.0,
-    "playerRunSpeed": 10.0,
+    "playerMoveSpeed": 25.0,
+    "playerRunSpeed": 102.0,
     "terrain": {
         "cellSize": 1.0,
         "gridDepth": 100,

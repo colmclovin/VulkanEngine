@@ -119,6 +119,7 @@ void PlacementSystem::TryConfirmPlacement(entt::registry &registry, entt::entity
 			} else if (m_PendingItem == ItemId::PowerPole) {
 				registry.emplace<PowerPoleComponent>(m_GhostEntity);
 			}
+            registry.remove<GhostComponent>(m_GhostEntity); // ADD — this is now a real machine, not a preview
 
 			registry.emplace<BoundsComponent>(m_GhostEntity, BoundsComponent{ def->footprintHalfExtents });
 

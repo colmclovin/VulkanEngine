@@ -12,10 +12,11 @@
 #include "../Rendering/Mesh.h"
 #include "../World/TerrainGenerator.h"
 #include "../Components/Components.h"
+
 using json = nlohmann::json;
 
 void SaveManager::SaveGame(const std::string &path, entt::registry &registry, entt::entity player,
-                           ResourceMap &resourceMap, TechState &techState, const GameSettings &settings, VulkanEngine *engine, MeshRenderer *meshRenderer) {
+                           ResourceMap &resourceMap, TechState &techState, const GameSettings &settings, VulkanEngine *engine, MeshRenderer *meshRenderer, DepletionMap &depletionMap, RemovedTreesMap &removedTreesMap) {
     json j;
     j["seed"] = settings.terrain.seed;
 
@@ -26,18 +27,22 @@ void SaveManager::SaveGame(const std::string &path, entt::registry &registry, en
     j["techState"]["techPoints"] = techState.techPoints;
     j["techState"]["unlocked"] = techState.GetUnlockedList();
 
-
-    json cellsJson = json::array();
-    for (int z = 0; z < resourceMap.getGridDepth(); z++) {
-        for (int x = 0; x < resourceMap.getGridWidth(); x++) {
-            ResourceCell &cell = resourceMap.GetCell(x, z);
-            if (cell.resource != ItemId::None) {
-                cellsJson.push_back({ { "x", x }, { "z", z }, { "resource", cell.resource }, { "amount", cell.amount } });
-            }
-        }
+json depletionJson = json::array();
+    for (auto &[coord, remainingFraction] : depletionMap.GetAll()) {
+        depletionJson.push_back({ { "x", coord.x }, { "z", coord.z }, { "remaining", remainingFraction } });
     }
-    j["resourceMapCells"] = cellsJson;
+    j["depletionMap"] = depletionJson;
 
+
+
+    json removedTreesJson = json::array();
+    for (auto &[coord, indices] : removedTreesMap.GetAll()) {
+        json indicesJson = json::array();
+        for (int idx : indices)
+            indicesJson.push_back(idx);
+        removedTreesJson.push_back({ { "chunkX", coord.x }, { "chunkZ", coord.z }, { "indices", indicesJson } });
+    }
+    j["removedTreesMap"] = removedTreesJson;
 
 
     json entitiesJson = json::array();
@@ -74,9 +79,7 @@ void SaveManager::SaveGame(const std::string &path, entt::registry &registry, en
             entityJson["data"] = registry.get<PowerGeneratorComponent>(entity);
             if (registry.any_of<MachineInventoryComponent>(entity))
                 entityJson["inventory"] = registry.get<MachineInventoryComponent>(entity);
-        }else if (registry.any_of<HarvestableComponent>(entity)) {
-        entityJson["type"] = "Tree";
-        entityJson["data"] = registry.get<HarvestableComponent>(entity);
+        
         } else if (registry.any_of<PowerPoleComponent>(entity)) {
             entityJson["type"] = "PowerPole";
             entityJson["data"] = registry.get<PowerPoleComponent>(entity);
@@ -105,7 +108,7 @@ void SaveManager::SaveGame(const std::string &path, entt::registry &registry, en
 }
 
 bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, entt::entity &outPlayer,
-                           ResourceMap &resourceMap, PlacementGrid &placementGrid, TechState &techState, GameSettings &settings, VulkanEngine *engine, MeshRenderer *meshRenderer) {
+                           ResourceMap &resourceMap, PlacementGrid &placementGrid, TechState &techState, GameSettings &settings, VulkanEngine *engine, MeshRenderer *meshRenderer, DepletionMap &depletionMap, RemovedTreesMap &removedTreesMap) {
     std::ifstream file(path);
     if (!file.is_open()) {
         std::cerr << "Save file not found: " << path << std::endl;
@@ -122,34 +125,19 @@ bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, en
         techState.ForceUnlock(techJson.get<TechId>());
     }
 
+       for (auto &entry : j["depletionMap"]) {
+        int x = entry["x"];
+        int z = entry["z"];
+        float remaining = entry["remaining"];
+        depletionMap.SetRemainingFraction(x, z, remaining); // small helper, see note below
+    }
 
-    resourceMap.Generate(settings.terrain.gridWidth, settings.terrain.gridDepth, settings.terrain.cellSize, settings.terrain.seed);
-
-    // Clear whatever Generate() produced from fresh noise — saved state must fully override it,
-    // since deposits get mined down over time and no longer match what regeneration would produce.
-    for (int z = 0; z < resourceMap.getGridDepth(); z++) {
-        for (int x = 0; x < resourceMap.getGridWidth(); x++) {
-            resourceMap.GetCell(x, z).resource = ItemId::None;
-            resourceMap.GetCell(x, z).amount = 0.0f;
+    for (auto &entry : j["removedTreesMap"]) {
+        ChunkCoord coord{ entry["chunkX"], entry["chunkZ"] };
+        for (auto &idx : entry["indices"]) {
+            removedTreesMap.MarkRemoved(coord, idx.get<int>());
         }
     }
-
-    for (auto &cellJson : j["resourceMapCells"]) {
-        int x = cellJson["x"];
-        int z = cellJson["z"];
-        ResourceCell &cell = resourceMap.GetCell(x, z);
-        cell.resource = cellJson["resource"].get<ItemId>();
-        cell.amount = cellJson["amount"];
-    }
-
-    auto terrainMesh = TerrainGenerator::GenerateHeightmapTerrain(
-            settings.terrain, resourceMap); // uses the ALREADY-restored resource map for correct color tinting
-
-    auto terrainEntity = registry.create();
-    registry.emplace<TransformComponent>(terrainEntity);
-    registry.emplace<MeshComponent>(terrainEntity, terrainMesh);
-    registry.emplace<NameTag>(terrainEntity, "Terrain");
-
 
 
     for (auto &entityJson : j["entities"]) {
@@ -196,28 +184,21 @@ bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, en
             registry.emplace<PowerPoleComponent>(entity, entityJson["data"].get<PowerPoleComponent>());
             auto mesh = ItemDatabase::GetWorldMesh(ItemId::PowerPole, engine, meshRenderer);
             if (mesh) registry.emplace<MeshComponent>(entity, mesh);
-        } else if (type == "Tree") { // FIXED
-            registry.emplace<HarvestableComponent>(entity, entityJson["data"].get<HarvestableComponent>());
-            auto treeMesh = std::make_shared<Mesh>(ModelLoader::LoadModel("Assets/Models/Tree.glb", engine, meshRenderer));
-            registry.emplace<MeshComponent>(entity, treeMesh);
+        
         } else {
             registry.destroy(entity); // unknown type — skip
             continue;
         }
 
-        if (entityJson.contains("powerConsumer")) {
+          if (entityJson.contains("powerConsumer")) {
             registry.emplace<PowerConsumerComponent>(entity, entityJson["powerConsumer"].get<PowerConsumerComponent>());
         }
 
-        // Re-register in the placement grid using the item's real footprint
         const PlaceableDef *def = PlaceableDatabase::TryGet(ItemDatabase::FromString(type));
         if (def) {
             registry.emplace<BoundsComponent>(entity, BoundsComponent{ def->footprintHalfExtents });
             auto coveredCells = PlacementGrid::GetCoveredCells(pos, def->footprintHalfExtents, settings.terrain.cellSize);
             placementGrid.RegisterArea(coveredCells, entity);
-        } else if (type == "Tree") {
-            registry.emplace<BoundsComponent>(entity, BoundsComponent{ glm::vec3(0.5f, 2.0f, 0.5f) }); // match WorldGenerator::SpawnTree's original bounds
-            // trees don't occupy the placement grid — they're not player-placed machines, so no PlacementGrid registration needed
         }
     }
 
