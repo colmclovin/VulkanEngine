@@ -33,6 +33,13 @@
 #include "../Systems/PlayerAnimationSystem.h"
 #include "BiomeDatabase.h"
 #include "OreDepositMap.h"
+#include "../Rendering/TerrainBufferPool.h"
+#include "../Rendering/ChunkCuller.h"
+
+#include "../Renderer/TerrainRenderer.h"
+#include "../Rendering/ChunkGpuMetadata.h"
+#include "ChunkManager.h"
+
 Game::Game() {
 
 }
@@ -75,7 +82,7 @@ void Game::Run() {
             RunPauseMenu(); // renders the frozen last frame + pause UI on top, no gameplay update
         } else if (m_State == GameState::Loading) {
         m_ChunkManager.ProcessCompletedChunks(*m_Registry, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(),
-                                              m_PlacementGrid, m_RemovedTreesMap);
+                                              m_PlacementGrid, m_RemovedTreesMap, m_RenderSystem->GetTerrainRenderer());
 
         RunLoadingScreen(); // renders progress bar
 
@@ -89,6 +96,8 @@ void Game::Run() {
 }
 
 void Game::Init() {
+
+
 
     std::cout << "=== Loading Settings ===" << std::endl;
     m_Settings = GameSettings::LoadFromFile("settings.json");
@@ -130,7 +139,10 @@ void Game::Init() {
 
 
     m_RenderSystem = std::make_unique<RenderSystem>(m_VulkanEngine.get());
-    m_RenderSystem->Init();
+    uint32_t vertsPerChunk = ChunkManager::CHUNK_VERTEX_RESOLUTION * ChunkManager::CHUNK_VERTEX_RESOLUTION;
+    uint32_t indicesPerChunk = (ChunkManager::CHUNK_VERTEX_RESOLUTION - 1) * (ChunkManager::CHUNK_VERTEX_RESOLUTION - 1) * 6;
+    uint32_t maxChunks = (ChunkManager::LOAD_RADIUS_CHUNKS * 2 + 1) * (ChunkManager::LOAD_RADIUS_CHUNKS * 2 + 1) + 50;   // +buffer
+    m_RenderSystem->Init(vertsPerChunk, indicesPerChunk, maxChunks);
 
      m_VulkanEngine->ChainScrollCallback(); 
 
@@ -141,6 +153,7 @@ void Game::Init() {
 
     m_Registry = std::make_unique<entt::registry>();
 
+ 
     //CreateInitialEntities();
     m_Initialized = true;
     std::cout << "=== Engine Initialized ===" << std::endl;
@@ -526,7 +539,7 @@ void Game::Update(float deltaTime) {
         glm::vec3 velocity = (playerTransform.Position - m_LastPlayerPosition) / deltaTime;
         //PlayerAnimationSystem::Update(*m_Registry, m_PlayerEntity, velocity);
         m_ChunkManager.Update(*m_Registry, playerTransform.Position, m_Settings.terrain,
-                              m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.seed, m_DepletionMap, m_PlacementGrid, m_RemovedTreesMap);
+                              m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.seed, m_DepletionMap, m_PlacementGrid, m_RemovedTreesMap, m_RenderSystem->GetTerrainRenderer());
         m_LastPlayerPosition = playerTransform.Position;
     }
 

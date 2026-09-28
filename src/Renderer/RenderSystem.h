@@ -16,6 +16,7 @@ class AudioEngine;
 //class ResourceManager;
 class MeshRenderer;
 class DebugLineRenderer;
+class TerrainRenderer;
 class Camera3D;
 class DebugUI;
 struct GameSettings;
@@ -27,7 +28,7 @@ public:
     ~RenderSystem();
     
     
-    void Init();
+    void Init(uint32_t terrainVertsPerChunk, uint32_t terrainIndicesPerChunk, uint32_t terrainMaxChunks);
     PauseMenuAction RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState, bool isPaused, bool &showOptionsInPause, DayNightCycle& dayNightCycle);
     void Shutdown();
 
@@ -37,6 +38,7 @@ public:
     ShadowMapRenderer* GetShadowMapRenderer() const { return m_ShadowMapRenderer.get(); }
     QuadRenderer *GetQuadRenderer() const { return m_QuadRenderer.get(); }
     DebugLineRenderer *GetDebugLineRenderer() const { return m_DebugLineRenderer.get(); }
+    TerrainRenderer* GetTerrainRenderer() const { return m_TerrainRenderer.get(); }
     DebugUI* GetDebugUI() const;
     ImGuiVulkanUtil *GetImGuiUtil() const;
 
@@ -50,6 +52,8 @@ private:
     std::unique_ptr<ShadowMap> m_ShadowMap;
     std::unique_ptr<ShadowMapRenderer> m_ShadowMapRenderer;
     std::unique_ptr<QuadRenderer> m_QuadRenderer;
+    std::unique_ptr<TerrainRenderer> m_TerrainRenderer;
+
     std::unique_ptr<DebugLineRenderer> m_DebugLineRenderer;
 	std::unique_ptr<ImGuiVulkanUtil> m_ImGuiVulkanUtil;
     std::unique_ptr<DebugUI> m_DebugUI;

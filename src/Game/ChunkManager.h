@@ -15,12 +15,12 @@
 #include <queue>
 #include <atomic>
 #include <unordered_set>   // add if not already present
-
+#include "../Renderer/TerrainRenderer.h"
 
 
 class VulkanEngine;
 class MeshRenderer;
-
+class TerrainRenderer;
 class ChunkManager {
 public:
     static constexpr int WORKER_THREAD_COUNT = 4;   // tune based on your CPU's core count
@@ -48,19 +48,22 @@ public:
     };
     void StartWorkerThread(const TerrainSettings &settings, int seed);
     void StopWorkerThread();
-    void ProcessCompletedChunks(entt::registry &registry, VulkanEngine *engine, MeshRenderer *meshRenderer, PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap);
+    void ProcessCompletedChunks(entt::registry& registry, VulkanEngine* engine, MeshRenderer* meshRenderer,
+        PlacementGrid& placementGrid, RemovedTreesMap& removedTreesMap,
+        TerrainRenderer* terrainRenderer);
 
     void Update(entt::registry &registry, glm::vec3 playerPosition, const TerrainSettings &settings,
-                VulkanEngine *engine, MeshRenderer *meshRenderer, int seed, DepletionMap &depletionMap, PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap);
-    void OnResourceDepleted(entt::registry &registry, glm::vec3 worldPos, const TerrainSettings &settings,
-                            VulkanEngine *engine, MeshRenderer *meshRenderer, DepletionMap &depletionMap);
+                VulkanEngine *engine, MeshRenderer *meshRenderer, int seed, DepletionMap &depletionMap, PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap, TerrainRenderer* terrainRenderer);
+    void OnResourceDepleted(entt::registry& registry, glm::vec3 worldPos, const TerrainSettings& settings,
+        VulkanEngine* engine, MeshRenderer* meshRenderer, DepletionMap& depletionMap,
+        TerrainRenderer* terrainRenderer);
     static ChunkCoord WorldToChunkCoord(glm::vec3 worldPos);
-    void RegenerateChunkMesh(Chunk &chunk, const TerrainSettings &settings, const DepletionMap &depletionMap);
+    void RegenerateChunkMesh(Chunk& chunk, const TerrainSettings& settings, const DepletionMap& depletionMap, TerrainRenderer* terrainRenderer);
 
-    void RequestInitialChunksBlocking(glm::vec3 playerPos, const TerrainSettings &settings,
-                                                    VulkanEngine *engine, MeshRenderer *meshRenderer, int seed,
-                                                    DepletionMap &depletionMap, RemovedTreesMap &removedTreesMap,
-                                                    entt::registry &registry, PlacementGrid &placementGrid);
+    void RequestInitialChunksBlocking(glm::vec3 playerPos, const TerrainSettings& settings,
+        VulkanEngine* engine, MeshRenderer* meshRenderer, int seed,
+        DepletionMap& depletionMap, RemovedTreesMap& removedTreesMap,
+        entt::registry& registry, PlacementGrid& placementGrid, TerrainRenderer* terrainRenderer);
     void BeginInitialLoad(glm::vec3 playerPos, const TerrainSettings &settings, int seed);
     bool IsInitialLoadComplete() const;
     float GetInitialLoadProgress() const;
@@ -82,17 +85,17 @@ public:
                 m_CompletedResults.pop();
         }
     }
+    ChunkManager::GeneratedVertexData GenerateTerrainDataOnly(ChunkCoord coord, const TerrainSettings& settings); // pure CPU, no GPU/registry
 
 private:
     size_t m_InitialLoadTarget = 0;
     void GenerateChunk(ChunkCoord coord, entt::registry &registry, const TerrainSettings &settings,
                        VulkanEngine *engine, MeshRenderer *meshRenderer, int seed, DepletionMap &depletionMap, PlacementGrid &placementGrid);
-    void UnloadChunk(ChunkCoord coord, entt::registry &registry, VulkanEngine *engine);
+    void UnloadChunk(ChunkCoord coord, entt::registry& registry, VulkanEngine* engine, TerrainRenderer* terrainRenderer);
 
     std::unordered_map<ChunkCoord, Chunk, ChunkCoordHash> m_LoadedChunks;
     std::unordered_set<ChunkCoord, ChunkCoordHash> m_AwaitingProcessing;
     void WorkerLoop(TerrainSettings settings, int seed); // takes settings BY VALUE — a safe snapshot, no shared-state races
-    ChunkManager::GeneratedVertexData GenerateTerrainDataOnly(ChunkCoord coord, const TerrainSettings &settings); // pure CPU, no GPU/registry
     std::vector<ChunkManager::TreeCandidate> GenerateTreeCandidatesOnly(ChunkCoord coord, const TerrainSettings &settings);
 
     std::vector<std::thread> m_WorkerThreads;   // CHANGED — was a single std::thread

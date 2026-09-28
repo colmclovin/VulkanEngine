@@ -2,6 +2,7 @@
 #include "QuadRenderer.h"
 #include "MeshRenderer.h"
 #include "SkinnedMeshRenderer.h"
+#include "TerrainRenderer.h"
 #include "ShadowMap.h"
 #include "ShadowMapRenderer.h"
 #include "DebugLineRenderer.h"
@@ -26,7 +27,7 @@ RenderSystem::~RenderSystem() {
 }
 
 
-void RenderSystem::Init() {
+void RenderSystem::Init(uint32_t terrainVertsPerChunk, uint32_t terrainIndicesPerChunk, uint32_t terrainMaxChunks) {
     std::cout << "RenderSystem initializing..." << std::endl;
     m_QuadRenderer = std::make_unique<QuadRenderer>(m_Engine);
     m_QuadRenderer->Init();
@@ -47,6 +48,8 @@ void RenderSystem::Init() {
 
 
 
+    m_TerrainRenderer = std::make_unique<TerrainRenderer>(m_Engine);
+    m_TerrainRenderer->Init(terrainVertsPerChunk, terrainIndicesPerChunk, terrainMaxChunks);
 
     m_DebugLineRenderer = std::make_unique<DebugLineRenderer>(m_Engine);
     m_DebugLineRenderer->Init();
@@ -61,45 +64,54 @@ void RenderSystem::Init() {
     std::cout << "RenderSystem initialized with all subsystems" << std::endl;
 }
 
-PauseMenuAction RenderSystem::RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState, bool isPaused, bool& showOptionsInPause, DayNightCycle& dayNightCycle) {
-    m_Engine->SetClearColor(settings.clearColor);   // NEW
+PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& camera, GameSettings& settings, AudioEngine& audioEngine,
+    entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId& selectedItem,
+    TechState& techState, bool isPaused, bool& showOptionsInPause, DayNightCycle& dayNightCycle) {
+    m_Engine->SetClearColor(settings.clearColor);
 
     glm::vec3 focusPoint = registry.valid(m_PlayerEntity) ? registry.get<TransformComponent>(m_PlayerEntity).Position : glm::vec3(0.0f);
-   
     float dynamicOrthoSize = glm::clamp(camera.GetIsoDistance() * 3.0f, 100.0f, 500.0f);
-    glm::mat4 lightSpaceMatrix = dayNightCycle.GetLightSpaceMatrix(focusPoint, 500.0f, 1.0f, 1000.0f);
-   
+    glm::mat4 lightSpaceMatrix = dayNightCycle.GetLightSpaceMatrix(focusPoint, dynamicOrthoSize, 1.0f, 1000.0f);
+
+    // NEW — compute the camera frustum here, early, before BeginFrame's lambda runs
+    VkExtent2D extent = m_Engine->GetSwapChainExtent();
+    float aspect = static_cast<float>(extent.width) / extent.height;
+    glm::mat4 view = camera.GetActiveViewMatrix();
+    glm::mat4 proj = camera.GetProjectionMatrix(aspect);
+    Frustum cameraFrustum = Frustum::FromViewProj(proj * view);
+
     std::vector<PointLight> activeLights;
     auto lightView = registry.view<TransformComponent, PointLightComponent>();
     for (auto entity : lightView) {
-        auto &lightComp = lightView.get<PointLightComponent>(entity);
+        auto& lightComp = lightView.get<PointLightComponent>(entity);
         if (!lightComp.active) continue;
-        auto &transform = lightView.get<TransformComponent>(entity);
+        auto& transform = lightView.get<TransformComponent>(entity);
 
         PointLight pl;
         pl.position = glm::vec4(transform.Position, lightComp.range);
         pl.color = glm::vec4(lightComp.color, lightComp.intensity);
         activeLights.push_back(pl);
         if (activeLights.size() >= MAX_POINT_LIGHTS) break;
-        std::cout << "Light gathered at position: " << transform.Position.x << "," << transform.Position.y << "," << transform.Position.z
-                  << " range: " << lightComp.range << std::endl;
     }
-    //std::cout << "Active point lights this frame: " << activeLights.size() << std::endl;
-    // Render the frame using the quad renderer
+
     bool began = m_Engine->BeginFrame([&](VkCommandBuffer cmd) {
         m_ShadowMapRenderer->BeginShadowPass(*m_ShadowMap);
         m_ShadowMapRenderer->RenderStatic(registry, lightSpaceMatrix);
-        m_SkinnedMeshRenderer->RenderShadowPass(registry, lightSpaceMatrix); // NEW
+        m_SkinnedMeshRenderer->RenderShadowPass(registry, lightSpaceMatrix);
         m_ShadowMapRenderer->EndShadowPass(*m_ShadowMap);
+
+        m_TerrainRenderer->RecordCullingPass(cmd, cameraFrustum);   // NEW — compute pass, before vkCmdBeginRendering
         });
 
     if (!began) {
+        std::cout << "BeginFrame returned false!" << std::endl;
         return PauseMenuAction::None;
     }
-    
-    
-    m_ImGuiVulkanUtil->NewFrame();                              // MOVED — now always runs against up-to-date window state
+
+    m_ImGuiVulkanUtil->NewFrame();
     m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine, m_PlayerEntity, m_InspectedEntity, selectedItem, techState);
+
+    m_TerrainRenderer->RecordDraw(m_Engine->GetCurrentCommandBuffer(), camera, dayNightCycle, lightSpaceMatrix, activeLights, settings.wireframeMode);   // CHANGED — RecordDraw, not Render
 
     m_MeshRenderer->Render(registry, camera, settings.wireframeMode, dayNightCycle, lightSpaceMatrix, activeLights);
     m_SkinnedMeshRenderer->Render(registry, camera, settings.wireframeMode, dayNightCycle, lightSpaceMatrix, activeLights);
@@ -135,9 +147,7 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry &registry, Camera3D &ca
         }
     }
 
-    // after mesh/quad rendering, before ImGui
-    VkExtent2D extent = m_Engine->GetSwapChainExtent();
-    float aspect = (float)extent.width / extent.height;
+
     m_DebugLineRenderer->Render(camera, aspect);
 
 

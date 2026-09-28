@@ -205,7 +205,45 @@ if exist "Shaders\shadow_instanced.vert" (
 ) else (
 	echo WARNING: shadow_instanced.vert not found
 )
-
+REM Compile chunk culling compute shader
+if exist "Shaders\chunk_cull.comp" (
+	echo Compiling chunk culling compute shader...
+	glslc Shaders\chunk_cull.comp -o Shaders\chunk_cull_comp.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Chunk culling compute shader compiled successfully
+	) else (
+		echo   Chunk culling compute shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: chunk_cull.comp not found
+)
+REM Compile terrain vertex shader
+if exist "Shaders\terrain.vert" (
+	echo Compiling terrain vertex shader...
+	glslc Shaders\terrain.vert -o Shaders\terrain_vert.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Terrain vertex shader compiled successfully
+	) else (
+		echo   Terrain vertex shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: terrain.vert not found
+)
+REM Compile terrain fragment shader
+if exist "Shaders\terrain.frag" (
+	echo Compiling terrain fragment shader...
+	glslc Shaders\terrain.frag -o Shaders\terrain_frag.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Terrain fragment shader compiled successfully
+	) else (
+		echo   Terrain fragment shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: terrain.frag not found
+)
 
 echo.
 echo Shader compilation complete!

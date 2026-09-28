@@ -7,11 +7,8 @@
 #include "ChunkCoord.h"
 
 struct Chunk {
-	ChunkCoord coord;
-	std::shared_ptr<Mesh> terrainMesh;
-	entt::entity terrainEntity = entt::null;
-	std::vector<entt::entity> treeEntities; // so we can destroy/hide them when unloading
-	bool isGenerated = false;
-	glm::vec3 boundsCenter;
-	float boundsRadius;
+    ChunkCoord coord;
+    uint32_t terrainSlot = UINT32_MAX;   // NEW — replaces terrainEntity/terrainMesh entirely
+    std::vector<entt::entity> treeEntities;
+    bool isGenerated = false;
 };

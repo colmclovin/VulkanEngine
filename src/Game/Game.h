@@ -14,6 +14,7 @@
 #include "ChunkManager.h"
 #include "../World/DepletionMap.h"
 #include "../World/RemovedTreesMap.h"
+#include "../Renderer/TerrainRenderer.h"
 class TerrainGenerator;
 class VulkanEngine;
 class RenderSystem;
@@ -98,4 +99,7 @@ private:
     bool m_Initialized = false;
     entt::entity m_InspectedEntity = entt::null;
     float m_LoadingProgress = 0.0f; // 0.0 to 1.0
+
+    std::unique_ptr<TerrainRenderer> m_TerrainRenderer;
+    bool m_TerrainTestActive = false;
 };

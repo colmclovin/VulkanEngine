@@ -150,6 +150,7 @@
   <ItemGroup>
     <None Include="compile_shaders.bat" />
     <None Include="compile_shaders.ps1" />
+    <None Include="Shaders\chunk_cull.comp" />
     <None Include="Shaders\debugline.frag" />
     <None Include="Shaders\debugline.vert" />
     <None Include="Shaders\mesh_instanced.frag" />
@@ -161,6 +162,9 @@
     <None Include="Shaders\shadow_skinned.vert" />
     <None Include="Shaders\skinned.frag" />
     <None Include="Shaders\skinned.vert" />
+    <None Include="Shaders\terrain.frag" />
+    <None Include="Shaders\terrain.vert" />
+    <None Include="Shaders\test_compute.comp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\External\imgui\backends\imgui_impl_glfw.cpp" />
@@ -186,6 +190,7 @@
     <ClCompile Include="src\Game\PlaceableDatabase.cpp" />
     <ClCompile Include="src\Game\RecipeDatabase.cpp" />
     <ClCompile Include="src\Game\TechDatabase.cpp" />
+    <ClCompile Include="src\Helpers\ComputeTest.cpp" />
     <ClCompile Include="src\Helpers\DebugUI.cpp" />
     <ClCompile Include="src\Helpers\SaveManager.cpp" />
     <ClCompile Include="src\Renderer\DebugLineRenderer.cpp" />
@@ -198,10 +203,13 @@
     <ClCompile Include="src\Renderer\ShadowMap.cpp" />
     <ClCompile Include="src\Renderer\ShadowMapRenderer.cpp" />
     <ClCompile Include="src\Renderer\SkinnedMeshRenderer.cpp" />
+    <ClCompile Include="src\Renderer\TerrainRenderer.cpp" />
     <ClCompile Include="src\Rendering\Animator.cpp" />
+    <ClCompile Include="src\Rendering\ChunkCuller.cpp" />
     <ClCompile Include="src\Rendering\Mesh.cpp" />
     <ClCompile Include="src\Rendering\ModelLoader.cpp" />
     <ClCompile Include="src\Rendering\SkinnedMesh.cpp" />
+    <ClCompile Include="src\Rendering\TerrainBufferPool.cpp" />
     <ClCompile Include="src\Rendering\Texture.cpp" />
     <ClCompile Include="src\Systems\AnimationSystem.cpp" />
     <ClCompile Include="src\Systems\AssemblerSystem.cpp" />
@@ -266,6 +274,7 @@
     <ClInclude Include="src\Game\RecipeDatabase.h" />
     <ClInclude Include="src\Game\TechDatabase.h" />
     <ClInclude Include="src\Game\TechState.h" />
+    <ClInclude Include="src\Helpers\ComputeTest.h" />
     <ClInclude Include="src\Helpers\DebugUI.h" />
     <ClInclude Include="src\Helpers\GlmSerialization.h" />
     <ClInclude Include="src\Game\PlaceableDatabase.h" />
@@ -279,10 +288,14 @@
     <ClInclude Include="src\Renderer\ShadowMap.h" />
     <ClInclude Include="src\Renderer\ShadowMapRenderer.h" />
     <ClInclude Include="src\Renderer\SkinnedMeshRenderer.h" />
+    <ClInclude Include="src\Renderer\TerrainRenderer.h" />
     <ClInclude Include="src\Rendering\AnimationClip.h" />
     <ClInclude Include="src\Rendering\Animator.h" />
     <ClInclude Include="src\Rendering\BoneMatrixUBO.h" />
+    <ClInclude Include="src\Rendering\ChunkCuller.h" />
+    <ClInclude Include="src\Rendering\ChunkGpuMetadata.h" />
     <ClInclude Include="src\Rendering\Frustum.h" />
+    <ClInclude Include="src\Rendering\GpuDrawCommand.h" />
     <ClInclude Include="src\Rendering\LightingUBO.h" />
     <ClInclude Include="src\Rendering\Material.h" />
     <ClInclude Include="src\Rendering\Mesh.h" />
@@ -291,6 +304,7 @@
     <ClInclude Include="src\Rendering\SkinnedMesh.h" />
     <ClInclude Include="src\Rendering\SkinnedVertex.h" />
     <ClInclude Include="src\Rendering\SubMesh.h" />
+    <ClInclude Include="src\Rendering\TerrainBufferPool.h" />
     <ClInclude Include="src\Rendering\Texture.h" />
     <ClInclude Include="src\Rendering\Vertex.h" />
     <ClInclude Include="src\Systems\AnimationSystem.h" />

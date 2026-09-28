@@ -60,7 +60,7 @@ public:
 
     VkShaderModule CreateShaderModule(const std::vector<char> &code);
     std::vector<char> ReadFile(const std::string &filename);
-
+    void CopyBufferRegion(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset);
 
     struct PendingDestruction {
         VkBuffer buffer;

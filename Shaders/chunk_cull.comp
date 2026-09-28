@@ -1,0 +1,72 @@
+// chunk_cull.comp
+#version 450
+
+layout(local_size_x = 64) in;
+
+struct ChunkMetadata {
+    vec4 boundsCenterAndRadius;
+    uint slot;
+    uint isActive;
+    uint padding[2];
+};
+
+struct DrawCommand {
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int vertexOffset;
+    uint firstInstance;
+};
+
+layout(std430, binding = 0) readonly buffer MetadataBuffer {
+    ChunkMetadata chunks[];
+};
+
+layout(std430, binding = 1) writeonly buffer DrawCommandBuffer {
+    DrawCommand commands[];
+};
+
+layout(std430, binding = 2) buffer DrawCountBuffer {
+    uint drawCount;
+};
+
+layout(push_constant) uniform PushConstants {
+    vec4 frustumPlanes[6];
+    uint indicesPerChunk;
+    uint vertsPerChunk;   // ADD
+    uint maxChunks;
+} pc;
+
+bool SphereInFrustum(vec3 center, float radius) {
+    for (int i = 0; i < 6; i++) {
+        if (dot(pc.frustumPlanes[i].xyz, center) + pc.frustumPlanes[i].w < -radius) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= pc.maxChunks) return;
+
+    ChunkMetadata chunk = chunks[idx];
+    if (chunk.isActive == 0) return;
+
+    vec3 center = chunk.boundsCenterAndRadius.xyz;
+    float radius = chunk.boundsCenterAndRadius.w;
+
+    if (!SphereInFrustum(center, radius)) return;
+
+    // Survived culling — atomically claim a slot in the draw command buffer
+    uint drawIndex = atomicAdd(drawCount, 1);
+
+    DrawCommand cmd;
+    cmd.indexCount = pc.indicesPerChunk;
+    cmd.instanceCount = 1;
+    cmd.firstIndex = chunk.slot * pc.indicesPerChunk;
+    cmd.vertexOffset = int(chunk.slot * pc.vertsPerChunk);
+    cmd.firstInstance = 0;
+
+    commands[drawIndex] = cmd;
+}

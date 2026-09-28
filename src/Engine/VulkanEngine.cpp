@@ -531,12 +531,17 @@ void VulkanEngine::CreateLogicalDevice() {
     }
 
     VkPhysicalDeviceFeatures deviceFeatures{};
-    deviceFeatures.fillModeNonSolid = VK_TRUE;   // ADD THIS — required for wireframe rendering
+    deviceFeatures.fillModeNonSolid = VK_TRUE;
+
+    // NEW — Vulkan 1.2 features, specifically drawIndirectCount for vkCmdDrawIndexedIndirectCount
+    VkPhysicalDeviceVulkan12Features vulkan12Features{};
+    vulkan12Features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    vulkan12Features.drawIndirectCount = VK_TRUE;
 
     VkPhysicalDeviceDynamicRenderingFeatures deviceDynamicFeatures{};
     deviceDynamicFeatures.dynamicRendering = true;
-    deviceDynamicFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES; // ← missing
-
+    deviceDynamicFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES;
+    deviceDynamicFeatures.pNext = &vulkan12Features;   // NEW — chain 1.2 features onto the existing dynamic rendering struct
 
     VkDeviceCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -546,10 +551,7 @@ void VulkanEngine::CreateLogicalDevice() {
     createInfo.enabledExtensionCount = static_cast<uint32_t>(m_DeviceExtensions.size());
     createInfo.ppEnabledExtensionNames = m_DeviceExtensions.data();
     createInfo.enabledLayerCount = 0;
-    createInfo.pNext = &deviceDynamicFeatures;
-
-    
-    
+    createInfo.pNext = &deviceDynamicFeatures;   // unchanged — still the head of the chain, now with vulkan12Features attached after it
 
     if (vkCreateDevice(m_PhysicalDevice, &createInfo, nullptr, &m_Device) != VK_SUCCESS) {
         throw std::runtime_error("Failed to create logical device");
@@ -779,6 +781,9 @@ VulkanEngine::QueueFamilyIndices VulkanEngine::FindQueueFamilies(VkPhysicalDevic
         VkBool32 presentSupport = false;
         vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_Surface, &presentSupport);
 
+        std::cout << "Queue family " << i << ": graphics=" << ((queueFamilies[i].queueFlags & VK_QUEUE_GRAPHICS_BIT) != 0)
+            << " compute=" << ((queueFamilies[i].queueFlags & VK_QUEUE_COMPUTE_BIT) != 0) << std::endl;
+
         if (presentSupport) {
             indices.presentFamily = i;
         }
@@ -939,4 +944,13 @@ void VulkanEngine::ChainScrollCallback() {
             s_ImGuiScrollCallback(window, xoffset, yoffset); // forward to ImGui too
         }
     });
+}
+void VulkanEngine::CopyBufferRegion(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset) {
+    VkCommandBuffer cmd = BeginSingleTimeCommands();
+    VkBufferCopy copyRegion{};
+    copyRegion.srcOffset = srcOffset;
+    copyRegion.dstOffset = dstOffset;
+    copyRegion.size = size;
+    vkCmdCopyBuffer(cmd, srcBuffer, dstBuffer, 1, &copyRegion);
+    EndSingleTimeCommands(cmd);
 }

@@ -30,6 +30,10 @@
     <None Include="Shaders\mesh_Instanced.vert" />
     <None Include="Shaders\mesh_instanced.frag" />
     <None Include="Shaders\shadow_instanced.vert" />
+    <None Include="Shaders\test_compute.comp" />
+    <None Include="Shaders\chunk_cull.comp" />
+    <None Include="Shaders\terrain.vert" />
+    <None Include="Shaders\terrain.frag" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Main.cpp">
@@ -204,6 +208,18 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\World\WorldGenerator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Helpers\ComputeTest.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Rendering\TerrainBufferPool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Rendering\ChunkCuller.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\TerrainRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -485,6 +501,24 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Components\ChunkBoundsComponent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Helpers\ComputeTest.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rendering\TerrainBufferPool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rendering\ChunkGpuMetadata.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rendering\ChunkCuller.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\TerrainRenderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rendering\GpuDrawCommand.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
