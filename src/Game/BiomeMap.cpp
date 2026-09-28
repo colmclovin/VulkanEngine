@@ -10,24 +10,34 @@ float BiomeMap::GetLatitude(float worldZ, float worldExtentZ) {
 }
 
 float BiomeMap::GetAridity(float worldX, float worldZ, int seed) {
-    FastNoiseLite noise;
-    noise.SetSeed(seed + 7000); // distinct offset from height/resource noise
-    noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    noise.SetFrequency(0.15f); // low frequency — large, slow-varying dry/wet regions
-    float raw = noise.GetNoise(worldX, worldZ); // [-1, 1]
-    return (raw + 1.0f) * 0.5f; // remap to [0, 1]
+    static thread_local FastNoiseLite noise;
+    static thread_local int lastSeed = -1;
+
+    if (lastSeed != seed) {
+        noise.SetSeed(seed + 7000);
+        noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+        noise.SetFrequency(0.0015f);
+        lastSeed = seed;
+    }
+
+    float raw = noise.GetNoise(worldX, worldZ);
+    return (raw + 1.0f) * 0.5f;
 }
 
 float BiomeMap::GetElevationTrigger(float worldX, float worldZ, int seed) {
-    FastNoiseLite noise;
-    noise.SetSeed(seed + 9000);
-    noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    noise.SetFractalType(FastNoiseLite::FractalType_Ridged);
-    noise.SetFractalOctaves(3);
-    noise.SetFrequency(0.0008f);
-    float raw = noise.GetNoise(worldX, worldZ);
+    static thread_local FastNoiseLite noise;
+    static thread_local int lastSeed = -1;
 
-    // Empirically, this ridged config outputs roughly [-0.5, 0.6] — remap to a clean [0,1]
+    if (lastSeed != seed) {
+        noise.SetSeed(seed + 9000);
+        noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+        noise.SetFractalType(FastNoiseLite::FractalType_Ridged);
+        noise.SetFractalOctaves(3);
+        noise.SetFrequency(0.0008f);
+        lastSeed = seed;
+    }
+
+    float raw = noise.GetNoise(worldX, worldZ);
     return glm::clamp((raw + 0.5f) / 1.1f, 0.0f, 1.0f);
 }
 

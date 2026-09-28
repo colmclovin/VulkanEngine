@@ -14,6 +14,7 @@
 #include "../Components/Components.h"
 #include "../Rendering/LightingUBO.h"
 #include "../World/DayNightCycle.h"
+#include "../Rendering/Frustum.h"
 #include <glm/glm.hpp>
 
 

@@ -13,6 +13,7 @@
 #include "../Rendering/BoneMatrixUBO.h"
 #include "../Rendering/LightingUBO.h"
 #include "../Rendering/Animator.h"
+#include "../Rendering/Frustum.h"
 #include <iostream>
 #include "ShadowMap.h"
 SkinnedMeshRenderer::SkinnedMeshRenderer(VulkanEngine *engine) : m_Engine(engine) {}
@@ -469,6 +470,7 @@ void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camer
     glm::mat4 view = camera.GetActiveViewMatrix();
     glm::mat4 proj = camera.GetProjectionMatrix(aspect);
 
+    Frustum frustum = Frustum::FromViewProj(proj * view);
     LightingUBO lighting{};
     lighting.viewProj = proj * view;   // is this line actually present?
     lighting.sunDirection = glm::vec4(dayNightCycle.GetSunDirection(), 0.0f);
@@ -497,6 +499,14 @@ void SkinnedMeshRenderer::Render(entt::registry &registry, const Camera3D &camer
         if (!meshComp.mesh) continue;
         meshComp.mesh->UploadToGPU(m_Engine);
 
+        float radius = 5.0f;   // ADD — rough bounding radius; use BoundsComponent if present for accuracy
+        if (registry.any_of<BoundsComponent>(entity)) {
+            auto& bounds = registry.get<BoundsComponent>(entity);
+            radius = glm::length(bounds.halfExtents);
+        }
+        if (!frustum.ContainsSphere(transform.Position, radius)) continue;   // ADD — skip if off-screen
+
+        meshComp.mesh->UploadToGPU(m_Engine);
         // --- Stage C: compute this entity's bone matrices for the current test pose ---
         BoneMatrixUBO uboData{};
         for (auto &m : uboData.boneMatrices)

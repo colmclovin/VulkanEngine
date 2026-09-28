@@ -20,3 +20,4 @@
 #include "AnimationComponent.h"
 #include "PointLightComponent.h"
 #include "TreeOriginComponent.h"
+#include "ChunkBoundsComponent.h"

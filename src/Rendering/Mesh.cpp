@@ -57,8 +57,9 @@ void Mesh::UploadToGPU(VulkanEngine* engine) {
 
 	vkDestroyBuffer(device, indexStagingBuffer, nullptr);
 	vkFreeMemory(device, indexStagingMemory, nullptr);
-
-	std::cout << "Mesh uploaded to GPU" << std::endl;
+	static int uploadCount = 0;
+	uploadCount++;
+	std::cout << "Mesh uploaded to GPU (#" << uploadCount << ") — mesh ptr: " << this << " vertex count: " << Vertices.size() << std::endl;
 }
 
 void Mesh::DestroyGPUResources(VkDevice device) {

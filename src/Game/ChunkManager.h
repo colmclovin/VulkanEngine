@@ -23,6 +23,7 @@ class MeshRenderer;
 
 class ChunkManager {
 public:
+    static constexpr int WORKER_THREAD_COUNT = 4;   // tune based on your CPU's core count
     static constexpr float CHUNK_WORLD_SIZE = 32.0f; // world units per chunk edge
     static constexpr int CHUNK_VERTEX_RESOLUTION = 32; // vertices per chunk edge (independent of world cellSize)
     static constexpr int LOAD_RADIUS_CHUNKS = 11; // how many chunks around the player stay loaded
@@ -94,7 +95,7 @@ private:
     ChunkManager::GeneratedVertexData GenerateTerrainDataOnly(ChunkCoord coord, const TerrainSettings &settings); // pure CPU, no GPU/registry
     std::vector<ChunkManager::TreeCandidate> GenerateTreeCandidatesOnly(ChunkCoord coord, const TerrainSettings &settings);
 
-    std::thread m_WorkerThread;
+    std::vector<std::thread> m_WorkerThreads;   // CHANGED — was a single std::thread
     std::atomic<bool> m_ShouldStop{ false };
 
     std::mutex m_RequestMutex;

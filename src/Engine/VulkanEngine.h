@@ -61,6 +61,34 @@ public:
     VkShaderModule CreateShaderModule(const std::vector<char> &code);
     std::vector<char> ReadFile(const std::string &filename);
 
+
+    struct PendingDestruction {
+        VkBuffer buffer;
+        VkDeviceMemory memory;
+        int framesRemaining;   // counts down; destroy once it hits 0
+    };
+
+    std::vector<PendingDestruction> m_PendingDestructions;
+
+    void QueueBufferDestruction(VkBuffer buffer, VkDeviceMemory memory) {
+        m_PendingDestructions.push_back({ buffer, memory, MAX_FRAMES_IN_FLIGHT });
+    }
+
+    void ProcessPendingDestructions() {   // call once per frame, e.g. at the start of BeginFrame
+        for (auto it = m_PendingDestructions.begin(); it != m_PendingDestructions.end(); ) {
+            it->framesRemaining--;
+            if (it->framesRemaining <= 0) {
+                vkDestroyBuffer(m_Device, it->buffer, nullptr);
+                vkFreeMemory(m_Device, it->memory, nullptr);
+                it = m_PendingDestructions.erase(it);
+            }
+            else {
+                ++it;
+            }
+        }
+    }
+
+
 private:
     glm::vec4 m_ClearColor = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);
     //GLFW variables

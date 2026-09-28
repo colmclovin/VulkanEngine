@@ -192,7 +192,19 @@ if exist "Shaders\mesh_instanced.frag" (
 ) else (
 	echo WARNING: mesh_instanced.frag not found
 )
-
+REM Compile shadow instanced vertex shader
+if exist "Shaders\shadow_instanced.vert" (
+	echo Compiling shadow instanced vertex shader...
+	glslc Shaders\shadow_instanced.vert -o Shaders\shadow_instanced_vert.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Shadow Instanced vertex shader compiled successfully
+	) else (
+		echo   Shadow Instanced vertex shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: shadow_instanced.vert not found
+)
 
 
 echo.

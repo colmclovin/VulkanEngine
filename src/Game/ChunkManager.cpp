@@ -4,7 +4,7 @@
 #include "../Components/Components.h"
 #include "../World/TerrainGenerator.h"
 #include "../World/WorldGenerator.h"
-
+#include "../Components/ChunkBoundsComponent.h"
 #include <iostream>
 #include <FastNoise/FastNoiseLite.h>
 #include "OreDepositMap.h"
@@ -78,21 +78,19 @@ void ChunkManager::GenerateChunk(ChunkCoord coord, entt::registry &registry, con
     m_LoadedChunks[coord] = chunk;
 }
 
-void ChunkManager::UnloadChunk(ChunkCoord coord, entt::registry &registry, VulkanEngine *engine) {
-    std::cout << "Unloading chunk (" << coord.x << "," << coord.z << ")" << std::endl;
+void ChunkManager::UnloadChunk(ChunkCoord coord, entt::registry& registry, VulkanEngine* engine) {
     auto it = m_LoadedChunks.find(coord);
     if (it == m_LoadedChunks.end()) return;
 
-    Chunk &chunk = it->second;
-
-   engine->WaitIdle(); // ADD — ensure no in-flight command buffer still references this chunk's GPU resources
-
-
+    Chunk& chunk = it->second;
     if (registry.valid(chunk.terrainEntity)) {
-        chunk.terrainMesh->DestroyGPUResources(engine->GetDevice());
+        engine->QueueBufferDestruction(chunk.terrainMesh->vertexBuffer, chunk.terrainMesh->vertexBufferMemory);
+        engine->QueueBufferDestruction(chunk.terrainMesh->indexBuffer, chunk.terrainMesh->indexBufferMemory);
+        chunk.terrainMesh->vertexBuffer = VK_NULL_HANDLE;   // prevent double-destroy if DestroyGPUResources is ever called too
+        chunk.terrainMesh->indexBuffer = VK_NULL_HANDLE;
         registry.destroy(chunk.terrainEntity);
     }
-    for (auto &tree : chunk.treeEntities) {
+    for (auto& tree : chunk.treeEntities) {
         if (registry.valid(tree)) registry.destroy(tree);
     }
 
@@ -114,7 +112,7 @@ void ChunkManager::OnResourceDepleted(entt::registry &registry, glm::vec3 worldP
 }
 
 // ChunkManager.cpp
-void ChunkManager::RegenerateChunkMesh(Chunk &chunk, const TerrainSettings &settings, const DepletionMap &depletionMap) {
+void ChunkManager::RegenerateChunkMesh(Chunk& chunk, const TerrainSettings& settings, const DepletionMap& depletionMap) {
     float chunkOriginX = chunk.coord.x * CHUNK_WORLD_SIZE;
     float chunkOriginZ = chunk.coord.z * CHUNK_WORLD_SIZE;
     float cellSize = CHUNK_WORLD_SIZE / (CHUNK_VERTEX_RESOLUTION - 1);
@@ -123,13 +121,16 @@ void ChunkManager::RegenerateChunkMesh(Chunk &chunk, const TerrainSettings &sett
 
     int paddedRes = CHUNK_VERTEX_RESOLUTION + 2;
     std::vector<glm::vec3> paddedPositions(paddedRes * paddedRes);
+    std::vector<glm::vec3> paddedColors(paddedRes * paddedRes);   // NEW
 
     for (int z = 0; z < paddedRes; z++) {
         for (int x = 0; x < paddedRes; x++) {
             float worldX = chunkOriginX + (x - 1) * cellSize;
             float worldZ = chunkOriginZ + (z - 1) * cellSize;
-            auto sample = TerrainGenerator::SampleTerrain(worldX, worldZ, settings, depletionMap);
-            paddedPositions[z * paddedRes + x] = glm::vec3(worldX, sample.height, worldZ);
+            auto sample = TerrainGenerator::SampleTerrain(worldX, worldZ, settings, depletionMap);   // ONLY call, per position
+            int idx = z * paddedRes + x;
+            paddedPositions[idx] = glm::vec3(worldX, sample.height, worldZ);
+            paddedColors[idx] = sample.color;   // NEW — stored for reuse
         }
     }
 
@@ -142,8 +143,8 @@ void ChunkManager::RegenerateChunkMesh(Chunk &chunk, const TerrainSettings &sett
             int br = bl + 1;
 
             glm::vec3 faceNormal = glm::normalize(glm::cross(
-                    paddedPositions[bl] - paddedPositions[tl],
-                    paddedPositions[tr] - paddedPositions[tl]));
+                paddedPositions[bl] - paddedPositions[tl],
+                paddedPositions[tr] - paddedPositions[tl]));
 
             paddedNormals[tl] += faceNormal;
             paddedNormals[tr] += faceNormal;
@@ -158,15 +159,11 @@ void ChunkManager::RegenerateChunkMesh(Chunk &chunk, const TerrainSettings &sett
             int paddedIdx = (z + 1) * paddedRes + (x + 1);
             int realIdx = z * CHUNK_VERTEX_RESOLUTION + x;
 
-            float worldX = chunkOriginX + x * cellSize;
-            float worldZ = chunkOriginZ + z * cellSize;
-            auto sample = TerrainGenerator::SampleTerrain(worldX, worldZ, settings, depletionMap);
-
-            Vertex &v = mesh->Vertices[realIdx];
+            Vertex& v = mesh->Vertices[realIdx];
             v.position = paddedPositions[paddedIdx];
             v.normal = glm::normalize(paddedNormals[paddedIdx]);
             v.texCoord = glm::vec2((float)x / (CHUNK_VERTEX_RESOLUTION - 1), (float)z / (CHUNK_VERTEX_RESOLUTION - 1));
-            v.color = sample.color;
+            v.color = paddedColors[paddedIdx];   // CHANGED — reused, no second SampleTerrain call
         }
     }
 
@@ -189,17 +186,19 @@ void ChunkManager::RegenerateChunkMesh(Chunk &chunk, const TerrainSettings &sett
     chunk.terrainMesh = mesh;
 }
 
-void ChunkManager::StartWorkerThread(const TerrainSettings &settings, int seed) {
+void ChunkManager::StartWorkerThread(const TerrainSettings& settings, int seed) {
     m_ShouldStop = false;
-    m_WorkerThread = std::thread(&ChunkManager::WorkerLoop, this, settings, seed);
+    for (int i = 0; i < WORKER_THREAD_COUNT; i++) {
+        m_WorkerThreads.emplace_back(&ChunkManager::WorkerLoop, this, settings, seed);
+    }
 }
-
 void ChunkManager::StopWorkerThread() {
     m_ShouldStop = true;
-    m_RequestCV.notify_all();
-    if (m_WorkerThread.joinable()) {
-        m_WorkerThread.join();
+    m_RequestCV.notify_all();   // wake ALL waiting threads, not just one
+    for (auto& t : m_WorkerThreads) {
+        if (t.joinable()) t.join();
     }
+    m_WorkerThreads.clear();
 }
 
 void ChunkManager::WorkerLoop(TerrainSettings settings, int seed) {
@@ -233,7 +232,7 @@ void ChunkManager::WorkerLoop(TerrainSettings settings, int seed) {
 
 
 void ChunkManager::ProcessCompletedChunks(entt::registry &registry, VulkanEngine *engine, MeshRenderer *meshRenderer, PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap) {
-    const int MAX_PER_FRAME = 2;
+    const int MAX_PER_FRAME = 196;
 
     for (int i = 0; i < MAX_PER_FRAME; i++) {
         ChunkGenerationResult result;
@@ -254,9 +253,17 @@ void ChunkManager::ProcessCompletedChunks(entt::registry &registry, VulkanEngine
         chunk.terrainMesh = mesh;
 
         chunk.terrainEntity = registry.create();
+
+
+
         registry.emplace<TransformComponent>(chunk.terrainEntity);
         registry.emplace<MeshComponent>(chunk.terrainEntity, mesh);
         registry.emplace<NameTag>(chunk.terrainEntity, "Chunk_" + std::to_string(result.coord.x) + "_" + std::to_string(result.coord.z));
+
+        chunk.boundsCenter = glm::vec3(chunk.coord.x * CHUNK_WORLD_SIZE + CHUNK_WORLD_SIZE * 0.5f, 0.0f, chunk.coord.z * CHUNK_WORLD_SIZE + CHUNK_WORLD_SIZE * 0.5f);
+        chunk.boundsRadius = CHUNK_WORLD_SIZE * 0.75f;
+
+        registry.emplace<ChunkBoundsComponent>(chunk.terrainEntity,chunk.boundsCenter, chunk.boundsRadius);
 
         auto treeMesh = WorldGenerator::GetTreeMeshCache(engine, meshRenderer); // needs a small accessor, see below
         int index = 0;
@@ -302,7 +309,7 @@ void ChunkManager::ProcessCompletedChunks(entt::registry &registry, VulkanEngine
 }
 
 // ChunkManager.cpp
-ChunkManager::GeneratedVertexData ChunkManager::GenerateTerrainDataOnly(ChunkCoord coord, const TerrainSettings &settings) {
+ChunkManager::GeneratedVertexData ChunkManager::GenerateTerrainDataOnly(ChunkCoord coord, const TerrainSettings& settings) {
     float chunkOriginX = coord.x * CHUNK_WORLD_SIZE;
     float chunkOriginZ = coord.z * CHUNK_WORLD_SIZE;
     float cellSize = CHUNK_WORLD_SIZE / (CHUNK_VERTEX_RESOLUTION - 1);
@@ -311,21 +318,18 @@ ChunkManager::GeneratedVertexData ChunkManager::GenerateTerrainDataOnly(ChunkCoo
 
     int paddedRes = CHUNK_VERTEX_RESOLUTION + 2;
     std::vector<glm::vec3> paddedPositions(paddedRes * paddedRes);
+    std::vector<glm::vec3> paddedColors(paddedRes * paddedRes);   // NEW — store color alongside position
 
-    // NOTE: no DepletionMap here — the worker thread can't safely read live depletion state
-    // (mining happens on the main thread concurrently). We use a temporary EMPTY DepletionMap
-    // for generation, and re-apply real depletion coloring afterward on the main thread if needed.
-    // For now, ore-tint coloring during initial generation will reflect "undepleted" state;
-    // any already-mined patches near a freshly-generated chunk boundary would show full tint
-    // until the next depletion-triggered regen — an acceptable simplification to start with.
     DepletionMap emptyDepletionMap;
 
     for (int z = 0; z < paddedRes; z++) {
         for (int x = 0; x < paddedRes; x++) {
             float worldX = chunkOriginX + (x - 1) * cellSize;
             float worldZ = chunkOriginZ + (z - 1) * cellSize;
-            auto sample = TerrainGenerator::SampleTerrain(worldX, worldZ, settings, emptyDepletionMap);
-            paddedPositions[z * paddedRes + x] = glm::vec3(worldX, sample.height, worldZ);
+            auto sample = TerrainGenerator::SampleTerrain(worldX, worldZ, settings, emptyDepletionMap);   // ONLY call, per position
+            int idx = z * paddedRes + x;
+            paddedPositions[idx] = glm::vec3(worldX, sample.height, worldZ);
+            paddedColors[idx] = sample.color;   // NEW — stored for reuse below
         }
     }
 
@@ -338,8 +342,8 @@ ChunkManager::GeneratedVertexData ChunkManager::GenerateTerrainDataOnly(ChunkCoo
             int br = bl + 1;
 
             glm::vec3 faceNormal = glm::normalize(glm::cross(
-                    paddedPositions[bl] - paddedPositions[tl],
-                    paddedPositions[tr] - paddedPositions[tl]));
+                paddedPositions[bl] - paddedPositions[tl],
+                paddedPositions[tr] - paddedPositions[tl]));
 
             paddedNormals[tl] += faceNormal;
             paddedNormals[tr] += faceNormal;
@@ -354,15 +358,11 @@ ChunkManager::GeneratedVertexData ChunkManager::GenerateTerrainDataOnly(ChunkCoo
             int paddedIdx = (z + 1) * paddedRes + (x + 1);
             int realIdx = z * CHUNK_VERTEX_RESOLUTION + x;
 
-            float worldX = chunkOriginX + x * cellSize;
-            float worldZ = chunkOriginZ + z * cellSize;
-            auto sample = TerrainGenerator::SampleTerrain(worldX, worldZ, settings, emptyDepletionMap);
-
-            Vertex &v = data.vertices[realIdx];
+            Vertex& v = data.vertices[realIdx];
             v.position = paddedPositions[paddedIdx];
             v.normal = glm::normalize(paddedNormals[paddedIdx]);
             v.texCoord = glm::vec2((float)x / (CHUNK_VERTEX_RESOLUTION - 1), (float)z / (CHUNK_VERTEX_RESOLUTION - 1));
-            v.color = sample.color;
+            v.color = paddedColors[paddedIdx];   // CHANGED — reused from padded grid, no second SampleTerrain call
         }
     }
 
@@ -385,17 +385,26 @@ ChunkManager::GeneratedVertexData ChunkManager::GenerateTerrainDataOnly(ChunkCoo
     return data;
 }
 
-std::vector<ChunkManager::TreeCandidate> ChunkManager::GenerateTreeCandidatesOnly(ChunkCoord coord, const TerrainSettings &settings) {
+std::vector<ChunkManager::TreeCandidate> ChunkManager::GenerateTreeCandidatesOnly(ChunkCoord coord, const TerrainSettings& settings) {
     std::vector<TreeCandidate> candidates;
 
     float chunkOriginX = coord.x * CHUNK_WORLD_SIZE;
     float chunkOriginZ = coord.z * CHUNK_WORLD_SIZE;
     float worldExtentZ = settings.gridDepth * settings.cellSize;
 
-    FastNoiseLite treeJitterNoise;
-    treeJitterNoise.SetSeed(settings.seed + 4000);
-    treeJitterNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-    treeJitterNoise.SetFrequency(0.4f);
+    // Cached per-thread — configured once, reused across every chunk this thread ever processes
+    static thread_local FastNoiseLite treeJitterNoise;
+    static thread_local int lastSeed = -1;
+    if (lastSeed != settings.seed) {
+        treeJitterNoise.SetSeed(settings.seed + 4000);
+        treeJitterNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+        treeJitterNoise.SetFrequency(0.4f);
+        lastSeed = settings.seed;
+    }
+
+    // Thread-safe RNG for jitter, replacing rand()/RAND_MAX — each thread gets its own independent generator
+    static thread_local std::mt19937 treeRng(std::hash<std::thread::id>{}(std::this_thread::get_id()));
+    std::uniform_real_distribution<float> jitterRange(-0.5f, 0.5f);
 
     float sampleSpacing = 8.0f;
 
@@ -407,7 +416,7 @@ std::vector<ChunkManager::TreeCandidate> ChunkManager::GenerateTreeCandidatesOnl
             BiomeId biome = BiomeMap::GetBiomeAt(worldX, worldZ, worldExtentZ, settings.seed);
             if (biome == BiomeId::Lake) continue;
 
-            const BiomeDef &def = BiomeDatabase::Get(biome);
+            const BiomeDef& def = BiomeDatabase::Get(biome);
             if (def.treeDensity <= 0.0f) continue;
 
             auto deposit = OreDepositMap::GetDepositAt(worldX, worldZ, settings.seed);
@@ -421,8 +430,8 @@ std::vector<ChunkManager::TreeCandidate> ChunkManager::GenerateTreeCandidatesOnl
             float threshold = 1.0f - (effectiveDensity * 2.0f);
             if (roll < threshold) continue;
 
-            float jitterX = (rand() / (float)RAND_MAX - 0.5f) * sampleSpacing;
-            float jitterZ = (rand() / (float)RAND_MAX - 0.5f) * sampleSpacing;
+            float jitterX = jitterRange(treeRng) * sampleSpacing;   // CHANGED — thread-safe, no more rand()
+            float jitterZ = jitterRange(treeRng) * sampleSpacing;   // CHANGED
             float finalX = worldX + jitterX;
             float finalZ = worldZ + jitterZ;
 

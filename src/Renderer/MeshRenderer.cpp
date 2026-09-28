@@ -8,7 +8,9 @@
 #include <glm/glm.hpp>
 #include "../Components/Components.h"
 #include "../Rendering/LightingUBO.h"
+#include "../Rendering/Frustum.h"
 #include <unordered_map>
+
 
 MeshRenderer::MeshRenderer(VulkanEngine* engine) : m_Engine(engine) {
 }
@@ -109,6 +111,9 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
     glm::mat4 view = camera.GetActiveViewMatrix();
     glm::mat4 proj = camera.GetProjectionMatrix(aspect);
 
+    Frustum frustum = Frustum::FromViewProj(proj * view);
+
+
     LightingUBO lighting{};
     lighting.viewProj = proj * view; // NEW
     lighting.sunDirection = glm::vec4(dayNightCycle.GetSunDirection(), 0.0f);
@@ -124,11 +129,26 @@ void MeshRenderer::Render(entt::registry &registry, const Camera3D &camera, bool
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_PipelineLayout,
                             1, 1, &m_LightingDescriptorSets[frameIndex], 0, nullptr);
 
-    std::unordered_map<Mesh *, std::vector<entt::entity>> meshGroups;
+    std::unordered_map<Mesh*, std::vector<entt::entity>> meshGroups;
     auto view3D = registry.view<TransformComponent, MeshComponent>();
     for (auto entity : view3D) {
-        auto &meshComp = view3D.get<MeshComponent>(entity);
+        auto& transform = view3D.get<TransformComponent>(entity);
+        auto& meshComp = view3D.get<MeshComponent>(entity);
         if (!meshComp.mesh) continue;
+
+        glm::vec3 cullCenter = transform.Position;
+        float cullRadius = 5.0f;
+        if (registry.any_of<ChunkBoundsComponent>(entity)) {
+            auto& cb = registry.get<ChunkBoundsComponent>(entity);
+            cullCenter = cb.center;
+            cullRadius = cb.radius;
+        }
+        else if (registry.any_of<BoundsComponent>(entity)) {
+            auto& bounds = registry.get<BoundsComponent>(entity);
+            cullRadius = glm::length(bounds.halfExtents);
+        }
+        if (!frustum.ContainsSphere(cullCenter, cullRadius)) continue;
+
         meshComp.mesh->UploadToGPU(m_Engine);
         meshGroups[meshComp.mesh.get()].push_back(entity);
     }
@@ -740,20 +760,18 @@ void MeshRenderer::CreateInstancedPipeline() {
 void MeshRenderer::EnsureInstanceBufferCapacity(size_t instanceCount) {
     if (instanceCount <= m_InstanceBufferCapacity) return;
 
-    m_Engine->WaitIdle(); // ensure no in-flight command buffer is still using the old buffer before destroying it
-
     VkDevice device = m_Engine->GetDevice();
+
     if (m_InstanceBuffer != VK_NULL_HANDLE) {
-        vkDestroyBuffer(device, m_InstanceBuffer, nullptr);
-        vkFreeMemory(device, m_InstanceBufferMemory, nullptr);
+        m_Engine->QueueBufferDestruction(m_InstanceBuffer, m_InstanceBufferMemory);   // CHANGED — was WaitIdle + immediate destroy
     }
 
     size_t newCapacity = std::max(instanceCount, m_InstanceBufferCapacity * 2);
     VkDeviceSize bufferSize = newCapacity * sizeof(InstanceData);
 
     m_Engine->CreateBuffer(bufferSize, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                           m_InstanceBuffer, m_InstanceBufferMemory);
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        m_InstanceBuffer, m_InstanceBufferMemory);
     vkMapMemory(device, m_InstanceBufferMemory, 0, bufferSize, 0, &m_InstanceBufferMapped);
 
     m_InstanceBufferCapacity = newCapacity;

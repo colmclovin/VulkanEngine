@@ -96,6 +96,7 @@ void VulkanEngine::CreateWindow(const char* title) {
 
 
 bool VulkanEngine::BeginFrame(const std::function<void(VkCommandBuffer)>& preRenderPass) {
+    ProcessPendingDestructions();   // ADD — free anything whose safe-to-destroy countdown has reached zero
     vkWaitForFences(m_Device, 1, &m_InFlightFences[m_CurrentFrame], VK_TRUE, UINT64_MAX);
 
     VkResult result = vkAcquireNextImageKHR(m_Device, m_SwapChain, UINT64_MAX,

@@ -90,37 +90,50 @@ std::shared_ptr<Mesh> TerrainGenerator::GenerateHeightmapTerrain(const TerrainSe
 
 
 // Factor the old per-biome switch statement into its own function, taking biome as a parameter instead of looking it up itself
-float TerrainGenerator::SampleRawHeightForBiome(float worldX, float worldZ, BiomeId biome, const TerrainSettings &settings) {
-	const BiomeDef &def = BiomeDatabase::Get(biome);
+float TerrainGenerator::SampleRawHeightForBiome(float worldX, float worldZ, BiomeId biome, const TerrainSettings& settings) {
+	const BiomeDef& def = BiomeDatabase::Get(biome);
 
-	FastNoiseLite noise;
-	noise.SetSeed(settings.seed);
+	static thread_local std::unordered_map<int, FastNoiseLite> noiseCache;   // keyed by (seed, style) combined
+	int key = settings.seed * 10 + static_cast<int>(def.heightStyle);   // simple combined key
 
+	auto it = noiseCache.find(key);
+	if (it == noiseCache.end()) {
+		FastNoiseLite noise;
+		noise.SetSeed(settings.seed);
+		switch (def.heightStyle) {
+		case HeightNoiseStyle::Gentle:
+			noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+			noise.SetFractalType(FastNoiseLite::FractalType_FBm);
+			noise.SetFractalOctaves(2);
+			noise.SetFrequency(0.004f);
+			break;
+		case HeightNoiseStyle::Rugged:
+			noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+			noise.SetFractalType(FastNoiseLite::FractalType_FBm);
+			noise.SetFractalOctaves(3);
+			noise.SetFrequency(0.006f);
+			break;
+		case HeightNoiseStyle::Ridged:
+			noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
+			noise.SetFractalType(FastNoiseLite::FractalType_Ridged);
+			noise.SetFractalOctaves(3);
+			noise.SetFrequency(0.005f);
+			break;
+		default:
+			break;
+		}
+		it = noiseCache.emplace(key, noise).first;
+	}
+
+	FastNoiseLite& cachedNoise = it->second;
 	switch (def.heightStyle) {
 	case HeightNoiseStyle::Gentle:
-		noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-		noise.SetFractalType(FastNoiseLite::FractalType_FBm);
-		noise.SetFractalOctaves(2); // CHANGED — fewer octaves = less fine detail/bumpiness
-		noise.SetFrequency(0.004f); // CHANGED — much lower, broader/smoother undulation
-		return noise.GetNoise(worldX, worldZ) * def.heightScale;
-
 	case HeightNoiseStyle::Rugged:
-		noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-		noise.SetFractalType(FastNoiseLite::FractalType_FBm);
-		noise.SetFractalOctaves(3); // CHANGED — was 5, fewer octaves = smoother, less noisy
-		noise.SetFrequency(0.006f); // CHANGED — much lower than before
-		return noise.GetNoise(worldX, worldZ) * def.heightScale;
-
-	case HeightNoiseStyle::Ridged: // kept available for future use (sharp peaks), just not used by Mountains right now
-		noise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-		noise.SetFractalType(FastNoiseLite::FractalType_Ridged);
-		noise.SetFractalOctaves(3);
-		noise.SetFrequency(0.005f);
-		return std::abs(noise.GetNoise(worldX, worldZ)) * def.heightScale;
-
+		return cachedNoise.GetNoise(worldX, worldZ) * def.heightScale;
+	case HeightNoiseStyle::Ridged:
+		return std::abs(cachedNoise.GetNoise(worldX, worldZ)) * def.heightScale;
 	case HeightNoiseStyle::Carved:
-		return -def.heightScale + noise.GetNoise(worldX, worldZ) * 0.3f;
-
+		return -def.heightScale + cachedNoise.GetNoise(worldX, worldZ) * 0.3f;
 	default:
 		return 0.0f;
 	}

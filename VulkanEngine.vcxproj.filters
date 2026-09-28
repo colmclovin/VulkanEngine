@@ -29,6 +29,7 @@
     <None Include="Shaders\shadow_skinned.vert" />
     <None Include="Shaders\mesh_Instanced.vert" />
     <None Include="Shaders\mesh_instanced.frag" />
+    <None Include="Shaders\shadow_instanced.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Main.cpp">
@@ -478,6 +479,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Components\TreeOriginComponent.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rendering\Frustum.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Components\ChunkBoundsComponent.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

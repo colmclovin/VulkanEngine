@@ -74,5 +74,6 @@ void main() {
     vec4 texColor = texture(texSampler, fragTexCoord);
     vec3 litColor = fragBaseColor.rgb * fragColor * texColor.rgb *
                     (lighting.sunColor.rgb * (ambient + diffuse * 0.8) + pointLightContribution);   // CHANGED — added point light term
+
     outColor = vec4(litColor, fragBaseColor.a * texColor.a);
 }
