@@ -23,7 +23,7 @@ class MeshRenderer;
 class TerrainRenderer;
 class ChunkManager {
 public:
-    static constexpr int WORKER_THREAD_COUNT = 4;   // tune based on your CPU's core count
+    static constexpr int WORKER_THREAD_COUNT = 8;   // tune based on your CPU's core count
     static constexpr float CHUNK_WORLD_SIZE = 32.0f; // world units per chunk edge
     static constexpr int CHUNK_VERTEX_RESOLUTION = 32; // vertices per chunk edge (independent of world cellSize)
     static constexpr int LOAD_RADIUS_CHUNKS = 11; // how many chunks around the player stay loaded

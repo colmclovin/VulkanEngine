@@ -16,7 +16,6 @@ public:
 
     // Returns a slot index, or std::nullopt if the pool is full
     std::optional<uint32_t> AllocateSlot();
-    void FreeSlot(uint32_t slot);
     void UploadMetadata(uint32_t slot, glm::vec3 boundsCenter, float boundsRadius);
     void ClearMetadata(uint32_t slot);
     VkBuffer GetMetadataBuffer() const { return m_MetadataBuffer; }
@@ -29,9 +28,18 @@ public:
     uint32_t GetIndicesPerChunk() const { return m_IndicesPerChunk; }
     uint32_t GetMaxChunks() const { return m_MaxChunks; }
 
+    struct PendingFree {
+        uint32_t slot;
+        int framesRemaining;
+    };
+    std::vector<PendingFree> m_PendingFrees;
+
+    void FreeSlot(uint32_t slot); // now defers, doesn't return to free-list immediately
+    void ProcessPendingFrees(); // call once per frame
+
 private:
     VulkanEngine* m_Engine = nullptr;
-
+    static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
     VkBuffer m_VertexBuffer = VK_NULL_HANDLE;
     VkDeviceMemory m_VertexBufferMemory = VK_NULL_HANDLE;
     VkBuffer m_IndexBuffer = VK_NULL_HANDLE;

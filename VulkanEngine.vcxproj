@@ -149,7 +149,6 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="compile_shaders.bat" />
-    <None Include="compile_shaders.ps1" />
     <None Include="Shaders\chunk_cull.comp" />
     <None Include="Shaders\debugline.frag" />
     <None Include="Shaders\debugline.vert" />

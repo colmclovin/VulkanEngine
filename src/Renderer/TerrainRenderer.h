@@ -23,7 +23,9 @@ public:
     void UploadChunk(uint32_t slot, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices,
         glm::vec3 boundsCenter, float boundsRadius);
     void FreeChunkSlot(uint32_t slot);
-
+    void ProcessPendingFrees() {
+        m_Pool.ProcessPendingFrees();
+    }
     void Render(VkCommandBuffer commandBuffer, const Camera3D& camera, DayNightCycle& dayNightCycle,
         const glm::mat4& lightSpaceMatrix, const std::vector<PointLight>& activeLights, bool wireframe);
     void RecordCullingPass(VkCommandBuffer commandBuffer, const Frustum& frustum);

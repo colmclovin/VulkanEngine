@@ -62,16 +62,7 @@ std::optional<uint32_t> TerrainBufferPool::AllocateSlot() {
     return slot;
 }
 
-void TerrainBufferPool::FreeSlot(uint32_t slot) {
-    if (slot >= m_MaxChunks) {
-        throw std::runtime_error("TerrainBufferPool: FreeSlot called with out-of-range slot index");
-    }
-    if (!m_SlotInUse[slot]) {
-        throw std::runtime_error("TerrainBufferPool: double-free detected on slot " + std::to_string(slot));
-    }
-    m_SlotInUse[slot] = false;
-    m_FreeSlots.push(slot);
-}
+
 
 void TerrainBufferPool::UploadChunkData(uint32_t slot, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices) {
     if (vertices.size() != m_VertsPerChunk || indices.size() != m_IndicesPerChunk) {
@@ -142,4 +133,22 @@ void TerrainBufferPool::UploadMetadata(uint32_t slot, glm::vec3 boundsCenter, fl
 void TerrainBufferPool::ClearMetadata(uint32_t slot) {
     ChunkGpuMetadata* metadata = static_cast<ChunkGpuMetadata*>(m_MetadataBufferMapped);
     metadata[slot].isActive = 0;
+}
+
+void TerrainBufferPool::FreeSlot(uint32_t slot) {
+    if (!m_SlotInUse[slot]) throw std::runtime_error("double-free");
+    m_PendingFrees.push_back({ slot, MAX_FRAMES_IN_FLIGHT }); // don't push to m_FreeSlots yet
+}
+
+void TerrainBufferPool::ProcessPendingFrees() {
+    for (auto it = m_PendingFrees.begin(); it != m_PendingFrees.end();) {
+        it->framesRemaining--;
+        if (it->framesRemaining <= 0) {
+            m_SlotInUse[it->slot] = false;
+            m_FreeSlots.push(it->slot); // NOW safe to reuse
+            it = m_PendingFrees.erase(it);
+        } else {
+            ++it;
+        }
+    }
 }

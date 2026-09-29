@@ -256,10 +256,18 @@ void ChunkManager::ProcessCompletedChunks(entt::registry& registry, VulkanEngine
         auto slot = terrainRenderer->AllocateChunkSlot();
         if (!slot) {
             std::cerr << "TerrainRenderer: out of chunk slots! Chunk (" << result.coord.x << "," << result.coord.z << ") not rendered." << std::endl;
+            {
+                std::lock_guard<std::mutex> lock(m_RequestMutex);
+                m_AwaitingProcessing.erase(result.coord); // ADD — clear tracking even on failure, so it can be retried later
+            }
             continue;
         }
         chunk.terrainSlot = *slot;   // NEW field on Chunk, see below
-
+        static std::unordered_set<uint32_t> everUsedSlots;
+        bool isReused = everUsedSlots.count(*slot) > 0;
+        everUsedSlots.insert(*slot);
+        std::cout << "Chunk (" << result.coord.x << "," << result.coord.z << ") got slot " << *slot
+                  << (isReused ? " [REUSED]" : " [FIRST USE]") << std::endl;
         glm::vec3 boundsCenter(
             chunk.coord.x * CHUNK_WORLD_SIZE + CHUNK_WORLD_SIZE * 0.5f,
             0.0f,
@@ -304,6 +312,10 @@ void ChunkManager::ProcessCompletedChunks(entt::registry& registry, VulkanEngine
 
         chunk.isGenerated = true;
         m_LoadedChunks[result.coord] = chunk;
+        {
+            std::lock_guard<std::mutex> lock(m_RequestMutex);
+            m_AwaitingProcessing.erase(result.coord); // only reached on SUCCESS
+        }
     }
 }
 

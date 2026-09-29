@@ -110,7 +110,7 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
 
     m_ImGuiVulkanUtil->NewFrame();
     m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine, m_PlayerEntity, m_InspectedEntity, selectedItem, techState);
-
+    m_TerrainRenderer->ProcessPendingFrees();
     m_TerrainRenderer->RecordDraw(m_Engine->GetCurrentCommandBuffer(), camera, dayNightCycle, lightSpaceMatrix, activeLights, settings.wireframeMode);   // CHANGED — RecordDraw, not Render
 
     m_MeshRenderer->Render(registry, camera, settings.wireframeMode, dayNightCycle, lightSpaceMatrix, activeLights);
