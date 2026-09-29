@@ -13,7 +13,7 @@ layout(push_constant) uniform PushConstants {
     float startX;
     float startZ;
     float spacing;
-    uint sampleType;   // 0 = raw simplex, 1 = fbm, 2 = ridged
+    uint sampleType;   // 0 = raw simplex, 1 = fbm (test params), 2 = ridged, 3 = fbm (real terrain params)
 } pc;
 
 void main() {
@@ -25,7 +25,10 @@ void main() {
         values[idx] = simplexNoise2D(vec2(x, z));
     } else if (pc.sampleType == 1) {
         values[idx] = fbm(vec2(x, z), 3, 0.01, 2.0, 0.5);
-    } else {
+    } else if (pc.sampleType == 2) {
         values[idx] = ridgedNoise(vec2(x, z), 3, 0.01, 2.0, 0.5);
+    } else if (pc.sampleType == 3) {
+        // Matches sampleRawHeightForBiome's Gentle path exactly
+        values[idx] = fbm(vec2(x, z) * 0.015, 4, 1.0, 2.0, 0.5);
     }
 }

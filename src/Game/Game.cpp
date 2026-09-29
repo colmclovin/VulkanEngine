@@ -155,12 +155,13 @@ void Game::Init() {
 
 
     //Test
-   // RunNoiseLibraryTest();
+
+    //RunNoiseLibraryTest();
    // float worldExtentZ = m_Settings.terrain.gridDepth * m_Settings.terrain.cellSize;   // = 100
    // std::cout << "worldExtentZ = " << worldExtentZ << std::endl;
-   // RunBiomeLibraryTest();
+    RunBiomeLibraryTest();
     //COmment to build
-    //RunBiomeGridTest();
+    RunBiomeGridTest();
 
     m_Registry = std::make_unique<entt::registry>();
 
@@ -865,7 +866,7 @@ void Game::RunNoiseLibraryTest()
     // Run once per sample type
     const char* typeNames[] = { "simplex", "fbm", "ridged" };
     for (uint32_t sampleType = 0; sampleType < 3; sampleType++) {
-        NoiseTestPush push{ -500.0f, 0.0f, 15.0f, sampleType };   // CHANGED — spacing=15, spans -500 to +460 across 64 samples
+        NoiseTestPush push{ 0.0f, 0.0f, 1.0f, 1 };  // CHANGED — spacing=15, spans -500 to +460 across 64 samples
 
         VkCommandBuffer cmd = m_VulkanEngine->BeginSingleTimeCommands();
         vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
@@ -881,7 +882,7 @@ void Game::RunNoiseLibraryTest()
             maxVal = std::max(maxVal, results[i]);
         }
         std::cout << "Noise test [" << typeNames[sampleType] << "]: min=" << minVal << " max=" << maxVal << " | first 8: ";
-        for (int i = 0; i < 8; i++) std::cout << results[i] << " ";
+        for (int i = 0; i < 64; i++) std::cout << results[i] << " ";
         std::cout << std::endl;
     }
 
@@ -984,42 +985,20 @@ void Game::RunBiomeLibraryTest() {
     }
     vkDestroyShaderModule(device, shaderModule, nullptr);
 
-    const char* typeNames[] = { "aridity", "elevationTrigger", "latitude", "determineBiome" };   // CHANGED — added 4th
-    float worldExtentZ = m_Settings.terrain.gridDepth * m_Settings.terrain.cellSize;
+    BiomeTestPush push{ 0.0f, 0.0f, 1.0f, (float)m_Settings.terrain.seed, 1, 0.0f };   // sampleType=1, spacing=1.0, worldExtentZ unused here
 
-    for (uint32_t sampleType = 0; sampleType < 4; sampleType++) {   // CHANGED — was < 3
-        float testRangeZ = worldExtentZ * 3.0f;   // = 300
-        float startZForBiomeTest = (worldExtentZ * 0.5f) - (testRangeZ * 0.5f);   // = 50 - 150 = -100
-        float spacing = (sampleType == 3) ? (testRangeZ / sampleCount) : 30.0f;
+    VkCommandBuffer cmd = m_VulkanEngine->BeginSingleTimeCommands();
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descSet, 0, nullptr);
+    vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(BiomeTestPush), &push);
+    vkCmdDispatch(cmd, sampleCount / 64, 1, 1);
+    m_VulkanEngine->EndSingleTimeCommands(cmd);
 
-        BiomeTestPush push{ 0.0f, (sampleType == 3) ? startZForBiomeTest : 0.0f, spacing, (float)m_Settings.terrain.seed, sampleType, worldExtentZ };
+    float* results = static_cast<float*>(mapped);
+    std::cout << "ElevationTrigger at REAL vertex spacing (1.0): ";
+    for (uint32_t i = 0; i < sampleCount; i++) std::cout << results[i] << " ";
+    std::cout << std::endl;
 
-        VkCommandBuffer cmd = m_VulkanEngine->BeginSingleTimeCommands();
-        vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
-        vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descSet, 0, nullptr);
-        vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(BiomeTestPush), &push);
-        vkCmdDispatch(cmd, sampleCount / 64, 1, 1);
-        m_VulkanEngine->EndSingleTimeCommands(cmd);
-
-        float* results = static_cast<float*>(mapped);
-        float minVal = results[0], maxVal = results[0];
-        int biomeCounts[6] = { 0, 0, 0, 0, 0, 0 };
-        for (uint32_t i = 0; i < sampleCount; i++) {
-            minVal = std::min(minVal, results[i]);
-            maxVal = std::max(maxVal, results[i]);
-            if (sampleType == 3) {
-                int biomeId = static_cast<int>(results[i]);
-                if (biomeId >= 0 && biomeId < 6) biomeCounts[biomeId]++;
-            }
-        }
-        std::cout << "Biome test [" << typeNames[sampleType] << "]: min=" << minVal << " max=" << maxVal << std::endl;
-        if (sampleType == 3) {
-            const char* biomeNames[] = { "Plains", "Desert", "Tundra", "Hills", "Mountains", "Lake" };
-            for (int b = 0; b < 6; b++) {
-                std::cout << "  " << biomeNames[b] << ": " << biomeCounts[b] << " (" << (100.0f * biomeCounts[b] / sampleCount) << "%)" << std::endl;
-            }
-        }
-    }
     vkDestroyPipeline(device, pipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
     vkDestroyDescriptorPool(device, descPool, nullptr);

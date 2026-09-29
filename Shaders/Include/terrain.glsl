@@ -18,31 +18,32 @@ float getBiomeHeightScale(int biomeId) {
     if (biomeId == BIOME_PLAINS)    return 2.5;
     if (biomeId == BIOME_DESERT)    return 2.0;
     if (biomeId == BIOME_TUNDRA)    return 3.0;
-    if (biomeId == BIOME_HILLS)     return 15.0;
-    if (biomeId == BIOME_MOUNTAINS) return 35.0;
-    if (biomeId == BIOME_LAKE)      return 3.0;
+    if (biomeId == BIOME_HILLS)     return 6.0;
+    if (biomeId == BIOME_MOUNTAINS) return 12.0;
+    if (biomeId == BIOME_LAKE)      return 1.0;
     return 1.0;
 }
-
+float smoothStepGLSL(float edge0, float edge1, float x) {
+    float t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
+    return t * t * (3.0 - 2.0 * t);
+}
 // heightStyle: 0=Gentle (Plains/Desert/Tundra), 1=Rugged (Hills/Mountains), 2=Carved (Lake)
 float sampleRawHeightForBiome(float worldX, float worldZ, int biomeId, float seed) {
     float heightScale = getBiomeHeightScale(biomeId);
 
     if (biomeId == BIOME_HILLS || biomeId == BIOME_MOUNTAINS) {
-        float n = fbm(vec2(worldX, worldZ) * 0.006 + vec2(seed * 1000.0), 5, 1.0, 2.0, 0.5);   // CHANGED — 3 to 5 octaves
+        float seedOffset = hashSeed(seed + 3000.0);
+        float n = fbm(vec2(worldX, worldZ) * 0.012 + vec2(seedOffset), 5, 1.0, 2.0, 0.5);
         return n * heightScale;
     }
     if (biomeId == BIOME_LAKE) {
-        float n = simplexNoise2D(vec2(worldX, worldZ) * 0.01 + vec2(seed * 1000.0));
+        float seedOffset = hashSeed(seed + 4000.0);
+        float n = simplexNoise2D(vec2(worldX, worldZ) * 0.01 + vec2(seedOffset));
         return -heightScale + n * 0.3;
     }
-    float n = fbm(vec2(worldX, worldZ) * 0.004 + vec2(seed * 1000.0), 4, 1.0, 2.0, 0.5);   // CHANGED — 2 to 4 octaves
+    float seedOffset = hashSeed(seed + 1000.0);
+    float n = fbm(vec2(worldX, worldZ) * 0.012 + vec2(seedOffset), 4, 1.0, 2.0, 0.5);
     return n * heightScale;
-}
-
-float smoothStepGLSL(float edge0, float edge1, float x) {
-    float t = clamp((x - edge0) / (edge1 - edge0), 0.0, 1.0);
-    return t * t * (3.0 - 2.0 * t);
 }
 
 void sampleBiomeWeights(float worldX, float worldZ, float seed, out float weights[6]) {

@@ -11,15 +11,17 @@ const int BIOME_HILLS = 3;
 const int BIOME_MOUNTAINS = 4;
 const int BIOME_LAKE = 5;
 
-float getAridity(float worldX, float worldZ, float seed) {
-    float raw = simplexNoise2D(vec2(worldX, worldZ) * 0.0015 + vec2(seed * 1000.0 + 7000.0));
-    return (raw + 1.0) * 0.5;
-}
 
 float getElevationTrigger(float worldX, float worldZ, float seed) {
-    float raw = ridgedNoise(vec2(worldX, worldZ) * 0.0008 + vec2(seed * 1000.0 + 9000.0), 3, 1.0, 2.0, 0.5);
-    // Empirically calibrated against GLSL ridgedNoise's actual observed range — may need further tuning once visible in-game
+    float seedOffset = hashSeed(seed);
+    float raw = ridgedNoise(vec2(worldX, worldZ) * 0.0008 + vec2(seedOffset), 3, 1.0, 2.0, 0.5);
     return clamp((raw - 0.05) / 0.9, 0.0, 1.0);
+}
+
+float getAridity(float worldX, float worldZ, float seed) {
+    float seedOffset = hashSeed(seed + 7000.0);   // add a distinct constant before hashing, so aridity/elevation get different offsets from the same seed
+    float raw = simplexNoise2D(vec2(worldX, worldZ) * 0.0015 + vec2(seedOffset));
+    return (raw + 1.0) * 0.5;
 }
 
 float getLatitude(float worldZ) {   // CHANGED — worldExtentZ parameter removed
