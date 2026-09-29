@@ -15,7 +15,6 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <None Include="compile_shaders.ps1" />
     <None Include="compile_shaders.bat">
       <Filter>Source Files</Filter>
     </None>
@@ -34,6 +33,16 @@
     <None Include="Shaders\chunk_cull.comp" />
     <None Include="Shaders\terrain.vert" />
     <None Include="Shaders\terrain.frag" />
+    <None Include="Shaders\Include\noise.glsl" />
+    <None Include="Shaders\test_include_user.comp" />
+    <None Include="Shaders\Include\test_include.glsl" />
+    <None Include="Shaders\noise_test.comp" />
+    <None Include="Shaders\Include\biome.glsl" />
+    <None Include="Shaders\biome_test.comp" />
+    <None Include="Shaders\biome_grid_test.comp" />
+    <None Include="Shaders\Include\terrain.glsl" />
+    <None Include="Shaders\chunk_generate_pass1.comp" />
+    <None Include="Shaders\chunk_generate_pass2.comp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Main.cpp">
@@ -220,6 +229,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Renderer\TerrainRenderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Systems\BeltRenderSystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Game\ChunkGenerator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -519,6 +534,12 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Rendering\GpuDrawCommand.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Systems\BeltRenderSystem.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Game\ChunkGenerator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

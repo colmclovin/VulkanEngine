@@ -70,6 +70,9 @@
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
       <WarningLevel>Level3</WarningLevel>
@@ -128,6 +131,9 @@
       </Message>
       <Command>xcopy /y /d "$(SolutionDir)..\External\Assimp\build\bin\Debug\*.dll" "$(OutDir)"</Command>
     </PostBuildEvent>
+    <PreBuildEvent>
+      <Message>call "$(ProjectDir)compile_shaders.bat" nopause</Message>
+    </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
@@ -149,11 +155,20 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <None Include="compile_shaders.bat" />
+    <None Include="Shaders\biome_grid_test.comp" />
     <None Include="Shaders\chunk_cull.comp" />
+    <None Include="Shaders\chunk_generate_pass1.comp" />
+    <None Include="Shaders\chunk_generate_pass2.comp" />
     <None Include="Shaders\debugline.frag" />
     <None Include="Shaders\debugline.vert" />
+    <None Include="Shaders\Include\biome.glsl" />
+    <None Include="Shaders\biome_test.comp" />
+    <None Include="Shaders\Include\noise.glsl" />
+    <None Include="Shaders\Include\terrain.glsl" />
+    <None Include="Shaders\Include\test_include.glsl" />
     <None Include="Shaders\mesh_instanced.frag" />
     <None Include="Shaders\mesh_Instanced.vert" />
+    <None Include="Shaders\noise_test.comp" />
     <None Include="Shaders\shadow.frag" />
     <None Include="Shaders\shadow.vert" />
     <None Include="Shaders\shadow_instanced.vert" />
@@ -164,6 +179,7 @@
     <None Include="Shaders\terrain.frag" />
     <None Include="Shaders\terrain.vert" />
     <None Include="Shaders\test_compute.comp" />
+    <None Include="Shaders\test_include_user.comp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\External\imgui\backends\imgui_impl_glfw.cpp" />
@@ -178,6 +194,7 @@
     <ClCompile Include="src\Game\BiomeDatabase.cpp" />
     <ClCompile Include="src\Game\BiomeMap.cpp" />
     <ClCompile Include="src\Game\Camera3D.cpp" />
+    <ClCompile Include="src\Game\ChunkGenerator.cpp" />
     <ClCompile Include="src\Game\ChunkManager.cpp" />
     <ClCompile Include="src\Game\CraftingSystem.cpp" />
     <ClCompile Include="src\Game\FuelDatabase.cpp" />
@@ -212,6 +229,7 @@
     <ClCompile Include="src\Rendering\Texture.cpp" />
     <ClCompile Include="src\Systems\AnimationSystem.cpp" />
     <ClCompile Include="src\Systems\AssemblerSystem.cpp" />
+    <ClCompile Include="src\Systems\BeltRenderSystem.cpp" />
     <ClCompile Include="src\Systems\BeltSystem.cpp" />
     <ClCompile Include="src\Systems\FurnaceSystem.cpp" />
     <ClCompile Include="src\Systems\InserterSystem.cpp" />
@@ -261,6 +279,7 @@
     <ClInclude Include="src\Game\BiomeDatabase.h" />
     <ClInclude Include="src\Game\BiomeMap.h" />
     <ClInclude Include="src\Game\Camera3D.h" />
+    <ClInclude Include="src\Game\ChunkGenerator.h" />
     <ClInclude Include="src\Game\ChunkManager.h" />
     <ClInclude Include="src\Game\CraftingSystem.h" />
     <ClInclude Include="src\Game\FuelDatabase.h" />
@@ -308,6 +327,7 @@
     <ClInclude Include="src\Rendering\Vertex.h" />
     <ClInclude Include="src\Systems\AnimationSystem.h" />
     <ClInclude Include="src\Systems\AssemblerSystem.h" />
+    <ClInclude Include="src\Systems\BeltRenderSystem.h" />
     <ClInclude Include="src\Systems\BeltSystem.h" />
     <ClInclude Include="src\Systems\FurnaceSystem.h" />
     <ClInclude Include="src\Systems\InserterSystem.h" />

@@ -316,3 +316,6 @@ void TerrainRenderer::RecordDraw(VkCommandBuffer commandBuffer, const Camera3D& 
         m_Culler.GetDrawCountBuffer(), 0, m_MaxChunks, sizeof(GpuDrawCommand));
     //std::cout << "Terrain indirect draw issued, maxChunks=" << m_MaxChunks << std::endl;
 }
+void TerrainRenderer::UploadChunkBounds(uint32_t slot, glm::vec3 boundsCenter, float boundsRadius) {
+    m_Pool.UploadMetadata(slot, boundsCenter, boundsRadius);
+}

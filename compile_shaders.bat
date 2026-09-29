@@ -245,7 +245,72 @@ if exist "Shaders\terrain.frag" (
 	echo WARNING: terrain.frag not found
 )
 
+REM Compile noise test compute shader
+if exist "Shaders\noise_test.comp" (
+	echo Compiling noise test compute shader...
+	glslc -I Shaders Shaders\noise_test.comp -o Shaders\noise_test_comp.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Noise test compute shader compiled successfully
+	) else (
+		echo   Noise test compute shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: noise_test.comp not found
+)
+
+REM Compile noise test compute shader
+if exist "Shaders\biome_test.comp" (
+	echo Compiling biome test compute shader...
+	glslc -I Shaders Shaders\biome_test.comp -o Shaders\biome_test_comp.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   biome test compute shader compiled successfully
+	) else (
+		echo   biome test compute shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: biome_test.comp not found
+)
+if exist "Shaders\biome_grid_test.comp" (
+	echo Compiling biome grid test compute shader...
+	glslc -I Shaders Shaders\biome_grid_test.comp -o Shaders\biome_grid_test_comp.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Biome grid test compute shader compiled successfully
+	) else (
+		echo   Biome grid test compute shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: biome_grid_test.comp not found
+)
+REM Compile chunk generation pass 1 compute shader
+if exist "Shaders\chunk_generate_pass1.comp" (
+	echo Compiling chunk generation pass 1 compute shader...
+	glslc -I Shaders Shaders\chunk_generate_pass1.comp -o Shaders\chunk_generate_pass1_comp.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Chunk generation pass 1 compute shader compiled successfully
+	) else (
+		echo   Chunk generation pass 1 compute shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: chunk_generate_pass1.comp not found
+)
+REM Compile chunk generation pass 2 compute shader
+if exist "Shaders\chunk_generate_pass2.comp" (
+	echo Compiling chunk generation pass 2 compute shader...
+	glslc -I Shaders Shaders\chunk_generate_pass2.comp -o Shaders\chunk_generate_pass2_comp.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Chunk generation pass 2 compute shader compiled successfully
+	) else (
+		echo   Chunk generation pass 2 compute shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: chunk_generate_pass2.comp not found
+)
 echo.
 echo Shader compilation complete!
 dir shaders\*.spv /b
-pause
+if "%1"=="" pause

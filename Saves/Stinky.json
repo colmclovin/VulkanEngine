@@ -1,6 +1,16 @@
 {
     "depletionMap": [
         {
+            "remaining": 0.9732729196548462,
+            "x": 451,
+            "z": -190
+        },
+        {
+            "remaining": 0.9349464178085327,
+            "x": -401,
+            "z": 259
+        },
+        {
             "remaining": 0.9900573492050171,
             "x": 22,
             "z": 7
@@ -9,9 +19,274 @@
             "remaining": 0.9900851249694824,
             "x": 32,
             "z": -13
+        },
+        {
+            "remaining": 0.9910885095596313,
+            "x": 451,
+            "z": -189
+        },
+        {
+            "remaining": 0.981715738773346,
+            "x": 347,
+            "z": 144
+        },
+        {
+            "remaining": 0.9680209755897522,
+            "x": 349,
+            "z": 144
+        },
+        {
+            "remaining": 0.9910880923271179,
+            "x": 451,
+            "z": -188
+        },
+        {
+            "remaining": 0.9955471158027649,
+            "x": 453,
+            "z": -190
+        },
+        {
+            "remaining": 0.8529218435287476,
+            "x": 448,
+            "z": -192
         }
     ],
     "entities": [
+        {
+            "data": {
+                "direction": [
+                    1.0,
+                    0.0,
+                    0.0
+                ],
+                "leftLane": {
+                    "capacity": 2,
+                    "queue": [
+                        {
+                            "item": "IronOre",
+                            "progress": 1.0
+                        },
+                        {
+                            "item": "IronOre",
+                            "progress": 1.0
+                        }
+                    ]
+                },
+                "rightLane": {
+                    "capacity": 2,
+                    "queue": [
+                        {
+                            "item": "IronOre",
+                            "progress": 1.0
+                        },
+                        {
+                            "item": "IronOre",
+                            "progress": 1.0
+                        }
+                    ]
+                },
+                "speed": 1.0
+            },
+            "transform": {
+                "Position": [
+                    453.0,
+                    -2.0146484375,
+                    -192.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.7071067690849304,
+                    0.0,
+                    0.7071067690849304
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "Belt"
+        },
+        {
+            "data": {
+                "facing": [
+                    1.0,
+                    0.0,
+                    0.0
+                ],
+                "heldItem": "IronOre",
+                "holdingItem": true,
+                "powerUsage": 1.0,
+                "runningOnPower": true,
+                "swingTime": 0.5,
+                "timer": -28.357208251953125
+            },
+            "powerConsumer": {
+                "isPowered": true,
+                "powerRequired": 5.0,
+                "wantsPower": true
+            },
+            "transform": {
+                "Position": [
+                    451.0,
+                    -2.6891303062438965,
+                    -192.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.7071067690849304,
+                    0.0,
+                    0.7071067690849304
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "Inserter"
+        },
+        {
+            "data": {
+                "radius": 8.0
+            },
+            "transform": {
+                "Position": [
+                    448.0,
+                    -2.870304822921753,
+                    -197.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.7071067690849304,
+                    0.0,
+                    0.7071067690849304
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "PowerPole"
+        },
+        {
+            "data": {
+                "fuelBuffer": 0,
+                "fuelRemaining": 2.129180908203125,
+                "loadedFuelType": "None",
+                "powerOutput": 100.0
+            },
+            "inventory": {
+                "inputs": [
+                    {
+                        "capacity": 100,
+                        "count": 0,
+                        "item": "None"
+                    }
+                ],
+                "outputs": []
+            },
+            "transform": {
+                "Position": [
+                    451.0,
+                    -1.562462568283081,
+                    -200.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.7071067690849304,
+                    0.0,
+                    0.7071067690849304
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "CoalGenerator"
+        },
+        {
+            "data": {
+                "collectionRadius": 3.0,
+                "extractionRate": 1.0,
+                "fuelBuffer": 0,
+                "fuelRemaining": 0.0,
+                "loadedFuelType": "None",
+                "outputBuffer": 28,
+                "outputBufferCapacity": 50,
+                "outputInterval": 1.0,
+                "outputItem": "IronOre",
+                "outputTimer": 0.863250732421875,
+                "powerUsage": 5.0,
+                "runningOnPower": true
+            },
+            "powerConsumer": {
+                "isPowered": true,
+                "powerRequired": 5.0,
+                "wantsPower": true
+            },
+            "transform": {
+                "Position": [
+                    448.0,
+                    -3.6436727046966553,
+                    -192.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.7071067690849304,
+                    0.0,
+                    0.7071067690849304
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "Miner"
+        },
+        {
+            "data": {
+                "collectionRadius": 3.0,
+                "extractionRate": 1.0,
+                "fuelBuffer": 0,
+                "fuelRemaining": 0.0,
+                "loadedFuelType": "None",
+                "outputBuffer": 0,
+                "outputBufferCapacity": 50,
+                "outputInterval": 1.0,
+                "outputItem": "None",
+                "outputTimer": 0.0,
+                "powerUsage": 5.0,
+                "runningOnPower": false
+            },
+            "powerConsumer": {
+                "isPowered": false,
+                "powerRequired": 5.0,
+                "wantsPower": false
+            },
+            "transform": {
+                "Position": [
+                    -18.0,
+                    -0.2916586697101593,
+                    125.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.7071067690849304,
+                    0.0,
+                    0.7071067690849304
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "Miner"
+        },
         {
             "data": {
                 "cookTimer": 0.0,
@@ -73,46 +348,6 @@
                 ]
             },
             "type": "Furnace"
-        },
-        {
-            "data": {
-                "collectionRadius": 3.0,
-                "extractionRate": 1.0,
-                "fuelBuffer": 0,
-                "fuelRemaining": 0.0,
-                "loadedFuelType": "None",
-                "outputBuffer": 0,
-                "outputBufferCapacity": 50,
-                "outputInterval": 1.0,
-                "outputItem": "None",
-                "outputTimer": 0.0,
-                "powerUsage": 5.0,
-                "runningOnPower": false
-            },
-            "powerConsumer": {
-                "isPowered": false,
-                "powerRequired": 5.0,
-                "wantsPower": false
-            },
-            "transform": {
-                "Position": [
-                    -18.0,
-                    -0.2916586697101593,
-                    125.0
-                ],
-                "Rotation": [
-                    0.0,
-                    0.7071067690849304,
-                    0.0,
-                    0.7071067690849304
-                ],
-                "Scale": [
-                    1.0,
-                    1.0,
-                    1.0
-                ]
-            },
-            "type": "Miner"
         }
     ],
     "player": {
@@ -120,24 +355,24 @@
             "capacity": 20,
             "slots": [
                 {
-                    "count": 20,
+                    "count": 15,
                     "item": "Wood"
                 },
                 {
-                    "count": 0,
-                    "item": "None"
+                    "count": 8,
+                    "item": "Coal"
+                },
+                {
+                    "count": 7,
+                    "item": "IronPlate"
                 },
                 {
                     "count": 0,
                     "item": "None"
                 },
                 {
-                    "count": 0,
-                    "item": "None"
-                },
-                {
-                    "count": 0,
-                    "item": "None"
+                    "count": 2,
+                    "item": "CopperPlate"
                 },
                 {
                     "count": 0,
@@ -203,9 +438,9 @@
         },
         "transform": {
             "Position": [
-                -17.334388732910156,
-                -0.19901062548160553,
-                119.200439453125
+                454.152099609375,
+                -1.420007586479187,
+                -194.96263122558594
             ],
             "Rotation": [
                 0.0,

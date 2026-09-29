@@ -102,4 +102,27 @@ private:
 
     std::unique_ptr<TerrainRenderer> m_TerrainRenderer;
     bool m_TerrainTestActive = false;
+
+
+    struct NoiseTestPush {
+        float startX;
+        float startZ;
+        float spacing;
+        uint32_t sampleType;   // 0 = raw simplex, 1 = fbm, 2 = ridged
+    };
+    void RunNoiseLibraryTest();
+
+    struct BiomeTestPush {
+        float startX;
+        float startZ;
+        float spacing;
+        float seed;
+        uint32_t sampleType;
+        float worldExtentZ;
+    };
+
+    void RunBiomeLibraryTest();
+
+
+    void RunBiomeGridTest();
 };

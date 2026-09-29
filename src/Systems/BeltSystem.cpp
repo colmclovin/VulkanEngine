@@ -47,9 +47,9 @@ void BeltSystem::Update(entt::registry &registry, PlacementGrid &grid, float gri
 		entt::entity nextEntity = FindNeighborInDirection(registry, grid, transform.Position, bounds.halfExtents, belt.direction, gridSize);
 
 
-		std::cout << "Belt at (" << transform.Position.x << "," << transform.Position.z
-				  << ") facing (" << belt.direction.x << "," << belt.direction.z
-				  << ") found next entity: " << (registry.valid(nextEntity) ? "yes" : "NONE") << std::endl;
+		//std::cout << "Belt at (" << transform.Position.x << "," << transform.Position.z
+		//		  << ") facing (" << belt.direction.x << "," << belt.direction.z
+		//		  << ") found next entity: " << (registry.valid(nextEntity) ? "yes" : "NONE") << std::endl;
 
 		UpdateLane(registry, belt.leftLane, belt.speed, deltaTime, nextEntity, true);
 		UpdateLane(registry, belt.rightLane, belt.speed, deltaTime, nextEntity, false);

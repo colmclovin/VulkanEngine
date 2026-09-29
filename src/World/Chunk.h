@@ -8,7 +8,8 @@
 
 struct Chunk {
     ChunkCoord coord;
-    uint32_t terrainSlot = UINT32_MAX;   // NEW — replaces terrainEntity/terrainMesh entirely
-    std::vector<entt::entity> treeEntities;
+    uint32_t terrainSlot = UINT32_MAX;
     bool isGenerated = false;
+    bool treesRequested = false;   // NEW — tracks whether we've already queued the CPU tree-generation job for this chunk
+    std::vector<entt::entity> treeEntities;
 };

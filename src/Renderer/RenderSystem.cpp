@@ -3,6 +3,7 @@
 #include "MeshRenderer.h"
 #include "SkinnedMeshRenderer.h"
 #include "TerrainRenderer.h"
+#include "../Game/ChunkGenerator.h"
 #include "ShadowMap.h"
 #include "ShadowMapRenderer.h"
 #include "DebugLineRenderer.h"
@@ -17,7 +18,7 @@
 #include "../World/DayNightCycle.h"
 #include "../Rendering/Frustum.h"
 #include <glm/glm.hpp>
-
+#include "../Game/ChunkManager.h"
 
 RenderSystem::RenderSystem(VulkanEngine *engine) : m_Engine(engine) {
 }
@@ -50,6 +51,10 @@ void RenderSystem::Init(uint32_t terrainVertsPerChunk, uint32_t terrainIndicesPe
 
     m_TerrainRenderer = std::make_unique<TerrainRenderer>(m_Engine);
     m_TerrainRenderer->Init(terrainVertsPerChunk, terrainIndicesPerChunk, terrainMaxChunks, m_ShadowMap.get());
+    m_TerrainRenderer->GetBufferPool()->InitializeSharedIndices();
+    std::cout << "TerrainBufferPool sizing: vertsPerChunk=" << terrainVertsPerChunk << " indicesPerChunk=" << terrainIndicesPerChunk << std::endl;   // FIXED
+    m_ChunkGenerator = std::make_unique<ChunkGenerator>();
+    m_ChunkGenerator->Init(m_Engine, m_TerrainRenderer->GetBufferPool(), ChunkManager::CHUNK_VERTEX_RESOLUTION);
 
     m_DebugLineRenderer = std::make_unique<DebugLineRenderer>(m_Engine);
     m_DebugLineRenderer->Init();
@@ -66,7 +71,7 @@ void RenderSystem::Init(uint32_t terrainVertsPerChunk, uint32_t terrainIndicesPe
 
 PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& camera, GameSettings& settings, AudioEngine& audioEngine,
     entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId& selectedItem,
-    TechState& techState, bool isPaused, bool& showOptionsInPause, DayNightCycle& dayNightCycle) {
+    TechState& techState, bool isPaused, bool& showOptionsInPause, DayNightCycle& dayNightCycle, ChunkManager& chunkManager) {
     m_Engine->SetClearColor(settings.clearColor);
 
     glm::vec3 focusPoint = registry.valid(m_PlayerEntity) ? registry.get<TransformComponent>(m_PlayerEntity).Position : glm::vec3(0.0f);
@@ -95,6 +100,9 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
     }
 
     bool began = m_Engine->BeginFrame([&](VkCommandBuffer cmd) {
+        chunkManager.RecordPendingGeneration(cmd, m_ChunkGenerator.get(), m_TerrainRenderer.get(), settings.terrain);   // ADD — generate new chunks first
+
+
         m_ShadowMapRenderer->BeginShadowPass(*m_ShadowMap);
         m_ShadowMapRenderer->RenderStatic(registry, lightSpaceMatrix);
         m_SkinnedMeshRenderer->RenderShadowPass(registry, lightSpaceMatrix);

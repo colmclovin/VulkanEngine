@@ -3,10 +3,20 @@
 #include <FastNoiseLite.h>
 #include <cmath>
 
-float BiomeMap::GetLatitude(float worldZ, float worldExtentZ) {
-    float center = worldExtentZ * 0.5f; // treat the middle of the world as the equator
-    float halfExtent = worldExtentZ * 0.5f;
-    return glm::clamp(std::abs(worldZ - center) / halfExtent, 0.0f, 1.0f);
+float BiomeMap::GetLatitude(float worldZ) {
+    const float LATITUDE_BAND_SIZE = 2000.0f;   // world units from equator (z=0) to full pole — tune to taste
+    return glm::clamp(std::abs(worldZ) / LATITUDE_BAND_SIZE, 0.0f, 1.0f);
+}
+
+BiomeId BiomeMap::GetBiomeAt(float worldX, float worldZ, int seed) {
+    float elevationTrigger = GetElevationTrigger(worldX, worldZ, seed);
+
+    if (elevationTrigger > 0.6f) return BiomeId::Mountains;
+    if (elevationTrigger > 0.35f) return BiomeId::Hills;
+
+    float latitude = GetLatitude(worldZ);   // CHANGED — no worldExtentZ
+    float aridity = GetAridity(worldX, worldZ, seed);
+    return BiomeDatabase::DetermineBiome(latitude, aridity);
 }
 
 float BiomeMap::GetAridity(float worldX, float worldZ, int seed) {
@@ -41,20 +51,10 @@ float BiomeMap::GetElevationTrigger(float worldX, float worldZ, int seed) {
     return glm::clamp((raw + 0.5f) / 1.1f, 0.0f, 1.0f);
 }
 
-BiomeId BiomeMap::GetBiomeAt(float worldX, float worldZ, float worldExtentZ, int seed) {
-    float elevationTrigger = GetElevationTrigger(worldX, worldZ, seed);
 
-    if (elevationTrigger > 0.6f) return BiomeId::Mountains;
-    if (elevationTrigger > 0.35f) return BiomeId::Hills;
-
-    // Otherwise, fall through to normal climate-based biome
-    float latitude = GetLatitude(worldZ, worldExtentZ);
-    float aridity = GetAridity(worldX, worldZ, seed);
-    return BiomeDatabase::DetermineBiome(latitude, aridity);
-}
 
 BiomeId BiomeMap::GetClimateBiomeAt(float worldX, float worldZ, float worldExtentZ, int seed) {
-    float latitude = GetLatitude(worldZ, worldExtentZ);
+    float latitude = GetLatitude(worldZ);
     float aridity = GetAridity(worldX, worldZ, seed);
     return BiomeDatabase::DetermineBiome(latitude, aridity);
 }

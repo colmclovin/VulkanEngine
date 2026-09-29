@@ -148,7 +148,7 @@ std::unordered_map<BiomeId, float> TerrainGenerator::SampleBiomeWeights(float wo
 	const int ringCount = 3; // multiple concentric rings instead of one
 	const int samplesPerRing = 12; // more samples per ring for smoother angular coverage
 
-	weights[BiomeMap::GetBiomeAt(worldX, worldZ, worldExtentZ, settings.seed)] += 1.0f;
+	weights[BiomeMap::GetBiomeAt(worldX, worldZ, settings.seed)] += 1.0f;
 
 	for (int r = 1; r <= ringCount; r++) {
 		float ringRadius = sampleRadius * (static_cast<float>(r) / ringCount);
@@ -158,7 +158,7 @@ std::unordered_map<BiomeId, float> TerrainGenerator::SampleBiomeWeights(float wo
 			float angle = (float)i / samplesPerRing * glm::two_pi<float>();
 			float sx = worldX + cos(angle) * ringRadius;
 			float sz = worldZ + sin(angle) * ringRadius;
-			weights[BiomeMap::GetBiomeAt(sx, sz, worldExtentZ, settings.seed)] += ringWeight;
+			weights[BiomeMap::GetBiomeAt(sx, sz, settings.seed)] += ringWeight;
 		}
 	}
 

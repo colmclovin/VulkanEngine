@@ -1,0 +1,35 @@
+// Shaders/biome_test.comp
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "Include/biome.glsl"
+
+layout(local_size_x = 64) in;
+
+layout(std430, binding = 0) buffer OutputBuffer {
+    float values[];
+};
+
+layout(push_constant) uniform PushConstants {
+    float startX;
+    float startZ;
+    float spacing;
+    float seed;
+    uint sampleType;   // 0 = aridity, 1 = elevationTrigger, 2 = latitude, 3 = determineBiome
+} pc;
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    float x = pc.startX + float(idx) * pc.spacing;
+    float z = (pc.sampleType == 2 || pc.sampleType == 3) ? (pc.startZ + float(idx) * pc.spacing) : pc.startZ;
+
+    if (pc.sampleType == 0) {
+        values[idx] = getAridity(x, z, pc.seed);
+    } else if (pc.sampleType == 1) {
+        values[idx] = getElevationTrigger(x, z, pc.seed);
+    } else if (pc.sampleType == 2) {
+        values[idx] = getLatitude(z);
+    } else if (pc.sampleType == 3) {
+        values[idx] = float(determineBiome(x, z, pc.seed));
+    }
+}

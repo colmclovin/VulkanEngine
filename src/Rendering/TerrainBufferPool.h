@@ -13,7 +13,7 @@ class TerrainBufferPool {
 public:
     void Init(VulkanEngine* engine, uint32_t vertsPerChunk, uint32_t indicesPerChunk, uint32_t maxChunks);
     void Shutdown(VkDevice device);
-
+    void InitializeSharedIndices();   // called once, fills every slot's index region with the same triangulation pattern
     // Returns a slot index, or std::nullopt if the pool is full
     std::optional<uint32_t> AllocateSlot();
     void UploadMetadata(uint32_t slot, glm::vec3 boundsCenter, float boundsRadius);

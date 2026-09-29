@@ -1,0 +1,31 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "Include/noise.glsl"
+
+layout(local_size_x = 64) in;
+
+layout(std430, binding = 0) buffer OutputBuffer {
+    float values[];
+};
+
+layout(push_constant) uniform PushConstants {
+    float startX;
+    float startZ;
+    float spacing;
+    uint sampleType;   // 0 = raw simplex, 1 = fbm, 2 = ridged
+} pc;
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    float x = pc.startX + float(idx) * pc.spacing;
+    float z = pc.startZ;
+
+    if (pc.sampleType == 0) {
+        values[idx] = simplexNoise2D(vec2(x, z));
+    } else if (pc.sampleType == 1) {
+        values[idx] = fbm(vec2(x, z), 3, 0.01, 2.0, 0.5);
+    } else {
+        values[idx] = ridgedNoise(vec2(x, z), 3, 0.01, 2.0, 0.5);
+    }
+}

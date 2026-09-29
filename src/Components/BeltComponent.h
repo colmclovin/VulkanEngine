@@ -11,9 +11,10 @@ struct BeltItem {
 };
 
 struct BeltLane {
-    std::vector<BeltItem> queue; // front() = closest to exit
-    int capacity = 2; // 2 tiles of length per lane
-    NLOHMANN_DEFINE_TYPE_INTRUSIVE(BeltLane, queue, capacity)
+    std::vector<BeltItem> queue;
+    int capacity = 2;
+    std::vector<entt::entity> itemEntities;   // NEW — parallel array, NOT serialized (rendering-only, rebuilt on load)
+    NLOHMANN_DEFINE_TYPE_INTRUSIVE(BeltLane, queue, capacity)   // unchanged — itemEntities excluded from serialization
 };
 
 struct BeltComponent {

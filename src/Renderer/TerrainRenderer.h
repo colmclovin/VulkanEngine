@@ -18,7 +18,7 @@ public:
     TerrainRenderer(VulkanEngine* engine);
     void Init(uint32_t vertsPerChunk, uint32_t indicesPerChunk, uint32_t maxChunks, ShadowMap* shadowMap);
     void Shutdown();
-
+    TerrainBufferPool* GetBufferPool() { return &m_Pool; }
     // Called by ChunkManager when a chunk finishes generating
     std::optional<uint32_t> AllocateChunkSlot();
     void UploadChunk(uint32_t slot, const std::vector<Vertex>& vertices, const std::vector<uint32_t>& indices,
@@ -27,6 +27,7 @@ public:
     void ProcessPendingFrees() {
         m_Pool.ProcessPendingFrees();
     }
+    void UploadChunkBounds(uint32_t slot, glm::vec3 boundsCenter, float boundsRadius);
     void Render(VkCommandBuffer commandBuffer, const Camera3D& camera, DayNightCycle& dayNightCycle,
         const glm::mat4& lightSpaceMatrix, const std::vector<PointLight>& activeLights, bool wireframe);
     void RecordCullingPass(VkCommandBuffer commandBuffer, const Frustum& frustum);

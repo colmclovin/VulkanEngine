@@ -16,11 +16,16 @@
 #include <atomic>
 #include <unordered_set>   // add if not already present
 #include "../Renderer/TerrainRenderer.h"
-
+#include "ChunkGenerator.h"
 
 class VulkanEngine;
 class MeshRenderer;
 class TerrainRenderer;
+
+struct GpuGenerationRequest {
+    ChunkCoord coord;
+};
+
 class ChunkManager {
 public:
     static constexpr int WORKER_THREAD_COUNT = 8;   // tune based on your CPU's core count
@@ -49,11 +54,8 @@ public:
     void StartWorkerThread(const TerrainSettings &settings, int seed);
     void StopWorkerThread();
     void ProcessCompletedChunks(entt::registry& registry, VulkanEngine* engine, MeshRenderer* meshRenderer,
-        PlacementGrid& placementGrid, RemovedTreesMap& removedTreesMap,
-        TerrainRenderer* terrainRenderer);
+        PlacementGrid& placementGrid, RemovedTreesMap& removedTreesMap);
 
-    void Update(entt::registry &registry, glm::vec3 playerPosition, const TerrainSettings &settings,
-                VulkanEngine *engine, MeshRenderer *meshRenderer, int seed, DepletionMap &depletionMap, PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap, TerrainRenderer* terrainRenderer);
     void OnResourceDepleted(entt::registry& registry, glm::vec3 worldPos, const TerrainSettings& settings,
         VulkanEngine* engine, MeshRenderer* meshRenderer, DepletionMap& depletionMap,
         TerrainRenderer* terrainRenderer);
@@ -67,8 +69,12 @@ public:
     void BeginInitialLoad(glm::vec3 playerPos, const TerrainSettings &settings, int seed);
     bool IsInitialLoadComplete() const;
     float GetInitialLoadProgress() const;
+    void Update(entt::registry& registry, glm::vec3 playerPosition, const TerrainSettings& settings,
+        VulkanEngine* engine, MeshRenderer* meshRenderer, int seed, DepletionMap& depletionMap,
+        PlacementGrid& placementGrid, TerrainRenderer* terrainRenderer, RemovedTreesMap& removedTreesMap);
 
-
+    void RecordPendingGeneration(VkCommandBuffer commandBuffer, ChunkGenerator* generator,
+        TerrainRenderer* terrainRenderer, const TerrainSettings& settings);
    
     void Reset() {
         m_LoadedChunks.clear();
@@ -105,7 +111,7 @@ private:
     std::condition_variable m_RequestCV;
     std::queue<ChunkCoord> m_PendingRequests;
     std::unordered_set<ChunkCoord, ChunkCoordHash> m_InFlightRequests; // prevents double-queuing the same chunk
-
+    std::vector<GpuGenerationRequest> m_PendingGpuGeneration;   // filled by Update(), drained/recorded by RenderFrame
     std::mutex m_ResultMutex;
     std::queue<ChunkGenerationResult> m_CompletedResults;
 

@@ -17,8 +17,10 @@ ChunkCoord ChunkManager::WorldToChunkCoord(glm::vec3 worldPos) {
     };
 }
 
-void ChunkManager::Update(entt::registry &registry, glm::vec3 playerPosition, const TerrainSettings &settings,
-                          VulkanEngine *engine, MeshRenderer *meshRenderer, int seed, DepletionMap &depletionMap, PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap, TerrainRenderer * terrainRenderer) {
+// ChunkManager.cpp
+void ChunkManager::Update(entt::registry& registry, glm::vec3 playerPosition, const TerrainSettings& settings,
+    VulkanEngine* engine, MeshRenderer* meshRenderer, int seed, DepletionMap& depletionMap,
+    PlacementGrid& placementGrid, TerrainRenderer* terrainRenderer, RemovedTreesMap& removedTreesMap) {
     ChunkCoord playerChunk = WorldToChunkCoord(playerPosition);
 
     std::vector<ChunkCoord> desiredChunks;
@@ -28,35 +30,57 @@ void ChunkManager::Update(entt::registry &registry, glm::vec3 playerPosition, co
         }
     }
 
-    // Request generation for anything not loaded and not already in flight
-    for (auto &coord : desiredChunks) {
+    // --- Terrain: GPU-driven, synchronous-per-frame allocation ---
+    for (auto& coord : desiredChunks) {
         if (m_LoadedChunks.find(coord) != m_LoadedChunks.end()) continue;
+
+        auto slot = terrainRenderer->AllocateChunkSlot();
+        if (!slot) continue;   // MOVED — check validity FIRST, before any dereference
+
+        static std::unordered_set<uint32_t> everAllocatedSlots;
+        if (everAllocatedSlots.count(*slot) > 0) {
+            std::cout << "WARNING: slot " << *slot << " allocated again for chunk (" << coord.x << "," << coord.z << ") — possible double-allocation!" << std::endl;
+        }
+        everAllocatedSlots.insert(*slot);
+
+        Chunk chunk;
+        chunk.coord = coord;
+        chunk.terrainSlot = *slot;
+        chunk.isGenerated = false;
+        m_LoadedChunks[coord] = chunk;
+        m_PendingGpuGeneration.push_back({ coord });
+    }
+
+    // --- Trees: unchanged, still async CPU worker thread ---
+    for (auto& coord : desiredChunks) {
+        auto it = m_LoadedChunks.find(coord);
+        if (it == m_LoadedChunks.end()) continue;   // terrain slot allocation failed this frame, skip trees too until it succeeds
+        if (it->second.treesRequested) continue;    // NEW flag — see Chunk.h note below
 
         std::lock_guard<std::mutex> lock(m_RequestMutex);
         if (m_InFlightRequests.find(coord) != m_InFlightRequests.end()) continue;
-        if (m_AwaitingProcessing.find(coord) != m_AwaitingProcessing.end()) continue; // NEW
+        if (m_AwaitingProcessing.find(coord) != m_AwaitingProcessing.end()) continue;
 
         m_InFlightRequests.insert(coord);
         m_PendingRequests.push(coord);
         m_RequestCV.notify_one();
+        it->second.treesRequested = true;
     }
 
-    // Turn any finished background work into real entities/GPU resources
-    ProcessCompletedChunks(registry, engine, meshRenderer, placementGrid, removedTreesMap, terrainRenderer);
-
-    // Unload chunks no longer in range — unchanged
+    // Drain completed TREE generation results (terrain no longer comes through this path)
+    ProcessCompletedChunks(registry, engine, meshRenderer, placementGrid, removedTreesMap);
+    // --- Unload chunks no longer desired ---
     std::vector<ChunkCoord> toUnload;
-    for (auto &[coord, chunk] : m_LoadedChunks) {
+    //std::cout << "Update: m_LoadedChunks=" << m_LoadedChunks.size() << " desiredChunks=" << desiredChunks.size()
+     //   << " toUnload=" << toUnload.size() << std::endl;
+    for (auto& [coord, chunk] : m_LoadedChunks) {
         bool stillDesired = false;
-        for (auto &d : desiredChunks) {
-            if (d == coord) {
-                stillDesired = true;
-                break;
-            }
+        for (auto& d : desiredChunks) {
+            if (d == coord) { stillDesired = true; break; }
         }
         if (!stillDesired) toUnload.push_back(coord);
     }
-    for (auto &coord : toUnload) {
+    for (auto& coord : toUnload) {
         UnloadChunk(coord, registry, engine, terrainRenderer);
     }
 }
@@ -80,7 +104,7 @@ void ChunkManager::Update(entt::registry &registry, glm::vec3 playerPosition, co
 //}
 
 void ChunkManager::UnloadChunk(ChunkCoord coord, entt::registry& registry, VulkanEngine* engine, TerrainRenderer* terrainRenderer) {
-    //std::cout << "UnloadChunk called for (" << coord.x << "," << coord.z << ")" << std::endl;
+   // std::cout << "UnloadChunk called for (" << coord.x << "," << coord.z << ")" << std::endl;
     auto it = m_LoadedChunks.find(coord);
     if (it == m_LoadedChunks.end()) return;
 
@@ -236,8 +260,7 @@ void ChunkManager::WorkerLoop(TerrainSettings settings, int seed) {
 
 
 void ChunkManager::ProcessCompletedChunks(entt::registry& registry, VulkanEngine* engine, MeshRenderer* meshRenderer,
-    PlacementGrid& placementGrid, RemovedTreesMap& removedTreesMap,
-    TerrainRenderer* terrainRenderer) {   // NEW parameter
+    PlacementGrid& placementGrid, RemovedTreesMap& removedTreesMap) {
     const int MAX_PER_FRAME = 2;
 
     for (int i = 0; i < MAX_PER_FRAME; i++) {
@@ -249,35 +272,14 @@ void ChunkManager::ProcessCompletedChunks(entt::registry& registry, VulkanEngine
             m_CompletedResults.pop();
         }
 
-        Chunk chunk;
-        chunk.coord = result.coord;
-
-        // NEW — allocate a slot and upload via TerrainRenderer, instead of creating a Mesh/MeshComponent
-        auto slot = terrainRenderer->AllocateChunkSlot();
-        if (!slot) {
-            std::cerr << "TerrainRenderer: out of chunk slots! Chunk (" << result.coord.x << "," << result.coord.z << ") not rendered." << std::endl;
-            {
-                std::lock_guard<std::mutex> lock(m_RequestMutex);
-                m_AwaitingProcessing.erase(result.coord); // ADD — clear tracking even on failure, so it can be retried later
-            }
+        auto it = m_LoadedChunks.find(result.coord);
+        if (it == m_LoadedChunks.end()) {
+            // Chunk was unloaded before its tree job finished — discard the result, nothing to attach trees to
+            std::lock_guard<std::mutex> lock(m_RequestMutex);
+            m_AwaitingProcessing.erase(result.coord);
             continue;
         }
-        chunk.terrainSlot = *slot;   // NEW field on Chunk, see below
-        static std::unordered_set<uint32_t> everUsedSlots;
-        bool isReused = everUsedSlots.count(*slot) > 0;
-        everUsedSlots.insert(*slot);
-        //std::cout << "Chunk (" << result.coord.x << "," << result.coord.z << ") got slot " << *slot
-        //          << (isReused ? " [REUSED]" : " [FIRST USE]") << std::endl;
-        glm::vec3 boundsCenter(
-            chunk.coord.x * CHUNK_WORLD_SIZE + CHUNK_WORLD_SIZE * 0.5f,
-            0.0f,
-            chunk.coord.z * CHUNK_WORLD_SIZE + CHUNK_WORLD_SIZE * 0.5f);
-        float boundsRadius = CHUNK_WORLD_SIZE * 0.75f;
-
-        terrainRenderer->UploadChunk(*slot, result.terrainData.vertices, result.terrainData.indices, boundsCenter, boundsRadius);
-
-        // NOTE: no more terrainEntity, no ChunkBoundsComponent, no MeshComponent for terrain at all —
-        // the chunk's visual representation is now entirely GPU-side, tracked only via chunk.terrainSlot.
+        Chunk& chunk = it->second;
 
         auto treeMesh = WorldGenerator::GetTreeMeshCache(engine, meshRenderer);
         int index = 0;
@@ -310,11 +312,9 @@ void ChunkManager::ProcessCompletedChunks(entt::registry& registry, VulkanEngine
             index++;
         }
 
-        chunk.isGenerated = true;
-        m_LoadedChunks[result.coord] = chunk;
         {
             std::lock_guard<std::mutex> lock(m_RequestMutex);
-            m_AwaitingProcessing.erase(result.coord); // only reached on SUCCESS
+            m_AwaitingProcessing.erase(result.coord);
         }
     }
 }
@@ -424,7 +424,7 @@ std::vector<ChunkManager::TreeCandidate> ChunkManager::GenerateTreeCandidatesOnl
             float worldX = chunkOriginX + x;
             float worldZ = chunkOriginZ + z;
 
-            BiomeId biome = BiomeMap::GetBiomeAt(worldX, worldZ, worldExtentZ, settings.seed);
+            BiomeId biome = BiomeMap::GetBiomeAt(worldX, worldZ, settings.seed);
             if (biome == BiomeId::Lake) continue;
 
             const BiomeDef& def = BiomeDatabase::Get(biome);
@@ -473,7 +473,7 @@ void ChunkManager::RequestInitialChunksBlocking(glm::vec3 playerPos, const Terra
     }
 
     while (m_LoadedChunks.size() < desired.size()) {
-        ProcessCompletedChunks(registry, engine, meshRenderer, placementGrid, removedTreesMap, terrainRenderer);
+        ProcessCompletedChunks(registry, engine, meshRenderer, placementGrid, removedTreesMap);
         std::this_thread::sleep_for(std::chrono::milliseconds(10)); // avoid busy-spinning
     }
 }
@@ -501,4 +501,29 @@ bool ChunkManager::IsInitialLoadComplete() const {
 float ChunkManager::GetInitialLoadProgress() const {
     if (m_InitialLoadTarget == 0) return 1.0f;
     return glm::clamp((float)m_LoadedChunks.size() / (float)m_InitialLoadTarget, 0.0f, 1.0f);
+}
+
+void ChunkManager::RecordPendingGeneration(VkCommandBuffer commandBuffer, ChunkGenerator* generator,
+    TerrainRenderer* terrainRenderer, const TerrainSettings& settings) {   // ADD terrainRenderer param
+    size_t processedCount = m_PendingGpuGeneration.size();   // capture before processing
+    for (auto& req : m_PendingGpuGeneration) {
+        auto it = m_LoadedChunks.find(req.coord);
+        if (it == m_LoadedChunks.end()) continue;
+        if (it->second.isGenerated) continue;
+
+        float chunkOriginX = req.coord.x * CHUNK_WORLD_SIZE;
+        float chunkOriginZ = req.coord.z * CHUNK_WORLD_SIZE;
+        float cellSize = CHUNK_WORLD_SIZE / (CHUNK_VERTEX_RESOLUTION - 1);
+        generator->RecordGenerateChunk(commandBuffer, it->second.terrainSlot, chunkOriginX, chunkOriginZ, cellSize, (float)settings.seed);
+
+        glm::vec3 boundsCenter(chunkOriginX + CHUNK_WORLD_SIZE * 0.5f, 0.0f, chunkOriginZ + CHUNK_WORLD_SIZE * 0.5f);
+        float boundsRadius = CHUNK_WORLD_SIZE * 0.75f;
+        terrainRenderer->UploadChunkBounds(it->second.terrainSlot, boundsCenter, boundsRadius);   // ADD
+
+        it->second.isGenerated = true;
+    }
+    m_PendingGpuGeneration.clear();
+   // if (processedCount > 0) {
+   //     std::cout << "RecordPendingGeneration processed " << processedCount << " chunks this call" << std::endl;
+   // }
 }

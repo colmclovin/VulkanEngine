@@ -18,7 +18,7 @@ void TerrainBufferPool::Init(VulkanEngine* engine, uint32_t vertsPerChunk, uint3
 
     // Device-local for performance; we'll upload via staging buffer per-chunk, same pattern as your existing Mesh::UploadToGPU
     engine->CreateBuffer(vertexBufferSize,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,   // ADD STORAGE_BUFFER_BIT
         VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, m_VertexBuffer, m_VertexBufferMemory);
 
     engine->CreateBuffer(indexBufferSize,
@@ -151,4 +151,49 @@ void TerrainBufferPool::ProcessPendingFrees() {
             ++it;
         }
     }
+}
+
+void TerrainBufferPool::InitializeSharedIndices() {
+    std::vector<uint32_t> indicesPerChunkPattern;
+    uint32_t res = static_cast<uint32_t>(std::sqrt(m_VertsPerChunk));   // 32, assuming square chunks
+    std::cout << "InitializeSharedIndices: m_VertsPerChunk=" << m_VertsPerChunk << " computed res=" << res
+        << " m_IndicesPerChunk=" << m_IndicesPerChunk << std::endl;
+    for (uint32_t z = 0; z < res - 1; z++) {
+        for (uint32_t x = 0; x < res - 1; x++) {
+            uint32_t topLeft = z * res + x;
+            uint32_t topRight = topLeft + 1;
+            uint32_t bottomLeft = (z + 1) * res + x;
+            uint32_t bottomRight = bottomLeft + 1;
+
+            indicesPerChunkPattern.push_back(topLeft);
+            indicesPerChunkPattern.push_back(bottomLeft);
+            indicesPerChunkPattern.push_back(topRight);
+            indicesPerChunkPattern.push_back(topRight);
+            indicesPerChunkPattern.push_back(bottomLeft);
+            indicesPerChunkPattern.push_back(bottomRight);
+        }
+    }
+
+    // Each slot's indices are IDENTICAL in relative structure (0-indexed within that slot's own vertex range),
+    // since the graphics pipeline's indirect draw command specifies a per-draw vertexOffset that shifts
+    // these relative indices into the correct absolute vertex range automatically.
+    for (uint32_t slot = 0; slot < m_MaxChunks; slot++) {
+        VkDeviceSize indexRegionOffset = static_cast<VkDeviceSize>(slot) * m_IndicesPerChunk * sizeof(uint32_t);
+        VkDeviceSize indexRegionSize = m_IndicesPerChunk * sizeof(uint32_t);
+
+        VkBuffer staging; VkDeviceMemory stagingMem;
+        m_Engine->CreateBuffer(indexRegionSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, staging, stagingMem);
+        void* data;
+        vkMapMemory(m_Engine->GetDevice(), stagingMem, 0, indexRegionSize, 0, &data);
+        memcpy(data, indicesPerChunkPattern.data(), indexRegionSize);
+        vkUnmapMemory(m_Engine->GetDevice(), stagingMem);
+
+        m_Engine->CopyBufferRegion(staging, m_IndexBuffer, indexRegionSize, 0, indexRegionOffset);
+
+        vkDestroyBuffer(m_Engine->GetDevice(), staging, nullptr);
+        vkFreeMemory(m_Engine->GetDevice(), stagingMem, nullptr);
+    }
+
+    std::cout << "TerrainBufferPool: initialized shared indices for all " << m_MaxChunks << " slots" << std::endl;
 }

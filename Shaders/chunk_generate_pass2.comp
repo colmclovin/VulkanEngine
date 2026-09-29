@@ -1,0 +1,74 @@
+// Shaders/chunk_generate_pass2.comp
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+struct GpuVertex {
+    float posX, posY, posZ;       // matches Vertex::position (glm::vec3, offset 0)
+    float colR, colG, colB;       // matches Vertex::color   (glm::vec3, offset 12)
+    float normX, normY, normZ;    // matches Vertex::normal  (glm::vec3, offset 24)
+    float texU, texV;             // matches Vertex::texCoord (glm::vec2, offset 36)
+};
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(std430, binding = 0) readonly buffer PaddedPositionBuffer {
+    vec4 paddedPositions[];
+};
+
+layout(std430, binding = 1) readonly buffer PaddedColorBuffer {
+    vec4 paddedColors[];
+};
+
+layout(std430, binding = 2) buffer VertexOutputBuffer {
+    GpuVertex vertices[];
+};
+
+layout(push_constant) uniform PushConstants {
+    uint vertexResolution;   // 32
+    uint paddedRes;          // 34
+    uint vertexOffset;       // slot * vertsPerChunk
+} pc;
+
+void main() {
+    uint gx = gl_GlobalInvocationID.x;
+    uint gz = gl_GlobalInvocationID.y;
+    if (gx >= pc.vertexResolution || gz >= pc.vertexResolution) return;
+
+    // gx/gz here are REAL vertex coordinates (0..31); map to padded-grid coordinates (offset by +1)
+    uint px = gx + 1;
+    uint pz = gz + 1;
+    uint paddedIdx = pz * pc.paddedRes + px;
+
+    vec3 center = paddedPositions[paddedIdx].xyz;
+    vec3 right  = paddedPositions[pz * pc.paddedRes + (px + 1)].xyz;
+    vec3 left   = paddedPositions[pz * pc.paddedRes + (px - 1)].xyz;
+    vec3 up     = paddedPositions[(pz + 1) * pc.paddedRes + px].xyz;
+    vec3 down   = paddedPositions[(pz - 1) * pc.paddedRes + px].xyz;
+
+    // Match CPU's face-accumulation normal more closely: accumulate the 4 triangles touching this vertex,
+    // same winding as your CPU loop (topLeft, bottomLeft, topRight / topRight, bottomLeft, bottomRight)
+    vec3 normalSum = vec3(0.0);
+    normalSum += normalize(cross(down - center, right - center));
+    normalSum += normalize(cross(right - center, up - center));
+    normalSum += normalize(cross(up - center, left - center));
+    normalSum += normalize(cross(left - center, down - center));
+    //vec3 normal = normalize(normalSum);
+    vec3 normal = vec3(0.0, 1.0, 0.0);
+    uint realIdx = gz * pc.vertexResolution + gx;
+uint outputIdx = pc.vertexOffset + realIdx;
+
+vertices[outputIdx].posX = center.x;
+vertices[outputIdx].posY = center.y;
+vertices[outputIdx].posZ = center.z;
+
+vertices[outputIdx].colR = paddedColors[paddedIdx].x;
+vertices[outputIdx].colG = paddedColors[paddedIdx].y;
+vertices[outputIdx].colB = paddedColors[paddedIdx].z;
+
+vertices[outputIdx].normX = normal.x;
+vertices[outputIdx].normY = normal.y;
+vertices[outputIdx].normZ = normal.z;
+
+vertices[outputIdx].texU = float(gx) / float(pc.vertexResolution - 1);
+vertices[outputIdx].texV = float(gz) / float(pc.vertexResolution - 1);
+}

@@ -1,0 +1,32 @@
+// Shaders/biome_grid_test.comp
+#version 450
+#extension GL_GOOGLE_include_directive : require
+
+#include "Include/biome.glsl"
+
+layout(local_size_x = 8, local_size_y = 8) in;   // 2D workgroup
+
+layout(std430, binding = 0) buffer OutputBuffer {
+    float values[];
+};
+
+layout(push_constant) uniform PushConstants {
+    float startX;
+    float startZ;
+    float spacing;
+    float seed;
+    uint gridSize;
+    // worldExtentZ removed entirely
+} pc;
+
+void main() {
+    uint ix = gl_GlobalInvocationID.x;
+    uint iz = gl_GlobalInvocationID.y;
+    if (ix >= pc.gridSize || iz >= pc.gridSize) return;
+
+    float x = pc.startX + float(ix) * pc.spacing;
+    float z = pc.startZ + float(iz) * pc.spacing;
+
+    uint idx = iz * pc.gridSize + ix;
+    values[idx] = float(determineBiome(x, z, pc.seed));   // CHANGED — no worldExtentZ argument
+}

@@ -84,7 +84,7 @@ glm::vec3 WorldGenerator::FindSpawnPoint(const TerrainSettings &terrainSettings,
 		float x = xDist(rng);
 		float z = zDist(rng);
 
-		BiomeId biome = BiomeMap::GetBiomeAt(x, z, worldDepth, seed);
+		BiomeId biome = BiomeMap::GetBiomeAt(x, z, seed);
 		if (biome == BiomeId::Lake || biome == BiomeId::Mountains) continue;
 
 		float height = TerrainGenerator::SampleHeight(x, z, terrainSettings);
@@ -119,7 +119,7 @@ void WorldGenerator::ScatterTreesInChunk(entt::registry &registry, ChunkCoord co
 			float worldX = chunkOriginX + x;
 			float worldZ = chunkOriginZ + z;
 
-			BiomeId biome = BiomeMap::GetBiomeAt(worldX, worldZ, worldExtentZ, terrainSettings.seed);
+			BiomeId biome = BiomeMap::GetBiomeAt(worldX, worldZ, terrainSettings.seed);
 			if (biome == BiomeId::Lake) continue; // hard exclusion — never any trees in lakes
 
 			const BiomeDef &def = BiomeDatabase::Get(biome);
