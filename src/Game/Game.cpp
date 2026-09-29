@@ -297,7 +297,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     bool loadIsDown = glfwGetKey(window, GLFW_KEY_F9) == GLFW_PRESS;
 
 
-    if (placeIsDown && !placeWasDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity, m_ResourceMap, m_PlacementGrid);
+    if (placeIsDown && !placeWasDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity, m_PlacementGrid, m_Settings.terrain);
     if (qIsDown && !qWasDown) m_Camera->SnapRotateIso(false);
     if (eIsDown && !eWasDown) m_Camera->SnapRotateIso(true);
     if (f11IsDown && !f11WasDown) m_VulkanEngine->ToggleFullscreen();
@@ -526,7 +526,7 @@ void Game::Update(float deltaTime) {
 
     m_DayNightCycle.Update(deltaTime);
 
-    MinerSystem::Update(*m_Registry, m_ResourceMap, deltaTime);
+    MinerSystem::Update(*m_Registry, m_DepletionMap, m_Settings.terrain, deltaTime, m_ChunkManager);
     FurnaceSystem::Update(*m_Registry, deltaTime);
     AssemblerSystem::Update(*m_Registry, deltaTime);
     BeltSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);

@@ -80,7 +80,7 @@ void ChunkManager::Update(entt::registry &registry, glm::vec3 playerPosition, co
 //}
 
 void ChunkManager::UnloadChunk(ChunkCoord coord, entt::registry& registry, VulkanEngine* engine, TerrainRenderer* terrainRenderer) {
-    std::cout << "UnloadChunk called for (" << coord.x << "," << coord.z << ")" << std::endl;
+    //std::cout << "UnloadChunk called for (" << coord.x << "," << coord.z << ")" << std::endl;
     auto it = m_LoadedChunks.find(coord);
     if (it == m_LoadedChunks.end()) return;
 
@@ -88,7 +88,7 @@ void ChunkManager::UnloadChunk(ChunkCoord coord, entt::registry& registry, Vulka
 
     if (chunk.terrainSlot != UINT32_MAX) {   // CHANGED — was checking/using chunk.terrainEntity
         terrainRenderer->FreeChunkSlot(chunk.terrainSlot);
-        std::cout << "  Freed terrain slot " << chunk.terrainSlot << std::endl;
+        //std::cout << "  Freed terrain slot " << chunk.terrainSlot << std::endl;
     }
 
     for (auto& tree : chunk.treeEntities) {
@@ -266,8 +266,8 @@ void ChunkManager::ProcessCompletedChunks(entt::registry& registry, VulkanEngine
         static std::unordered_set<uint32_t> everUsedSlots;
         bool isReused = everUsedSlots.count(*slot) > 0;
         everUsedSlots.insert(*slot);
-        std::cout << "Chunk (" << result.coord.x << "," << result.coord.z << ") got slot " << *slot
-                  << (isReused ? " [REUSED]" : " [FIRST USE]") << std::endl;
+        //std::cout << "Chunk (" << result.coord.x << "," << result.coord.z << ") got slot " << *slot
+        //          << (isReused ? " [REUSED]" : " [FIRST USE]") << std::endl;
         glm::vec3 boundsCenter(
             chunk.coord.x * CHUNK_WORLD_SIZE + CHUNK_WORLD_SIZE * 0.5f,
             0.0f,

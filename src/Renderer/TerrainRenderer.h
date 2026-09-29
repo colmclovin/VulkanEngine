@@ -6,6 +6,7 @@
 #include "../Rendering/TerrainBufferPool.h"
 #include "../Rendering/ChunkCuller.h"
 #include "../Rendering/Frustum.h"
+#include "../Renderer/ShadowMap.h"
 
 class VulkanEngine;
 class Camera3D;
@@ -15,7 +16,7 @@ struct PointLight;
 class TerrainRenderer {
 public:
     TerrainRenderer(VulkanEngine* engine);
-    void Init(uint32_t vertsPerChunk, uint32_t indicesPerChunk, uint32_t maxChunks);
+    void Init(uint32_t vertsPerChunk, uint32_t indicesPerChunk, uint32_t maxChunks, ShadowMap* shadowMap);
     void Shutdown();
 
     // Called by ChunkManager when a chunk finishes generating

@@ -49,7 +49,7 @@ void RenderSystem::Init(uint32_t terrainVertsPerChunk, uint32_t terrainIndicesPe
 
 
     m_TerrainRenderer = std::make_unique<TerrainRenderer>(m_Engine);
-    m_TerrainRenderer->Init(terrainVertsPerChunk, terrainIndicesPerChunk, terrainMaxChunks);
+    m_TerrainRenderer->Init(terrainVertsPerChunk, terrainIndicesPerChunk, terrainMaxChunks, m_ShadowMap.get());
 
     m_DebugLineRenderer = std::make_unique<DebugLineRenderer>(m_Engine);
     m_DebugLineRenderer->Init();

@@ -173,6 +173,11 @@ void ShadowMapRenderer::BeginShadowPass(ShadowMap &shadowMap) {
 void ShadowMapRenderer::RenderStatic(entt::registry& registry, const glm::mat4& lightSpaceMatrix) {
     VkCommandBuffer commandBuffer = m_Engine->GetCurrentCommandBuffer();
     Frustum lightFrustum = Frustum::FromViewProj(lightSpaceMatrix);
+    
+    static int frameCounter = 0;
+    frameCounter++;
+    int drawnCount = 0;
+
 
     std::unordered_map<Mesh*, std::vector<entt::entity>> meshGroups;
     auto view = registry.view<TransformComponent, MeshComponent>();
@@ -225,10 +230,13 @@ void ShadowMapRenderer::RenderStatic(entt::registry& registry, const glm::mat4& 
                 VkDeviceSize offsets[] = { 0 };
                 vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
                 vkCmdBindIndexBuffer(commandBuffer, meshComp.mesh->indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                
                 vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(meshComp.mesh->Indices.size()), 1, 0, 0, 0);
+                
             }
         }
     }
+    
 }
 
 void ShadowMapRenderer::EndShadowPass(ShadowMap &shadowMap) {

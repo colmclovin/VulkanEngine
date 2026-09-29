@@ -15,7 +15,7 @@
 
 TerrainRenderer::TerrainRenderer(VulkanEngine* engine) : m_Engine(engine) {}
 
-void TerrainRenderer::Init(uint32_t vertsPerChunk, uint32_t indicesPerChunk, uint32_t maxChunks) {
+void TerrainRenderer::Init(uint32_t vertsPerChunk, uint32_t indicesPerChunk, uint32_t maxChunks, ShadowMap* shadowMap) {
     m_VertsPerChunk = vertsPerChunk;
     m_IndicesPerChunk = indicesPerChunk;
     m_MaxChunks = maxChunks;
@@ -45,14 +45,27 @@ void TerrainRenderer::Init(uint32_t vertsPerChunk, uint32_t indicesPerChunk, uin
 
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         VkDescriptorBufferInfo bufferInfo{ m_LightingUBOBuffers[i], 0, sizeof(LightingUBO) };
-        VkWriteDescriptorSet write{};
-        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        write.dstSet = m_LightingDescriptorSets[i];
-        write.dstBinding = 0;
-        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        write.descriptorCount = 1;
-        write.pBufferInfo = &bufferInfo;
-        vkUpdateDescriptorSets(m_Engine->GetDevice(), 1, &write, 0, nullptr);
+        VkDescriptorImageInfo shadowImageInfo{};
+        shadowImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        shadowImageInfo.imageView = shadowMap->GetImageView();
+        shadowImageInfo.sampler = shadowMap->GetSampler();
+
+        VkWriteDescriptorSet writes[2]{};
+        writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[0].dstSet = m_LightingDescriptorSets[i];
+        writes[0].dstBinding = 0;
+        writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writes[0].descriptorCount = 1;
+        writes[0].pBufferInfo = &bufferInfo;
+
+        writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;   // NEW
+        writes[1].dstSet = m_LightingDescriptorSets[i];
+        writes[1].dstBinding = 1;
+        writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[1].descriptorCount = 1;
+        writes[1].pImageInfo = &shadowImageInfo;
+
+        vkUpdateDescriptorSets(m_Engine->GetDevice(), 2, writes, 0, nullptr);   // CHANGED — 2 writes now
     }
 }
 
@@ -73,23 +86,32 @@ void TerrainRenderer::FreeChunkSlot(uint32_t slot) {
 
 void TerrainRenderer::CreateGraphicsPipeline() {
     // Lighting descriptor set layout: just the UBO, binding 0
-    VkDescriptorSetLayoutBinding lightingBinding{};
-    lightingBinding.binding = 0;
-    lightingBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    lightingBinding.descriptorCount = 1;
-    lightingBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    VkDescriptorSetLayoutBinding bindings[2]{};
+    bindings[0].binding = 0;
+    bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    bindings[0].descriptorCount = 1;
+    bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    bindings[1].binding = 1;   // NEW — shadow map sampler
+    bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[1].descriptorCount = 1;
+    bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &lightingBinding;
+    layoutInfo.bindingCount = 2;   // CHANGED — was 1
+    layoutInfo.pBindings = bindings;
     vkCreateDescriptorSetLayout(m_Engine->GetDevice(), &layoutInfo, nullptr, &m_LightingDescriptorSetLayout);
 
-    VkDescriptorPoolSize poolSize{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_FRAMES_IN_FLIGHT };
+    VkDescriptorPoolSize poolSizes[2]{};
+    poolSizes[0] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_FRAMES_IN_FLIGHT };
+    poolSizes[1] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_FRAMES_IN_FLIGHT };   // NEW
+
+  
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = 1;
-    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.poolSizeCount = 2;
+    poolInfo.pPoolSizes = poolSizes;
     poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
     vkCreateDescriptorPool(m_Engine->GetDevice(), &poolInfo, nullptr, &m_LightingDescriptorPool);
 

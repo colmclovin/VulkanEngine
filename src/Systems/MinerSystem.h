@@ -1,8 +1,11 @@
 #pragma once
-#include "../World/ResourceMap.h"
+#include "../Game/OreDepositMap.h"
+#include "../World/DepletionMap.h"
 #include <entt/entt.hpp>
+#include "../Utils/GameSettings.h"
+#include "../Game/ChunkManager.h"
 
 class MinerSystem {
 public:
-	static void Update(entt::registry &registry, ResourceMap &resourceMap, float deltaTime);
+	static void Update(entt::registry& registry, DepletionMap& depletionMap, const TerrainSettings& terrainSettings, float deltaTime, ChunkManager& m_ChunkManager);
 };

@@ -7,6 +7,7 @@
 #include "../World/TerrainRaycast.h"
 #include "../World/PlacementGrid.h"
 #include <iostream>
+#include "../Game/OreDepositMap.h"
 void PlacementSystem::Update(entt::registry& registry, entt::entity player, Camera3D& camera,
 	ItemId selectedItem, const TerrainSettings& terrainSettings,
 	float mouseX, float mouseY, float screenWidth, float screenHeight, float aspect, PlacementGrid& placementGrid, VulkanEngine *engine, MeshRenderer *meshRenderer) {
@@ -62,7 +63,7 @@ void PlacementSystem::Update(entt::registry& registry, entt::entity player, Came
 	}
 }
 
-void PlacementSystem::TryConfirmPlacement(entt::registry &registry, entt::entity player, ResourceMap &resourceMap, PlacementGrid &placementGrid) {
+void PlacementSystem::TryConfirmPlacement(entt::registry &registry, entt::entity player, PlacementGrid &placementGrid, TerrainSettings settings) {
 	float gridSize = 1.0f; // tune — match your terrain's cellSize for visually clean alignment
 	if (m_GhostEntity == entt::null) return;
 
@@ -73,6 +74,8 @@ void PlacementSystem::TryConfirmPlacement(entt::registry &registry, entt::entity
 	glm::vec3 facing = GetFacingFromRotation();
 
 	auto coveredCells = PlacementGrid::GetCoveredCells(ghostPos, def->footprintHalfExtents, gridSize);
+
+	
 
 	if (placementGrid.IsAreaOccupied(coveredCells)) {
 		return; // blocked — refuse before touching inventory at all
@@ -86,15 +89,14 @@ void PlacementSystem::TryConfirmPlacement(entt::registry &registry, entt::entity
 			placementGrid.RegisterArea(coveredCells, m_GhostEntity);
 
 			if (m_PendingItem == ItemId::Miner) {
-				ResourceCell *cell = resourceMap.GetCellAtWorldPos(ghostPos.x, ghostPos.z);
+				auto deposit = OreDepositMap::GetDepositAt(ghostPos.x, ghostPos.z, settings.seed);   // CHANGED
 
 				MinerComponent miner;
-				if (cell && cell->resource != ItemId::None) {
-					miner.outputItem = cell->resource;
+				if (deposit) {
+					miner.outputItem = deposit->item;
 				}
 				registry.emplace<MinerComponent>(m_GhostEntity, miner);
-				registry.emplace<PowerConsumerComponent>(m_GhostEntity, PowerConsumerComponent{ 5.0f, false }); // NEW
-
+				registry.emplace<PowerConsumerComponent>(m_GhostEntity, PowerConsumerComponent{ 5.0f, false });
 			} else if (m_PendingItem == ItemId::Furnace) {
 				registry.emplace<FurnaceComponent>(m_GhostEntity);
 				registry.emplace<MachineInventoryComponent>(m_GhostEntity, MachineInventoryComponent{
