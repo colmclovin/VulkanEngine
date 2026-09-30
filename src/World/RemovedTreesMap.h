@@ -2,7 +2,10 @@
 #include "ChunkCoord.h"
 #include <unordered_map>
 #include <unordered_set>
-
+//struct GpuRemovedTreeEntry {
+//    ivec2 chunkCoord;
+//    int candidateIndex;
+//};
 class RemovedTreesMap {
 public:
     bool IsRemoved(ChunkCoord coord, int index) const {

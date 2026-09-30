@@ -159,6 +159,7 @@
     <None Include="Shaders\chunk_cull.comp" />
     <None Include="Shaders\chunk_generate_pass1.comp" />
     <None Include="Shaders\chunk_generate_pass2.comp" />
+    <None Include="Shaders\chunk_ore_generate.comp" />
     <None Include="Shaders\debugline.frag" />
     <None Include="Shaders\debugline.vert" />
     <None Include="Shaders\Include\biome.glsl" />
@@ -169,6 +170,7 @@
     <None Include="Shaders\mesh_instanced.frag" />
     <None Include="Shaders\mesh_Instanced.vert" />
     <None Include="Shaders\noise_test.comp" />
+    <None Include="Shaders\Include\ore.glsl" />
     <None Include="Shaders\shadow.frag" />
     <None Include="Shaders\shadow.vert" />
     <None Include="Shaders\shadow_instanced.vert" />
@@ -180,6 +182,10 @@
     <None Include="Shaders\terrain.vert" />
     <None Include="Shaders\test_compute.comp" />
     <None Include="Shaders\test_include_user.comp" />
+    <None Include="Shaders\tree_cull.comp" />
+    <None Include="Shaders\tree_generate.comp" />
+    <None Include="Shaders\tree_instanced.frag" />
+    <None Include="Shaders\tree_instanced.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\External\imgui\backends\imgui_impl_glfw.cpp" />
@@ -220,6 +226,7 @@
     <ClCompile Include="src\Renderer\ShadowMapRenderer.cpp" />
     <ClCompile Include="src\Renderer\SkinnedMeshRenderer.cpp" />
     <ClCompile Include="src\Renderer\TerrainRenderer.cpp" />
+    <ClCompile Include="src\Renderer\TreeRenderer.cpp" />
     <ClCompile Include="src\Rendering\Animator.cpp" />
     <ClCompile Include="src\Rendering\ChunkCuller.cpp" />
     <ClCompile Include="src\Rendering\Mesh.cpp" />
@@ -227,6 +234,8 @@
     <ClCompile Include="src\Rendering\SkinnedMesh.cpp" />
     <ClCompile Include="src\Rendering\TerrainBufferPool.cpp" />
     <ClCompile Include="src\Rendering\Texture.cpp" />
+    <ClCompile Include="src\Rendering\TreeCuller.cpp" />
+    <ClCompile Include="src\Rendering\TreeInstanceBufferPool.cpp" />
     <ClCompile Include="src\Systems\AnimationSystem.cpp" />
     <ClCompile Include="src\Systems\AssemblerSystem.cpp" />
     <ClCompile Include="src\Systems\BeltRenderSystem.cpp" />
@@ -307,6 +316,7 @@
     <ClInclude Include="src\Renderer\ShadowMapRenderer.h" />
     <ClInclude Include="src\Renderer\SkinnedMeshRenderer.h" />
     <ClInclude Include="src\Renderer\TerrainRenderer.h" />
+    <ClInclude Include="src\Renderer\TreeRenderer.h" />
     <ClInclude Include="src\Rendering\AnimationClip.h" />
     <ClInclude Include="src\Rendering\Animator.h" />
     <ClInclude Include="src\Rendering\BoneMatrixUBO.h" />
@@ -324,6 +334,8 @@
     <ClInclude Include="src\Rendering\SubMesh.h" />
     <ClInclude Include="src\Rendering\TerrainBufferPool.h" />
     <ClInclude Include="src\Rendering\Texture.h" />
+    <ClInclude Include="src\Rendering\TreeCuller.h" />
+    <ClInclude Include="src\Rendering\TreeInstanceBufferPool.h" />
     <ClInclude Include="src\Rendering\Vertex.h" />
     <ClInclude Include="src\Systems\AnimationSystem.h" />
     <ClInclude Include="src\Systems\AssemblerSystem.h" />

@@ -1,0 +1,76 @@
+#version 450
+
+struct TreeChunkMetadata {
+    vec4 boundsCenterAndRadius;
+    uint firstInstance;
+    uint instanceCount;
+    uint isActive;
+    uint padding;
+};
+
+struct DrawCommand {
+    uint indexCount;
+    uint instanceCount;
+    uint firstIndex;
+    int vertexOffset;
+    uint firstInstance;
+};
+
+layout(local_size_x = 64) in;
+
+layout(std430, binding = 0) readonly buffer MetadataBuffer {
+    TreeChunkMetadata chunks[];
+};
+
+// Submesh 0
+layout(std430, binding = 1) writeonly buffer DrawCmd0 { DrawCommand commands0[]; };
+layout(std430, binding = 2) buffer DrawCount0 { uint drawCount0; };
+// Submesh 1
+layout(std430, binding = 3) writeonly buffer DrawCmd1 { DrawCommand commands1[]; };
+layout(std430, binding = 4) buffer DrawCount1 { uint drawCount1; };
+
+layout(push_constant) uniform PushConstants {
+    vec4 frustumPlanes[6];
+    uint maxChunks;
+    uint numSubmeshes;
+    uvec2 submeshInfo[4];
+} pc;
+
+bool SphereInFrustum(vec3 center, float radius) {
+    for (int i = 0; i < 6; i++) {
+        if (dot(pc.frustumPlanes[i].xyz, center) + pc.frustumPlanes[i].w < -radius) return false;
+    }
+    return true;
+}
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= pc.maxChunks) return;
+
+    TreeChunkMetadata chunk = chunks[idx];
+    if (chunk.isActive == 0 || chunk.instanceCount == 0) return;
+    if (!SphereInFrustum(chunk.boundsCenterAndRadius.xyz, chunk.boundsCenterAndRadius.w)) return;
+
+    // Submesh 0
+    if (pc.numSubmeshes > 0) {
+        uint di = atomicAdd(drawCount0, 1);
+        DrawCommand cmd;
+        cmd.indexCount = pc.submeshInfo[0].x;
+        cmd.instanceCount = chunk.instanceCount;
+        cmd.firstIndex = pc.submeshInfo[0].y;
+        cmd.vertexOffset = 0;
+        cmd.firstInstance = chunk.firstInstance;
+        commands0[di] = cmd;
+    }
+    // Submesh 1
+    if (pc.numSubmeshes > 1) {
+        uint di = atomicAdd(drawCount1, 1);
+        DrawCommand cmd;
+        cmd.indexCount = pc.submeshInfo[1].x;
+        cmd.instanceCount = chunk.instanceCount;
+        cmd.firstIndex = pc.submeshInfo[1].y;
+        cmd.vertexOffset = 0;
+        cmd.firstInstance = chunk.firstInstance;
+        commands1[di] = cmd;
+    }
+}

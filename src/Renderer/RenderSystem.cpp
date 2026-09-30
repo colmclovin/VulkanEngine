@@ -1,6 +1,7 @@
 #include "RenderSystem.h"
 #include "QuadRenderer.h"
 #include "MeshRenderer.h"
+#include "TreeRenderer.h"
 #include "SkinnedMeshRenderer.h"
 #include "TerrainRenderer.h"
 #include "../Game/ChunkGenerator.h"
@@ -19,6 +20,7 @@
 #include "../Rendering/Frustum.h"
 #include <glm/glm.hpp>
 #include "../Game/ChunkManager.h"
+#include "../Rendering/ModelLoader.h"
 
 RenderSystem::RenderSystem(VulkanEngine *engine) : m_Engine(engine) {
 }
@@ -53,8 +55,35 @@ void RenderSystem::Init(uint32_t terrainVertsPerChunk, uint32_t terrainIndicesPe
     m_TerrainRenderer->Init(terrainVertsPerChunk, terrainIndicesPerChunk, terrainMaxChunks, m_ShadowMap.get());
     m_TerrainRenderer->GetBufferPool()->InitializeSharedIndices();
     std::cout << "TerrainBufferPool sizing: vertsPerChunk=" << terrainVertsPerChunk << " indicesPerChunk=" << terrainIndicesPerChunk << std::endl;   // FIXED
+   
+
+    m_TreeMesh = ModelLoader::LoadModel("Assets/Models/Tree.glb", m_Engine, m_MeshRenderer.get());
+    m_TreeMesh.UploadToGPU(m_Engine);
+
+    std::vector<TreeSubmeshRenderInfo> treeSubmeshInfo;
+    for (const auto& sub : m_TreeMesh.SubMeshes) {   // FIXED — was treeMesh
+        TreeSubmeshRenderInfo info{};
+        info.indexCount = sub.indexCount;
+        info.firstIndex = sub.indexOffset;
+        if (sub.materialIndex >= 0 && sub.materialIndex < static_cast<int>(m_TreeMesh.Materials.size())) {   // FIXED
+            auto& mat = m_TreeMesh.Materials[sub.materialIndex];   // FIXED
+            if (mat.texture) {
+                info.textureView = mat.texture->imageView;
+                info.textureSampler = mat.texture->sampler;
+            }
+        }
+        treeSubmeshInfo.push_back(info);
+    }
+    uint32_t maxTreesPerChunk = 20;        // headroom above the 16 max candidates (4x4 grid) per chunk
+    uint32_t maxTreeChunks = terrainMaxChunks;   // match terrain's chunk slot count, 1:1 allocation
+
+    m_TreeRenderer = std::make_unique<TreeRenderer>(m_Engine);
+    m_TreeRenderer->Init(maxTreesPerChunk, maxTreeChunks, m_ShadowMap.get(),
+        m_TreeMesh.vertexBuffer, m_TreeMesh.indexBuffer, treeSubmeshInfo,
+        m_MeshRenderer->GetDefaultTextureView(), m_MeshRenderer->GetDefaultTextureSampler());
+
     m_ChunkGenerator = std::make_unique<ChunkGenerator>();
-    m_ChunkGenerator->Init(m_Engine, m_TerrainRenderer->GetBufferPool(), ChunkManager::CHUNK_VERTEX_RESOLUTION);
+    m_ChunkGenerator->Init(m_Engine, m_TerrainRenderer->GetBufferPool(), m_TreeRenderer->GetBufferPool(), ChunkManager::CHUNK_VERTEX_RESOLUTION);
 
     m_DebugLineRenderer = std::make_unique<DebugLineRenderer>(m_Engine);
     m_DebugLineRenderer->Init();
@@ -100,8 +129,9 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
     }
 
     bool began = m_Engine->BeginFrame([&](VkCommandBuffer cmd) {
-        chunkManager.RecordPendingGeneration(cmd, m_ChunkGenerator.get(), m_TerrainRenderer.get(), settings.terrain);   // ADD — generate new chunks first
-
+       // std::cout << "about to call RecordPendingGeneration  rendersystem.cpp" << std::endl;
+        chunkManager.RecordPendingGeneration(cmd, m_ChunkGenerator.get(), m_TerrainRenderer.get(), m_TreeRenderer.get(), settings.terrain);   // ADD — generate new chunks first
+       // std::cout << "RecordPendingGeneration complete rendersystem.cpp" << std::endl;
 
         m_ShadowMapRenderer->BeginShadowPass(*m_ShadowMap);
         m_ShadowMapRenderer->RenderStatic(registry, lightSpaceMatrix);
@@ -109,6 +139,7 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
         m_ShadowMapRenderer->EndShadowPass(*m_ShadowMap);
 
         m_TerrainRenderer->RecordCullingPass(cmd, cameraFrustum);   // NEW — compute pass, before vkCmdBeginRendering
+        m_TreeRenderer->RecordCullingPass(cmd, cameraFrustum);
         });
 
     if (!began) {
@@ -119,8 +150,10 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
     m_ImGuiVulkanUtil->NewFrame();
     m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine, m_PlayerEntity, m_InspectedEntity, selectedItem, techState);
     m_TerrainRenderer->ProcessPendingFrees();
+    m_TreeRenderer->ProcessPendingFrees();
     m_TerrainRenderer->RecordDraw(m_Engine->GetCurrentCommandBuffer(), camera, dayNightCycle, lightSpaceMatrix, activeLights, settings.wireframeMode);   // CHANGED — RecordDraw, not Render
-
+  
+    m_TreeRenderer->RecordDraw(m_Engine->GetCurrentCommandBuffer(), camera, dayNightCycle, lightSpaceMatrix, activeLights);   // confirm this is also present
     m_MeshRenderer->Render(registry, camera, settings.wireframeMode, dayNightCycle, lightSpaceMatrix, activeLights);
     m_SkinnedMeshRenderer->Render(registry, camera, settings.wireframeMode, dayNightCycle, lightSpaceMatrix, activeLights);
     m_QuadRenderer->Render(registry);

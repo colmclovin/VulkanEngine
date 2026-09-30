@@ -3,6 +3,7 @@
 #define TERRAIN_GLSL
 
 #include "biome.glsl"
+#include "ore.glsl"
 
 vec3 getBiomeColor(int biomeId) {
     if (biomeId == BIOME_PLAINS)    return vec3(0.35, 0.6, 0.25);
@@ -114,6 +115,12 @@ TerrainSample sampleTerrain(float worldX, float worldZ, float seed) {
     vec3 finalColor = climateColor * baseWeight
                      + mix(climateColor, hillsColor, 0.5) * hillsWeight
                      + mix(climateColor, mountainsColor, 0.7) * mountainsWeight;
+
+    OreInfo ore = getOreDepositAt(worldX, worldZ, seed);
+    if (ore.oreType != ORE_NONE) {
+        vec3 oreColor = getOreColor(ore.oreType);
+        finalColor = mix(finalColor, oreColor, 0.5);   // matches your CPU version's 0.5 blend factor
+    }
 
     TerrainSample result;
     result.height = finalHeight;

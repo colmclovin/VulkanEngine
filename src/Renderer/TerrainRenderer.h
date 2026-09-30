@@ -27,6 +27,7 @@ public:
     void ProcessPendingFrees() {
         m_Pool.ProcessPendingFrees();
     }
+ 
     void UploadChunkBounds(uint32_t slot, glm::vec3 boundsCenter, float boundsRadius);
     void Render(VkCommandBuffer commandBuffer, const Camera3D& camera, DayNightCycle& dayNightCycle,
         const glm::mat4& lightSpaceMatrix, const std::vector<PointLight>& activeLights, bool wireframe);

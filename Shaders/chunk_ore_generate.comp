@@ -1,0 +1,44 @@
+// Shaders/chunk_ore_generate.comp
+#version 450
+#extension GL_GOOGLE_include_directive : require
+#include "Include/ore.glsl"
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+struct OreRecord {
+    vec4 positionAndAmount;   // xyz = world position (cell center), w = amount
+    int oreType;
+    int padding[3];
+};
+
+layout(std430, binding = 0) buffer OreRecordBuffer {
+    OreRecord records[];
+};
+
+layout(std430, binding = 1) buffer OreCountBuffer {
+    uint recordCount;
+};
+
+layout(push_constant) uniform PushConstants {
+    float chunkOriginX, chunkOriginZ, cellSize, seed;
+    uint vertexResolution;
+    uint maxRecords;
+} pc;
+
+void main() {
+    uint gx = gl_GlobalInvocationID.x;
+    uint gz = gl_GlobalInvocationID.y;
+    if (gx >= pc.vertexResolution || gz >= pc.vertexResolution) return;
+
+    float worldX = pc.chunkOriginX + float(gx) * pc.cellSize;
+    float worldZ = pc.chunkOriginZ + float(gz) * pc.cellSize;
+
+    OreInfo ore = getOreDepositAt(worldX, worldZ, pc.seed);
+    if (ore.oreType == ORE_NONE) return;
+
+    uint idx = atomicAdd(recordCount, 1);
+    if (idx >= pc.maxRecords) return;   // safety guard against overflow
+
+    records[idx].positionAndAmount = vec4(worldX, 0.0, worldZ, ore.amount);
+    records[idx].oreType = ore.oreType;
+}

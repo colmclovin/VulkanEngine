@@ -1,7 +1,10 @@
 #pragma once
 #include "PlacementGrid.h" // reuse GridCoord/GridCoordHash
 #include <unordered_map>
-
+//struct GpuDepletionEntry {
+//	ivec2 gridCoord;
+//	float remainingFraction;
+//};
 class DepletionMap {
 public:
 	float GetRemainingFraction(int cellX, int cellZ) const;

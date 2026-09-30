@@ -20,7 +20,8 @@ public:
     void Init(ShadowMap* shadowMap);
     void Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle &dayNightCycle, const glm::mat4 &lightSpaceMatrix, const std::vector<PointLight> &activeLights);
     void Shutdown();
-
+    VkImageView GetDefaultTextureView() const { return m_DefaultTexture->imageView; }
+    VkSampler GetDefaultTextureSampler() const { return m_DefaultTexture->sampler; }
     VkDescriptorSetLayout GetTextureDescriptorSetLayout() const { return m_TextureDescriptorSetLayout; }
     VkDescriptorSet AllocateTextureDescriptorSet(VkImageView imageView, VkSampler sampler);
     struct InstanceData {

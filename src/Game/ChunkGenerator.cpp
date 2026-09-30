@@ -5,12 +5,12 @@
 #include <stdexcept>
 #include <iostream>
 
-void ChunkGenerator::Init(VulkanEngine* engine, TerrainBufferPool* pool, uint32_t vertexResolution) {
+void ChunkGenerator::Init(VulkanEngine* engine, TerrainBufferPool* pool, TreeInstanceBufferPool* treePool, uint32_t vertexResolution) {
     m_Engine = engine;
     m_VertexResolution = vertexResolution;
     m_PaddedRes = vertexResolution + 2;
     m_Pool = pool;
-
+    m_TreePool = treePool;
     VkDevice device = engine->GetDevice();
 
     uint32_t paddedCount = m_PaddedRes * m_PaddedRes;
@@ -23,7 +23,7 @@ void ChunkGenerator::Init(VulkanEngine* engine, TerrainBufferPool* pool, uint32_
 
     CreatePass1Pipeline();
     CreatePass2Pipeline(pool);   // CHANGED — pass pool through
-
+	CreateTreeGenPipeline(treePool);   // NEW — pass tree pool through
     std::cout << "ChunkGenerator initialized (vertexResolution=" << vertexResolution << ")" << std::endl;
 }
 
@@ -174,39 +174,41 @@ void ChunkGenerator::CreatePass2Pipeline(TerrainBufferPool* pool) {
     vkDestroyShaderModule(device, shaderModule, nullptr);
 }
 
-void ChunkGenerator::RecordGenerateChunk(VkCommandBuffer commandBuffer, uint32_t slot,
+void ChunkGenerator::RecordGenerateChunk(VkCommandBuffer commandBuffer, uint32_t terrainSlot, uint32_t treeSlot,
     float chunkOriginX, float chunkOriginZ, float cellSize, float seed) {
+   //std::cout << "About to record tree generation for slot " << treeSlot << std::endl;
+    // ===== Pass 1: padded position/color =====
     struct Pass1Push {
         float chunkOriginX, chunkOriginZ, cellSize, seed;
         uint32_t vertexResolution, paddedRes;
     } pass1Push{ chunkOriginX, chunkOriginZ, cellSize, seed, m_VertexResolution, m_PaddedRes };
-   // std::cout << "RecordGenerateChunk: m_VertexResolution=" << m_VertexResolution << " m_PaddedRes=" << m_PaddedRes << std::endl;
+
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_Pass1Pipeline);
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_Pass1PipelineLayout, 0, 1, &m_Pass1DescSet, 0, nullptr);
     vkCmdPushConstants(commandBuffer, m_Pass1PipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(Pass1Push), &pass1Push);
 
-    uint32_t groupsPerAxis = (m_PaddedRes + 7) / 8;   // matches local_size_x/y = 8
+    uint32_t groupsPerAxis = (m_PaddedRes + 7) / 8;
     vkCmdDispatch(commandBuffer, groupsPerAxis, groupsPerAxis, 1);
 
-    // Barrier: Pass 1's writes to padded position/color buffers must complete before Pass 2 reads them
-    VkBufferMemoryBarrier barriers[2]{};
-    barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
-    barriers[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barriers[0].buffer = m_PaddedPositionBuffer;
-    barriers[0].offset = 0;
-    barriers[0].size = VK_WHOLE_SIZE;
-    barriers[1] = barriers[0];
-    barriers[1].buffer = m_PaddedColorBuffer;
+    VkBufferMemoryBarrier pass1Barriers[2]{};
+    pass1Barriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    pass1Barriers[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    pass1Barriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    pass1Barriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    pass1Barriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    pass1Barriers[0].buffer = m_PaddedPositionBuffer;
+    pass1Barriers[0].offset = 0;
+    pass1Barriers[0].size = VK_WHOLE_SIZE;
+    pass1Barriers[1] = pass1Barriers[0];
+    pass1Barriers[1].buffer = m_PaddedColorBuffer;
 
     vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-        0, 0, nullptr, 2, barriers, 0, nullptr);
+        0, 0, nullptr, 2, pass1Barriers, 0, nullptr);
 
+    // ===== Pass 2: normals + final vertex write =====
     struct Pass2Push {
         uint32_t vertexResolution, paddedRes, vertexOffset;
-    } pass2Push{ m_VertexResolution, m_PaddedRes, slot * m_VertexResolution * m_VertexResolution };
+    } pass2Push{ m_VertexResolution, m_PaddedRes, terrainSlot * m_VertexResolution * m_VertexResolution };
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_Pass2Pipeline);
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_Pass2PipelineLayout, 0, 1, &m_Pass2DescSet, 0, nullptr);
@@ -215,17 +217,137 @@ void ChunkGenerator::RecordGenerateChunk(VkCommandBuffer commandBuffer, uint32_t
     uint32_t groupsPerAxisReal = (m_VertexResolution + 7) / 8;
     vkCmdDispatch(commandBuffer, groupsPerAxisReal, groupsPerAxisReal, 1);
 
-    // Barrier: Pass 2's writes to the real vertex buffer must complete before anything (indirect draw) reads it later
     VkBufferMemoryBarrier vertexBarrier{};
     vertexBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
     vertexBarrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
     vertexBarrier.dstAccessMask = VK_ACCESS_VERTEX_ATTRIBUTE_READ_BIT;
     vertexBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     vertexBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    vertexBarrier.buffer = m_Pool->GetVertexBuffer();   // now resolves correctly
+    vertexBarrier.buffer = m_Pool->GetVertexBuffer();
     vertexBarrier.offset = 0;
     vertexBarrier.size = VK_WHOLE_SIZE;
 
     vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_VERTEX_INPUT_BIT,
         0, 0, nullptr, 1, &vertexBarrier, 0, nullptr);
+
+    // ===== Tree generation =====
+    // Reset this slot's instanceCount to 0 before the generation shader accumulates into it
+    VkDeviceSize instanceCountFieldOffset = static_cast<VkDeviceSize>(treeSlot) * sizeof(TreeChunkGpuMetadata) + offsetof(TreeChunkGpuMetadata, instanceCount);
+    vkCmdFillBuffer(commandBuffer, m_TreePool->GetMetadataBuffer(), instanceCountFieldOffset, sizeof(uint32_t), 0);
+
+    VkBufferMemoryBarrier fillBarrier{};
+    fillBarrier.sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    fillBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    fillBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT;
+    fillBarrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    fillBarrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    fillBarrier.buffer = m_TreePool->GetMetadataBuffer();
+    fillBarrier.offset = instanceCountFieldOffset;
+    fillBarrier.size = sizeof(uint32_t);
+
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0, 0, nullptr, 1, &fillBarrier, 0, nullptr);
+
+    struct TreeGenPush {
+        float chunkOriginX, chunkOriginZ, chunkWorldSize, seed;
+        uint32_t chunkSlot, maxTreesPerChunk, samplesPerAxis;
+        float sampleSpacing;
+    } treePush{ chunkOriginX, chunkOriginZ, 32.0f, seed, treeSlot, m_TreePool->GetMaxTreesPerChunk(), 4, 8.0f };
+
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_TreeGenPipeline);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_TreeGenPipelineLayout, 0, 1, &m_TreeGenDescSet, 0, nullptr);
+    vkCmdPushConstants(commandBuffer, m_TreeGenPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(TreeGenPush), &treePush);
+
+    uint32_t totalSamples = 4 * 4;   // samplesPerAxis=4 -> 16 total sample points
+    vkCmdDispatch(commandBuffer, (totalSamples + 63) / 64, 1, 1);
+
+    // Barrier: tree generation's writes must complete before the culling shader reads instance/metadata buffers
+    VkBufferMemoryBarrier treeBarriers[2]{};
+    treeBarriers[0].sType = VK_STRUCTURE_TYPE_BUFFER_MEMORY_BARRIER;
+    treeBarriers[0].srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    treeBarriers[0].dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+    treeBarriers[0].srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    treeBarriers[0].dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    treeBarriers[0].buffer = m_TreePool->GetInstanceBuffer();
+    treeBarriers[0].offset = 0;
+    treeBarriers[0].size = VK_WHOLE_SIZE;
+    treeBarriers[1] = treeBarriers[0];
+    treeBarriers[1].buffer = m_TreePool->GetMetadataBuffer();
+
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+        0, 0, nullptr, 2, treeBarriers, 0, nullptr);
+}
+
+void ChunkGenerator::CreateTreeGenPipeline(TreeInstanceBufferPool* treePool) {
+    VkDevice device = m_Engine->GetDevice();
+
+    VkDescriptorSetLayoutBinding bindings[2]{};
+    bindings[0] = { 0, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr };   // instance buffer
+    bindings[1] = { 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1, VK_SHADER_STAGE_COMPUTE_BIT, nullptr };   // count buffer
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 2;
+    layoutInfo.pBindings = bindings;
+    vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &m_TreeGenDescSetLayout);
+
+    VkDescriptorPoolSize poolSize{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2 };
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = 1;
+    vkCreateDescriptorPool(device, &poolInfo, nullptr, &m_TreeGenDescPool);
+
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = m_TreeGenDescPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &m_TreeGenDescSetLayout;
+    vkAllocateDescriptorSets(device, &allocInfo, &m_TreeGenDescSet);
+
+    VkDescriptorBufferInfo instInfo{ treePool->GetInstanceBuffer(), 0, VK_WHOLE_SIZE };
+    VkDescriptorBufferInfo metaInfo{ treePool->GetMetadataBuffer(), 0, VK_WHOLE_SIZE };   // CHANGED — was countInfo
+
+    VkWriteDescriptorSet writes[2]{};
+    writes[0] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, m_TreeGenDescSet, 0, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, nullptr, &instInfo, nullptr };
+    writes[1] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, m_TreeGenDescSet, 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, nullptr, &metaInfo, nullptr };
+    vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
+
+    struct TreeGenPush {
+        float chunkOriginX, chunkOriginZ, chunkWorldSize, seed;
+        uint32_t chunkSlot, maxTreesPerChunk, samplesPerAxis;
+        float sampleSpacing;
+    };
+    VkPushConstantRange pushRange{};
+    pushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pushRange.offset = 0;
+    pushRange.size = sizeof(TreeGenPush);
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &m_TreeGenDescSetLayout;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushRange;
+    vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_TreeGenPipelineLayout);
+
+    auto shaderCode = m_Engine->ReadFile("Shaders/tree_generate_comp.spv");
+    VkShaderModule shaderModule = m_Engine->CreateShaderModule(shaderCode);
+
+    VkPipelineShaderStageCreateInfo stageInfo{};
+    stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    stageInfo.module = shaderModule;
+    stageInfo.pName = "main";
+
+    VkComputePipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipelineInfo.stage = stageInfo;
+    pipelineInfo.layout = m_TreeGenPipelineLayout;
+
+    if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_TreeGenPipeline) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create tree generation pipeline");
+    }
+    vkDestroyShaderModule(device, shaderModule, nullptr);
 }

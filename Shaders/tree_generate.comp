@@ -1,0 +1,79 @@
+// Shaders/tree_generate.comp
+#version 450
+#extension GL_GOOGLE_include_directive : require
+#include "Include/terrain.glsl"
+#include "Include/ore.glsl"
+
+layout(local_size_x = 64) in;
+
+struct TreeChunkMetadata {
+    vec4 boundsCenterAndRadius;
+    uint firstInstance;
+    uint instanceCount;
+    uint isActive;
+    uint padding;
+};
+
+layout(std430, binding = 0) buffer TreeInstanceBuffer {
+    vec4 treeInstances[];
+};
+
+layout(std430, binding = 1) buffer MetadataBuffer {
+    TreeChunkMetadata chunks[];
+};
+
+layout(push_constant) uniform PushConstants {
+    float chunkOriginX, chunkOriginZ, chunkWorldSize, seed;
+    uint chunkSlot, maxTreesPerChunk, samplesPerAxis;
+    float sampleSpacing;
+} pc;
+
+float hashJitter(vec2 pos, float salt) {
+    float h = dot(pos, vec2(12.9898, 78.233)) + salt;
+    return fract(sin(h) * 43758.5453);
+}
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    if (idx >= pc.samplesPerAxis * pc.samplesPerAxis) return;
+
+    uint sx = idx % pc.samplesPerAxis;
+    uint sz = idx / pc.samplesPerAxis;
+
+    float worldX = pc.chunkOriginX + float(sx) * pc.sampleSpacing;
+    float worldZ = pc.chunkOriginZ + float(sz) * pc.sampleSpacing;
+
+    int biomeId = determineBiome(worldX, worldZ, pc.seed);
+    if (biomeId == BIOME_LAKE) return;
+
+    float treeDensity = 0.0;
+    if (biomeId == BIOME_PLAINS) treeDensity = 0.2;
+    else if (biomeId == BIOME_HILLS) treeDensity = 0.25;
+    else if (biomeId == BIOME_TUNDRA) treeDensity = 0.05;
+
+    if (treeDensity <= 0.0) return;
+
+    OreInfo ore = getOreDepositAt(worldX, worldZ, pc.seed);
+    if (ore.oreType != ORE_NONE) return;
+
+    float aridity = getAridity(worldX, worldZ, pc.seed);
+    float wetness = 1.0 - aridity;
+    float effectiveDensity = treeDensity * wetness;
+
+    float roll = hashJitter(vec2(worldX, worldZ), 1.0);
+    float threshold = 1.0 - (effectiveDensity * 2.0);
+    if (roll < threshold) return;
+
+    float jitterX = (hashJitter(vec2(worldX, worldZ), 2.0) - 0.5) * pc.sampleSpacing;
+    float jitterZ = (hashJitter(vec2(worldX, worldZ), 3.0) - 0.5) * pc.sampleSpacing;
+    float finalX = worldX + jitterX;
+    float finalZ = worldZ + jitterZ;
+
+    TerrainSample terrainSample = sampleTerrain(finalX, finalZ, pc.seed);
+
+    uint outputIndex = atomicAdd(chunks[pc.chunkSlot].instanceCount, 1);   // CHANGED — direct metadata write
+    if (outputIndex >= pc.maxTreesPerChunk) return;
+
+    uint bufferIndex = pc.chunkSlot * pc.maxTreesPerChunk + outputIndex;
+    treeInstances[bufferIndex] = vec4(finalX, terrainSample.height, finalZ, 0.3);
+}

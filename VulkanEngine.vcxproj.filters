@@ -43,6 +43,12 @@
     <None Include="Shaders\Include\terrain.glsl" />
     <None Include="Shaders\chunk_generate_pass1.comp" />
     <None Include="Shaders\chunk_generate_pass2.comp" />
+    <None Include="Shaders\Include\ore.glsl" />
+    <None Include="Shaders\chunk_ore_generate.comp" />
+    <None Include="Shaders\tree_generate.comp" />
+    <None Include="Shaders\tree_cull.comp" />
+    <None Include="Shaders\tree_instanced.vert" />
+    <None Include="Shaders\tree_instanced.frag" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Main.cpp">
@@ -235,6 +241,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\ChunkGenerator.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Rendering\TreeInstanceBufferPool.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\TreeRenderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Rendering\TreeCuller.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -540,6 +555,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\ChunkGenerator.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rendering\TreeInstanceBufferPool.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\TreeRenderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rendering\TreeCuller.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

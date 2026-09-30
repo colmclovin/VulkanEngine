@@ -310,6 +310,59 @@ if exist "Shaders\chunk_generate_pass2.comp" (
 ) else (
 	echo WARNING: chunk_generate_pass2.comp not found
 )
+REM Compile tree culling compute shader
+if exist "Shaders\tree_cull.comp" (
+	echo Compiling tree culling compute shader...
+	glslc -I Shaders Shaders\tree_cull.comp -o Shaders\tree_cull_comp.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Tree culling compute shader compiled successfully
+	) else (
+		echo   Tree culling compute shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: tree_cull.comp not found
+)
+REM Compile tree generation compute shader
+if exist "Shaders\tree_generate.comp" (
+	echo Compiling tree generation compute shader...
+	glslc -I Shaders Shaders\tree_generate.comp -o Shaders\tree_generate_comp.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Tree generation compute shader compiled successfully
+	) else (
+		echo   Tree generation compute shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: tree_generate.comp not found
+)
+REM Compile tree instanced vertex shader
+if exist "Shaders\tree_instanced.vert" (
+	echo Compiling tree instanced vertex shader...
+	glslc -I Shaders Shaders\tree_instanced.vert -o Shaders\tree_instanced_vert.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Tree instanced vertex shader compiled successfully
+	) else (
+		echo   Tree instanced vertex shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: tree_instanced.vert not found
+)
+REM Compile tree instanced fragment shader
+if exist "Shaders\tree_instanced.frag" (
+	echo Compiling tree instanced fragment shader...
+	glslc -I Shaders Shaders\tree_instanced.frag -o Shaders\tree_instanced_frag.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Tree instanced fragment shader compiled successfully
+	) else (
+		echo   Tree instanced fragment shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: tree_instanced.frag not found
+)
+
 echo.
 echo Shader compilation complete!
 dir shaders\*.spv /b

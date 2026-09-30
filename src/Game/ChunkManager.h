@@ -21,6 +21,7 @@
 class VulkanEngine;
 class MeshRenderer;
 class TerrainRenderer;
+class TreeRenderer;
 
 struct GpuGenerationRequest {
     ChunkCoord coord;
@@ -32,6 +33,7 @@ public:
     static constexpr float CHUNK_WORLD_SIZE = 32.0f; // world units per chunk edge
     static constexpr int CHUNK_VERTEX_RESOLUTION = 16; // vertices per chunk edge (independent of world cellSize)
     static constexpr int LOAD_RADIUS_CHUNKS = 16; // how many chunks around the player stay loaded
+    static constexpr float MAX_ZOOM_FACTOR = 1.8f;
 
     struct ChunkGenerationJob {
         ChunkCoord coord;
@@ -71,10 +73,10 @@ public:
     float GetInitialLoadProgress() const;
     void Update(entt::registry& registry, glm::vec3 playerPosition, const TerrainSettings& settings,
         VulkanEngine* engine, MeshRenderer* meshRenderer, int seed, DepletionMap& depletionMap,
-                PlacementGrid &placementGrid, TerrainRenderer *terrainRenderer, RemovedTreesMap &removedTreesMap, glm::vec3 cameraForward, float isoDistance);
+                PlacementGrid &placementGrid, TerrainRenderer *terrainRenderer, RemovedTreesMap &removedTreesMap, glm::vec3 cameraForward, float isoDistance, TreeRenderer* treeRenderer);
 
     void RecordPendingGeneration(VkCommandBuffer commandBuffer, ChunkGenerator* generator,
-        TerrainRenderer* terrainRenderer, const TerrainSettings& settings);
+        TerrainRenderer* terrainRenderer, TreeRenderer* treeRenderer, const TerrainSettings& settings);
    
     void Reset() {
         m_LoadedChunks.clear();
@@ -97,7 +99,7 @@ private:
     size_t m_InitialLoadTarget = 0;
     void GenerateChunk(ChunkCoord coord, entt::registry &registry, const TerrainSettings &settings,
                        VulkanEngine *engine, MeshRenderer *meshRenderer, int seed, DepletionMap &depletionMap, PlacementGrid &placementGrid);
-    void UnloadChunk(ChunkCoord coord, entt::registry& registry, VulkanEngine* engine, TerrainRenderer* terrainRenderer);
+    void UnloadChunk(ChunkCoord coord, entt::registry& registry, VulkanEngine* engine, TerrainRenderer* terrainRenderer, TreeRenderer* treeRenderer);
 
     std::unordered_map<ChunkCoord, Chunk, ChunkCoordHash> m_LoadedChunks;
     std::unordered_set<ChunkCoord, ChunkCoordHash> m_AwaitingProcessing;

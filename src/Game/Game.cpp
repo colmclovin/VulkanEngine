@@ -112,7 +112,7 @@ void Game::Init() {
     m_PlacementSystem = std::make_unique<PlacementSystem>();
 
     FurnaceRecipeDatabase::Init();
-    OreDatabase::Init();
+    //OreDatabase::Init();
     BiomeDatabase::Init();
 
     m_ChunkManager.StartWorkerThread(m_Settings.terrain, m_Settings.terrain.seed);
@@ -141,8 +141,11 @@ void Game::Init() {
     m_RenderSystem = std::make_unique<RenderSystem>(m_VulkanEngine.get());
     uint32_t vertsPerChunk = ChunkManager::CHUNK_VERTEX_RESOLUTION * ChunkManager::CHUNK_VERTEX_RESOLUTION;
     uint32_t indicesPerChunk = (ChunkManager::CHUNK_VERTEX_RESOLUTION - 1) * (ChunkManager::CHUNK_VERTEX_RESOLUTION - 1) * 6;
-    uint32_t maxChunks = (ChunkManager::LOAD_RADIUS_CHUNKS * 2 + 1) * (ChunkManager::LOAD_RADIUS_CHUNKS * 2 + 1) + 500;   // +buffer
-    
+
+    const float maxZoomFactor = ChunkManager::MAX_ZOOM_FACTOR;   // MUST match ChunkManager::Update's maxZoomFactor exactly
+    int scaledRadius = static_cast<int>(ChunkManager::LOAD_RADIUS_CHUNKS * maxZoomFactor);
+    uint32_t maxChunks = (scaledRadius * 2 + 1) * (scaledRadius * 2 + 1) + 200;   // full worst-case square + buffer
+
  
     m_RenderSystem->Init(vertsPerChunk, indicesPerChunk, maxChunks);
 
@@ -159,9 +162,9 @@ void Game::Init() {
     //RunNoiseLibraryTest();
    // float worldExtentZ = m_Settings.terrain.gridDepth * m_Settings.terrain.cellSize;   // = 100
    // std::cout << "worldExtentZ = " << worldExtentZ << std::endl;
-    RunBiomeLibraryTest();
+    //RunBiomeLibraryTest();
     //COmment to build
-    RunBiomeGridTest();
+   // RunBiomeGridTest();
 
     m_Registry = std::make_unique<entt::registry>();
 
@@ -553,7 +556,7 @@ void Game::Update(float deltaTime) {
         //PlayerAnimationSystem::Update(*m_Registry, m_PlayerEntity, velocity);
         m_ChunkManager.Update(*m_Registry, playerTransform.Position, m_Settings.terrain,
             m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.seed,
-                              m_DepletionMap, m_PlacementGrid, m_RenderSystem->GetTerrainRenderer(), m_RemovedTreesMap, m_Camera->GetForwardDirection(), m_Camera->GetIsoDistance());
+                              m_DepletionMap, m_PlacementGrid, m_RenderSystem->GetTerrainRenderer(), m_RemovedTreesMap, m_Camera->GetForwardDirection(), m_Camera->GetIsoDistance(), m_RenderSystem->GetTreeRenderer());
 
         m_LastPlayerPosition = playerTransform.Position;
     }
@@ -745,11 +748,13 @@ void Game::RunLoadingScreen() {
         auto& playerTransform = m_Registry->get<TransformComponent>(m_PlayerEntity);
         m_ChunkManager.Update(*m_Registry, playerTransform.Position, m_Settings.terrain,
             m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.seed,
-            m_DepletionMap, m_PlacementGrid, m_RenderSystem->GetTerrainRenderer(), m_RemovedTreesMap, m_Camera->GetForwardDirection(), m_Camera->GetIsoDistance());
+            m_DepletionMap, m_PlacementGrid, m_RenderSystem->GetTerrainRenderer(), m_RemovedTreesMap, m_Camera->GetForwardDirection(), m_Camera->GetIsoDistance(), m_RenderSystem->GetTreeRenderer());
     }
 
     if (!m_VulkanEngine->BeginFrame([&](VkCommandBuffer cmd) {
-        m_ChunkManager.RecordPendingGeneration(cmd, m_RenderSystem->GetChunkGenerator(), m_RenderSystem->GetTerrainRenderer(), m_Settings.terrain);
+        std::cout << "About to call RecordPendingGeneration Game.cpp" << std::endl;
+        m_ChunkManager.RecordPendingGeneration(cmd, m_RenderSystem->GetChunkGenerator(), m_RenderSystem->GetTerrainRenderer(), m_RenderSystem->GetTreeRenderer(), m_Settings.terrain);
+        std::cout << "RecordPendingGeneration complete Game.cpp" << std::endl;
         })) {
         return;
     }

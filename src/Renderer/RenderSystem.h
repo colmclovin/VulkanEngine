@@ -6,6 +6,7 @@
 #include "../Helpers/PauseMenuAction.h"
 #include "../World/DayNightCycle.h"
 #include "../Game/ChunkManager.h"
+#include "../Rendering/Mesh.h"
 
 class VulkanEngine;
 class QuadRenderer;
@@ -16,6 +17,7 @@ class ChunkGenerator;
 class ImGuiVulkanUtil;
 class AudioEngine;
 //class ResourceManager;
+class TreeRenderer;
 class MeshRenderer;
 class DebugLineRenderer;
 class TerrainRenderer;
@@ -42,12 +44,13 @@ public:
     DebugLineRenderer *GetDebugLineRenderer() const { return m_DebugLineRenderer.get(); }
     ChunkGenerator* GetChunkGenerator() const { return m_ChunkGenerator.get(); }
     TerrainRenderer* GetTerrainRenderer() const { return m_TerrainRenderer.get(); }
+    TreeRenderer* GetTreeRenderer() const { return m_TreeRenderer.get(); }
     DebugUI* GetDebugUI() const;
     ImGuiVulkanUtil *GetImGuiUtil() const;
 
 private:
     VulkanEngine *m_Engine = nullptr;
-
+    Mesh m_TreeMesh;
     // Rendering subsystems
     //std::unique_ptr<ResourceManager> m_ResourceManager;
     std::unique_ptr<MeshRenderer> m_MeshRenderer;
@@ -57,7 +60,7 @@ private:
     std::unique_ptr<ShadowMapRenderer> m_ShadowMapRenderer;
     std::unique_ptr<QuadRenderer> m_QuadRenderer;
     std::unique_ptr<TerrainRenderer> m_TerrainRenderer;
-
+    std::unique_ptr<TreeRenderer> m_TreeRenderer;
     std::unique_ptr<DebugLineRenderer> m_DebugLineRenderer;
 	std::unique_ptr<ImGuiVulkanUtil> m_ImGuiVulkanUtil;
     std::unique_ptr<DebugUI> m_DebugUI;
