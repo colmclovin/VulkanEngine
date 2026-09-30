@@ -20,13 +20,37 @@ ChunkCoord ChunkManager::WorldToChunkCoord(glm::vec3 worldPos) {
 // ChunkManager.cpp
 void ChunkManager::Update(entt::registry& registry, glm::vec3 playerPosition, const TerrainSettings& settings,
     VulkanEngine* engine, MeshRenderer* meshRenderer, int seed, DepletionMap& depletionMap,
-    PlacementGrid& placementGrid, TerrainRenderer* terrainRenderer, RemovedTreesMap& removedTreesMap) {
+                          PlacementGrid &placementGrid, TerrainRenderer *terrainRenderer, RemovedTreesMap &removedTreesMap, glm::vec3 cameraForward, float isoDistance) {
     ChunkCoord playerChunk = WorldToChunkCoord(playerPosition);
+    glm::vec2 forward2D = glm::normalize(glm::vec2(cameraForward.x, cameraForward.z));
+
+    // Normalize isoDistance against a baseline "typical" zoom, so zoomFactor is ~1.0 at normal play distance
+    // and grows toward ~1.5-2.0 at max zoom-out. Tune baselineDistance/maxZoomFactor to your camera's real range.
+    const float baselineDistance = 20.0f; // adjust to whatever your "normal" isoDistance typically is
+    const float maxZoomFactor = 1.8f; // how much wider at max zoom-out, tune to taste
+    float zoomFactor = glm::clamp(isoDistance / baselineDistance, 1.0f, maxZoomFactor);
+
+    int scaledLoopRadius = static_cast<int>(LOAD_RADIUS_CHUNKS * maxZoomFactor); // e.g., 20 * 1.8 = 36
 
     std::vector<ChunkCoord> desiredChunks;
-    for (int dz = -LOAD_RADIUS_CHUNKS; dz <= LOAD_RADIUS_CHUNKS; dz++) {
-        for (int dx = -LOAD_RADIUS_CHUNKS; dx <= LOAD_RADIUS_CHUNKS; dx++) {
-            desiredChunks.push_back({ playerChunk.x + dx, playerChunk.z + dz });
+    for (int dz = -scaledLoopRadius; dz <= scaledLoopRadius; dz++) { // CHANGED — loop now goes to ±36, not ±20
+        for (int dx = -scaledLoopRadius; dx <= scaledLoopRadius; dx++) { // CHANGED
+            float distance = glm::length(glm::vec2(dx, dz));
+            if (distance < 0.001f) {
+                desiredChunks.push_back({ playerChunk.x + dx, playerChunk.z + dz });
+                continue;
+            }
+
+            glm::vec2 toChunk = glm::vec2(dx, dz) / distance;
+            float dot = glm::dot(toChunk, forward2D);
+
+            float baseEffectiveRadius = glm::mix(static_cast<float>(LOAD_RADIUS_CHUNKS) * 0.35f,
+                                                 static_cast<float>(LOAD_RADIUS_CHUNKS), (dot + 1.0f) * 0.5f);
+            float effectiveRadius = baseEffectiveRadius * zoomFactor;
+
+            if (distance <= effectiveRadius) {
+                desiredChunks.push_back({ playerChunk.x + dx, playerChunk.z + dz });
+            }
         }
     }
 
@@ -50,7 +74,7 @@ void ChunkManager::Update(entt::registry& registry, glm::vec3 playerPosition, co
         m_LoadedChunks[coord] = chunk;
         m_PendingGpuGeneration.push_back({ coord });
     }
-
+    /*
     // --- Trees: unchanged, still async CPU worker thread ---
     for (auto& coord : desiredChunks) {
         auto it = m_LoadedChunks.find(coord);
@@ -66,7 +90,7 @@ void ChunkManager::Update(entt::registry& registry, glm::vec3 playerPosition, co
         m_RequestCV.notify_one();
         it->second.treesRequested = true;
     }
-
+    */
     // Drain completed TREE generation results (terrain no longer comes through this path)
     ProcessCompletedChunks(registry, engine, meshRenderer, placementGrid, removedTreesMap);
     // --- Unload chunks no longer desired ---
@@ -477,14 +501,28 @@ void ChunkManager::RequestInitialChunksBlocking(glm::vec3 playerPos, const Terra
         std::this_thread::sleep_for(std::chrono::milliseconds(10)); // avoid busy-spinning
     }
 }
-void ChunkManager::BeginInitialLoad(glm::vec3 playerPos, const TerrainSettings &settings, int seed) {
+void ChunkManager::BeginInitialLoad(glm::vec3 playerPos, glm::vec3 cameraForward, const TerrainSettings &settings, int seed) {
     ChunkCoord playerChunk = WorldToChunkCoord(playerPos);
-    std::vector<ChunkCoord> desired;
-    for (int dz = -LOAD_RADIUS_CHUNKS; dz <= LOAD_RADIUS_CHUNKS; dz++)
-        for (int dx = -LOAD_RADIUS_CHUNKS; dx <= LOAD_RADIUS_CHUNKS; dx++)
-            desired.push_back({ playerChunk.x + dx, playerChunk.z + dz });
+    glm::vec2 forward2D = glm::normalize(glm::vec2(cameraForward.x, cameraForward.z));
 
-    m_InitialLoadTarget = desired.size();
+    std::vector<ChunkCoord> desired;
+    for (int dz = -LOAD_RADIUS_CHUNKS; dz <= LOAD_RADIUS_CHUNKS; dz++) {
+        for (int dx = -LOAD_RADIUS_CHUNKS; dx <= LOAD_RADIUS_CHUNKS; dx++) {
+            float distance = glm::length(glm::vec2(dx, dz));
+            if (distance < 0.001f) {
+                desired.push_back({ playerChunk.x + dx, playerChunk.z + dz });
+                continue;
+            }
+
+            glm::vec2 toChunk = glm::vec2(dx, dz) / distance;
+            float dot = glm::dot(toChunk, forward2D);
+            float effectiveRadius = glm::mix(static_cast<float>(LOAD_RADIUS_CHUNKS) * 0.35f,
+                                             static_cast<float>(LOAD_RADIUS_CHUNKS), (dot + 1.0f) * 0.5f);
+            if (distance <= effectiveRadius) desired.push_back({ playerChunk.x + dx, playerChunk.z + dz });
+        }
+    }
+
+    m_InitialLoadTarget = desired.size(); // now matches the REAL, forward-biased chunk count
 
     for (auto &coord : desired) {
         std::lock_guard<std::mutex> lock(m_RequestMutex);

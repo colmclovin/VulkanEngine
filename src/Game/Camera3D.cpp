@@ -155,3 +155,7 @@ glm::vec3 Camera3D::ScreenPointToRay(float mouseX, float mouseY, float screenWid
 glm::vec3 Camera3D::GetEyePosition() const{
     return (m_Mode == Mode::Isometric) ? GetIsoPosition() : position;
 }
+glm::vec3 Camera3D::GetForwardDirection() const {
+    float yaw = GetIsoYaw(); // or however you access the camera's current yaw
+    return glm::normalize(glm::vec3(-cos(glm::radians(yaw)), 0.0f, -sin(glm::radians(yaw))));
+}

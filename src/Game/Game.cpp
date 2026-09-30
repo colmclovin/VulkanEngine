@@ -553,7 +553,7 @@ void Game::Update(float deltaTime) {
         //PlayerAnimationSystem::Update(*m_Registry, m_PlayerEntity, velocity);
         m_ChunkManager.Update(*m_Registry, playerTransform.Position, m_Settings.terrain,
             m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.seed,
-            m_DepletionMap, m_PlacementGrid, m_RenderSystem->GetTerrainRenderer(), m_RemovedTreesMap);
+                              m_DepletionMap, m_PlacementGrid, m_RenderSystem->GetTerrainRenderer(), m_RemovedTreesMap, m_Camera->GetForwardDirection(), m_Camera->GetIsoDistance());
 
         m_LastPlayerPosition = playerTransform.Position;
     }
@@ -623,7 +623,7 @@ void Game::StartNewGame(const std::string &saveName) {
     SaveManager::SaveGame("Saves/" + saveName + ".json", *m_Registry, m_PlayerEntity, m_ResourceMap, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_DepletionMap, m_RemovedTreesMap); // save immediately so the file exists
 
    m_ChunkManager.BeginInitialLoad(m_Registry->get<TransformComponent>(m_PlayerEntity).Position,
-                                    m_Settings.terrain, m_Settings.terrain.seed);
+                                    m_Camera->GetForwardDirection(), m_Settings.terrain, m_Settings.terrain.seed);
     m_State = GameState::Loading; // CHANGED — was Playing
 }
 
@@ -638,7 +638,7 @@ void Game::LoadExistingGame(const std::string &saveName) {
         m_PlayerEntity = loadedPlayer;
         m_CurrentSaveName = saveName;
         m_ChunkManager.BeginInitialLoad(m_Registry->get<TransformComponent>(m_PlayerEntity).Position,
-                                        m_Settings.terrain, m_Settings.terrain.seed);
+                                        m_Camera->GetForwardDirection(), m_Settings.terrain, m_Settings.terrain.seed);
         m_State = GameState::Loading; // CHANGED — was Playing
     } else {
         std::cerr << "Failed to load save: " << saveName << std::endl;
@@ -745,7 +745,7 @@ void Game::RunLoadingScreen() {
         auto& playerTransform = m_Registry->get<TransformComponent>(m_PlayerEntity);
         m_ChunkManager.Update(*m_Registry, playerTransform.Position, m_Settings.terrain,
             m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.seed,
-            m_DepletionMap, m_PlacementGrid, m_RenderSystem->GetTerrainRenderer(), m_RemovedTreesMap);
+            m_DepletionMap, m_PlacementGrid, m_RenderSystem->GetTerrainRenderer(), m_RemovedTreesMap, m_Camera->GetForwardDirection(), m_Camera->GetIsoDistance());
     }
 
     if (!m_VulkanEngine->BeginFrame([&](VkCommandBuffer cmd) {

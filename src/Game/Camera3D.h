@@ -47,7 +47,7 @@ public:
     void SetIsoTarget(glm::vec3 pos) { isoTarget = pos; }
     glm::mat4 GetActiveViewMatrix() const;   // picks the right one internally
     glm::vec3 ScreenPointToRay(float mouseX, float mouseY, float screenWidth, float screenHeight, float aspect) const;
-
+    glm::vec3 GetForwardDirection() const;
 
 
     //Setters
