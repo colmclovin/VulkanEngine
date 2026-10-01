@@ -363,6 +363,32 @@ if exist "Shaders\tree_instanced.frag" (
 	echo WARNING: tree_instanced.frag not found
 )
 
+if exist "Shaders\simplex_debug.comp" (
+	echo Compiling simplex debug compute shader...
+	glslc -I Shaders Shaders\simplex_debug.comp -o Shaders\simplex_debug_comp.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Simplex debug compute shader compiled successfully
+	) else (
+		echo   Simplex debug compute shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: simplex_debug.comp not found
+)
+if exist "Shaders\ridged_debug.comp" (
+	echo Compiling ridged debug compute shader...
+	glslc -I Shaders Shaders\ridged_debug.comp -o Shaders\ridged_debug_comp.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Ridged debug compute shader compiled successfully
+	) else (
+		echo   Ridged debug compute shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: ridged_debug.comp not found
+)
+
+
 echo.
 echo Shader compilation complete!
 dir shaders\*.spv /b

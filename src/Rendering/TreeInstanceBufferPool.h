@@ -20,11 +20,15 @@ struct TreeChunkGpuMetadata {
     uint32_t padding;
 };
 
+struct TreeInstanceReadback {
+    glm::vec3 position;
+    int gridIndex;
+};
+
 class TreeInstanceBufferPool {
 public:
     void Init(VulkanEngine* engine, uint32_t maxTreesPerChunk, uint32_t maxChunks);
     void Shutdown(VkDevice device);
-
     std::optional<uint32_t> AllocateSlot();
     void FreeSlot(uint32_t slot);
     void ProcessPendingFrees();
@@ -38,12 +42,14 @@ public:
     uint32_t GetMaxChunks() const { return m_MaxChunks; }
     void UploadBoundsOnly(uint32_t slot, glm::vec3 boundsCenter, float boundsRadius);
     void ClearMetadata(uint32_t slot);
-
+    
+    std::vector<TreeInstanceReadback> ReadBackChunkInstances(uint32_t slot) const;
 private:
     VulkanEngine* m_Engine = nullptr;
 
     VkBuffer m_InstanceBuffer = VK_NULL_HANDLE;
     VkDeviceMemory m_InstanceBufferMemory = VK_NULL_HANDLE;
+    void* m_InstanceBufferMapped = nullptr;
 
     VkBuffer m_MetadataBuffer = VK_NULL_HANDLE;
     VkDeviceMemory m_MetadataBufferMemory = VK_NULL_HANDLE;

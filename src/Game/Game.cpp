@@ -2,6 +2,7 @@
 #include <filesystem>
 #include "../Engine/VulkanEngine.h"
 #include "../Renderer/RenderSystem.h"
+#include "../Renderer/DebugLineRenderer.h"
 #include <iostream>
 #include <glm/glm.hpp>
 #include "../Components/Components.h"
@@ -39,7 +40,8 @@
 #include "../Renderer/TerrainRenderer.h"
 #include "../Rendering/ChunkGpuMetadata.h"
 #include "ChunkManager.h"
-
+#include "../World/TreePlacement.h"
+#include "../Utils/GpuNoiseMatch.h"
 Game::Game() {
 
 }
@@ -162,7 +164,22 @@ void Game::Init() {
     //RunNoiseLibraryTest();
    // float worldExtentZ = m_Settings.terrain.gridDepth * m_Settings.terrain.cellSize;   // = 100
    // std::cout << "worldExtentZ = " << worldExtentZ << std::endl;
+    //std::cout << "m_Settings.terrain.seed = " << m_Settings.terrain.seed << std::endl;
     //RunBiomeLibraryTest();
+    //float seedOffset = GpuNoiseMatch::HashSeed((float)m_Settings.terrain.seed);
+    //glm::vec2 testInput = glm::vec2(-32.0f, 312.0f) * 0.0008f + glm::vec2(seedOffset, seedOffset);
+    //std::cout << "m_Settings.terrain.seed = " << m_Settings.terrain.seed << std::endl;
+    //RunSimplexDebugTest(testInput);
+    //GpuNoiseMatch::SimplexNoise2D(testInput);
+    //
+    //std::cout << "m_Settings.terrain.seed = " << m_Settings.terrain.seed << std::endl;
+    ////float seedOffset = GpuNoiseMatch::HashSeed((float)m_Settings.terrain.seed);
+    //std::cout << "New HashSeed(2143) = " << seedOffset << std::endl;   // sanity check — should roughly match whatever biome_test.comp now reports internally
+    //glm::vec2 testPos = glm::vec2(-32.0f, 312.0f) * 0.0008f + glm::vec2(seedOffset, seedOffset);    RunRidgedDebugTest(testPos, 3, 1.0f, 2.0f, 0.5f);
+    //float cpuResult = GpuNoiseMatch::RidgedNoise(testPos, 3, 1.0f, 2.0f, 0.5f);   // will print each octave via the added std::cout lines
+    //std::cout << "CPU final result=" << cpuResult << std::endl;
+    //float cpuTrigger = GpuNoiseMatch::GetElevationTrigger(-32.0f, 312.0f, 2143.0f);
+    //std::cout << "CPU full GetElevationTrigger = " << cpuTrigger << std::endl;
     //COmment to build
    // RunBiomeGridTest();
 
@@ -295,7 +312,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
                                                   static_cast<float>(extent.width), static_cast<float>(extent.height), aspect);
 
     auto &playerTransform = m_Registry->get<TransformComponent>(m_PlayerEntity);
-    float interactRange = 5.0f;
+    float interactRange = 25.0f;
 
     entt::entity machineTarget = InteractionSystem::FindMachineAlongRay(*m_Registry, rayOrigin, rayDir, 100.0f);
 
@@ -356,7 +373,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
         } else {
             InteractionSystem::TryMineAtCursor(*m_Registry, m_DepletionMap, m_PlayerEntity,
                                                rayOrigin, rayDir, m_Settings.terrain, interactRange, m_AudioEvents.get(),
-                                               m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_PlacementGrid, m_RemovedTreesMap);
+                                               m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_PlacementGrid, m_RemovedTreesMap, m_ChunkManager, m_TreeHealthMap, *m_RenderSystem->GetTreeRenderer());
         }
     }
     
@@ -462,8 +479,7 @@ void Game::MovePlayer(glm::vec3 direction, float deltaTime) {
 		transform.Position += (forward * direction.z + right * direction.x) * player.moveSpeed * deltaTime;
 	}
 
-    auto sample = TerrainGenerator::SampleTerrain(transform.Position.x, transform.Position.z, m_Settings.terrain, m_DepletionMap);
-    transform.Position.y = sample.height;
+    transform.Position.y = GpuNoiseMatch::SampleHeight(transform.Position.x, transform.Position.z, static_cast<float>(m_Settings.terrain.seed));
 }
 
 void Game::HandleFreeFlyInput(GLFWwindow* window, float deltaTime) {
@@ -558,6 +574,7 @@ void Game::Update(float deltaTime) {
             m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.seed,
                               m_DepletionMap, m_PlacementGrid, m_RenderSystem->GetTerrainRenderer(), m_RemovedTreesMap, m_Camera->GetForwardDirection(), m_Camera->GetIsoDistance(), m_RenderSystem->GetTreeRenderer());
 
+
         m_LastPlayerPosition = playerTransform.Position;
     }
 
@@ -567,7 +584,7 @@ void Game::Update(float deltaTime) {
 void Game::Render() {
     m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine,
                                 m_PlayerEntity, m_InspectedEntity, m_SelectedItem, m_TechState,
-                                false, m_ShowOptionsInPause, m_DayNightCycle, m_ChunkManager);
+                                false, m_ShowOptionsInPause, m_DayNightCycle, m_ChunkManager, m_DepletionMap, m_RemovedTreesMap);
 }
 void Game::Shutdown() {
     std::cout << "=== Shutting Down Game ===" << std::endl;
@@ -719,7 +736,7 @@ void Game::RunMainMenu() {
 void Game::RunPauseMenu() {
     PauseMenuAction action = m_RenderSystem->RenderFrame(*m_Registry, *m_Camera, m_Settings, *m_AudioEngine,
                                                          m_PlayerEntity, m_InspectedEntity, m_SelectedItem, m_TechState,
-                                                         true, m_ShowOptionsInPause, m_DayNightCycle,m_ChunkManager);
+                                                         true, m_ShowOptionsInPause, m_DayNightCycle,m_ChunkManager,m_DepletionMap, m_RemovedTreesMap);
 
     switch (action) {
     case PauseMenuAction::Resume:
@@ -753,7 +770,7 @@ void Game::RunLoadingScreen() {
 
     if (!m_VulkanEngine->BeginFrame([&](VkCommandBuffer cmd) {
         std::cout << "About to call RecordPendingGeneration Game.cpp" << std::endl;
-        m_ChunkManager.RecordPendingGeneration(cmd, m_RenderSystem->GetChunkGenerator(), m_RenderSystem->GetTerrainRenderer(), m_RenderSystem->GetTreeRenderer(), m_Settings.terrain);
+        m_ChunkManager.RecordPendingGeneration(cmd, m_RenderSystem->GetChunkGenerator(), m_RenderSystem->GetTerrainRenderer(), m_RenderSystem->GetTreeRenderer(), m_Settings.terrain, m_DepletionMap, m_RemovedTreesMap);
         std::cout << "RecordPendingGeneration complete Game.cpp" << std::endl;
         })) {
         return;
@@ -990,7 +1007,7 @@ void Game::RunBiomeLibraryTest() {
     }
     vkDestroyShaderModule(device, shaderModule, nullptr);
 
-    BiomeTestPush push{ 0.0f, 0.0f, 1.0f, (float)m_Settings.terrain.seed, 1, 0.0f };   // sampleType=1, spacing=1.0, worldExtentZ unused here
+    BiomeTestPush push{ -32.0f, 312.0f, 0.0f, (float)m_Settings.terrain.seed, 1, 0.0f };
 
     VkCommandBuffer cmd = m_VulkanEngine->BeginSingleTimeCommands();
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
@@ -1000,9 +1017,7 @@ void Game::RunBiomeLibraryTest() {
     m_VulkanEngine->EndSingleTimeCommands(cmd);
 
     float* results = static_cast<float*>(mapped);
-    std::cout << "ElevationTrigger at REAL vertex spacing (1.0): ";
-    for (uint32_t i = 0; i < sampleCount; i++) std::cout << results[i] << " ";
-    std::cout << std::endl;
+    std::cout << "GPU elevationTrigger at (-32,312) [single point test] = " << results[0] << std::endl;
 
     vkDestroyPipeline(device, pipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
@@ -1130,6 +1145,233 @@ void Game::RunBiomeGridTest() {
     for (int b = 0; b < 6; b++) {
         std::cout << "  " << biomeNames[b] << ": " << biomeCounts[b] << " (" << (100.0f * biomeCounts[b] / sampleCount) << "%)" << std::endl;
     }
+
+    vkDestroyPipeline(device, pipeline, nullptr);
+    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+    vkDestroyDescriptorPool(device, descPool, nullptr);
+    vkDestroyDescriptorSetLayout(device, descSetLayout, nullptr);
+    vkDestroyBuffer(device, outputBuffer, nullptr);
+    vkFreeMemory(device, outputMemory, nullptr);
+}
+
+void Game::RunSimplexDebugTest(glm::vec2 testPoint) {
+    VkDevice device = m_VulkanEngine->GetDevice();
+
+    const uint32_t numVec4s = 9;   // CHANGED — was 8
+    VkBuffer outputBuffer;
+    VkDeviceMemory outputMemory;
+    VkDeviceSize bufferSize = numVec4s * sizeof(glm::vec4);
+    m_VulkanEngine->CreateBuffer(bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        outputBuffer, outputMemory);
+    void* mapped;
+    vkMapMemory(device, outputMemory, 0, bufferSize, 0, &mapped);
+
+    VkDescriptorSetLayoutBinding binding{};
+    binding.binding = 0;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    binding.descriptorCount = 1;
+    binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &binding;
+    VkDescriptorSetLayout descSetLayout;
+    vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descSetLayout);
+
+    VkDescriptorPoolSize poolSize{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 };
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = 1;
+    VkDescriptorPool descPool;
+    vkCreateDescriptorPool(device, &poolInfo, nullptr, &descPool);
+
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = descPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &descSetLayout;
+    VkDescriptorSet descSet;
+    vkAllocateDescriptorSets(device, &allocInfo, &descSet);
+
+    VkDescriptorBufferInfo bufferInfo{ outputBuffer, 0, bufferSize };
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = descSet;
+    write.dstBinding = 0;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    write.descriptorCount = 1;
+    write.pBufferInfo = &bufferInfo;
+    vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+
+    VkPushConstantRange pushRange{};
+    pushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pushRange.offset = 0;
+    pushRange.size = sizeof(glm::vec2);
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &descSetLayout;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushRange;
+    VkPipelineLayout pipelineLayout;
+    vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout);
+
+    auto shaderCode = m_VulkanEngine->ReadFile("Shaders/simplex_debug_comp.spv");
+    VkShaderModule shaderModule = m_VulkanEngine->CreateShaderModule(shaderCode);
+
+    VkPipelineShaderStageCreateInfo stageInfo{};
+    stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    stageInfo.module = shaderModule;
+    stageInfo.pName = "main";
+
+    VkComputePipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipelineInfo.stage = stageInfo;
+    pipelineInfo.layout = pipelineLayout;
+
+    VkPipeline pipeline;
+    if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create simplex debug pipeline");
+    }
+    vkDestroyShaderModule(device, shaderModule, nullptr);
+
+    VkCommandBuffer cmd = m_VulkanEngine->BeginSingleTimeCommands();
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descSet, 0, nullptr);
+    vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(glm::vec2), &testPoint);
+    vkCmdDispatch(cmd, 1, 1, 1);
+    m_VulkanEngine->EndSingleTimeCommands(cmd);
+
+    glm::vec4* results = static_cast<glm::vec4*>(mapped);
+    const char* labels[9] = { "i", "x0", "i1", "x12", "p", "mPreSquare", "m", "g", "result" };   // CHANGED
+    for (int i = 0; i < 9; i++) {   // CHANGED
+        std::cout << "  " << labels[i] << " = (" << results[i].x << ", " << results[i].y << ", " << results[i].z << ", " << results[i].w << ")" << std::endl;
+    }
+
+    vkDestroyPipeline(device, pipeline, nullptr);
+    vkDestroyPipelineLayout(device, pipelineLayout, nullptr);
+    vkDestroyDescriptorPool(device, descPool, nullptr);
+    vkDestroyDescriptorSetLayout(device, descSetLayout, nullptr);
+    vkDestroyBuffer(device, outputBuffer, nullptr);
+    vkFreeMemory(device, outputMemory, nullptr);
+}
+
+void Game::RunRidgedDebugTest(glm::vec2 pos, int octaves, float frequency, float lacunarity, float gain) {
+    VkDevice device = m_VulkanEngine->GetDevice();
+
+    const uint32_t numVec4s = 4;
+    VkBuffer outputBuffer;
+    VkDeviceMemory outputMemory;
+    VkDeviceSize bufferSize = numVec4s * sizeof(glm::vec4);
+    m_VulkanEngine->CreateBuffer(bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+        outputBuffer, outputMemory);
+    void* mapped;
+    vkMapMemory(device, outputMemory, 0, bufferSize, 0, &mapped);
+
+    VkDescriptorSetLayoutBinding binding{};
+    binding.binding = 0;
+    binding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    binding.descriptorCount = 1;
+    binding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+    VkDescriptorSetLayoutCreateInfo layoutInfo{};
+    layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    layoutInfo.bindingCount = 1;
+    layoutInfo.pBindings = &binding;
+    VkDescriptorSetLayout descSetLayout;
+    vkCreateDescriptorSetLayout(device, &layoutInfo, nullptr, &descSetLayout);
+
+    VkDescriptorPoolSize poolSize{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 };
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = 1;
+    VkDescriptorPool descPool;
+    vkCreateDescriptorPool(device, &poolInfo, nullptr, &descPool);
+
+    VkDescriptorSetAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = descPool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &descSetLayout;
+    VkDescriptorSet descSet;
+    vkAllocateDescriptorSets(device, &allocInfo, &descSet);
+
+    VkDescriptorBufferInfo bufferInfo{ outputBuffer, 0, bufferSize };
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.dstSet = descSet;
+    write.dstBinding = 0;
+    write.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    write.descriptorCount = 1;
+    write.pBufferInfo = &bufferInfo;
+    vkUpdateDescriptorSets(device, 1, &write, 0, nullptr);
+
+    struct RidgedPush {
+        glm::vec2 pos;
+        int octaves;
+        float frequency;
+        float lacunarity;
+        float gain;
+    };
+    VkPushConstantRange pushRange{};
+    pushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    pushRange.offset = 0;
+    pushRange.size = sizeof(RidgedPush);
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &descSetLayout;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushRange;
+    VkPipelineLayout pipelineLayout;
+    vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &pipelineLayout);
+
+    auto shaderCode = m_VulkanEngine->ReadFile("Shaders/ridged_debug_comp.spv");
+    VkShaderModule shaderModule = m_VulkanEngine->CreateShaderModule(shaderCode);
+
+    VkPipelineShaderStageCreateInfo stageInfo{};
+    stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    stageInfo.module = shaderModule;
+    stageInfo.pName = "main";
+
+    VkComputePipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    pipelineInfo.stage = stageInfo;
+    pipelineInfo.layout = pipelineLayout;
+
+    VkPipeline pipeline;
+    if (vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create ridged debug pipeline");
+    }
+    vkDestroyShaderModule(device, shaderModule, nullptr);
+
+    RidgedPush push{ pos, octaves, frequency, lacunarity, gain };
+
+    VkCommandBuffer cmd = m_VulkanEngine->BeginSingleTimeCommands();
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipelineLayout, 0, 1, &descSet, 0, nullptr);
+    vkCmdPushConstants(cmd, pipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(RidgedPush), &push);
+    vkCmdDispatch(cmd, 1, 1, 1);
+    m_VulkanEngine->EndSingleTimeCommands(cmd);
+
+    glm::vec4* results = static_cast<glm::vec4*>(mapped);
+    std::cout << "=== GPU RidgedNoise octaves at (" << pos.x << "," << pos.y << ") ===" << std::endl;
+    for (int i = 0; i < 3; i++) {
+        std::cout << "  octave " << i << ": sum=" << results[i].x << " n=" << results[i].y
+            << " amplitude=" << results[i].z << " freq=" << results[i].w << std::endl;
+    }
+    std::cout << "  final result=" << results[3].x << std::endl;
 
     vkDestroyPipeline(device, pipeline, nullptr);
     vkDestroyPipelineLayout(device, pipelineLayout, nullptr);

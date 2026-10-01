@@ -18,6 +18,7 @@ void TreeInstanceBufferPool::Init(VulkanEngine* engine, uint32_t maxTreesPerChun
     engine->CreateBuffer(instanceBufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
         m_InstanceBuffer, m_InstanceBufferMemory);
+    vkMapMemory(device, m_InstanceBufferMemory, 0, instanceBufferSize, 0, &m_InstanceBufferMapped);   // ADD — persistent map
 
     VkDeviceSize metadataBufferSize = maxChunks * sizeof(TreeChunkGpuMetadata);
     engine->CreateBuffer(metadataBufferSize,
@@ -77,9 +78,9 @@ void TreeInstanceBufferPool::UploadChunkTrees(uint32_t slot, const std::vector<g
     VkDeviceSize offset = static_cast<VkDeviceSize>(slot) * m_MaxTreesPerChunk * sizeof(TreeInstanceGpuData);
     void* mapped;
     vkMapMemory(m_Engine->GetDevice(), m_InstanceBufferMemory, offset, treePositions.size() * sizeof(TreeInstanceGpuData), 0, &mapped);
-    TreeInstanceGpuData* data = static_cast<TreeInstanceGpuData*>(mapped);
+    TreeInstanceGpuData* data = static_cast<TreeInstanceGpuData*>(m_InstanceBufferMapped);   // CHANGED — use persistent map
     for (size_t i = 0; i < treePositions.size(); i++) {
-        data[i].positionAndScale = glm::vec4(treePositions[i], 0.3f);   // 0.3f matching your existing tree scale convention
+        data[slot * m_MaxTreesPerChunk + i].positionAndScale = glm::vec4(treePositions[i], 0.3f);
     }
     vkUnmapMemory(m_Engine->GetDevice(), m_InstanceBufferMemory);
 
@@ -116,4 +117,22 @@ void TreeInstanceBufferPool::UploadBoundsOnly(uint32_t slot, glm::vec3 boundsCen
 void TreeInstanceBufferPool::ClearMetadata(uint32_t slot) {
     TreeChunkGpuMetadata* metadata = static_cast<TreeChunkGpuMetadata*>(m_MetadataBufferMapped);
     metadata[slot].isActive = 0;
+}
+
+
+
+std::vector<TreeInstanceReadback> TreeInstanceBufferPool::ReadBackChunkInstances(uint32_t slot) const {
+    std::vector<TreeInstanceReadback> results;
+    if (slot >= m_MaxChunks) return results;
+
+    const TreeChunkGpuMetadata* metadata = static_cast<const TreeChunkGpuMetadata*>(m_MetadataBufferMapped);
+    uint32_t count = metadata[slot].instanceCount;
+    if (count == 0 || metadata[slot].isActive == 0) return results;
+
+    const glm::vec4* instanceData = static_cast<const glm::vec4*>(m_InstanceBufferMapped);
+    for (uint32_t i = 0; i < count; i++) {
+        glm::vec4 data = instanceData[slot * m_MaxTreesPerChunk + i];
+        results.push_back({ glm::vec3(data.x, data.y, data.z), static_cast<int>(data.w) });
+    }
+    return results;
 }

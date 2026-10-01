@@ -4,7 +4,7 @@
 #include "../Rendering/TerrainBufferPool.h"
 #include <stdexcept>
 #include <iostream>
-
+#include <unordered_set>
 void ChunkGenerator::Init(VulkanEngine* engine, TerrainBufferPool* pool, TreeInstanceBufferPool* treePool, uint32_t vertexResolution) {
     m_Engine = engine;
     m_VertexResolution = vertexResolution;
@@ -65,11 +65,14 @@ void ChunkGenerator::CreatePass1Pipeline() {
     struct Pass1Push {
         float chunkOriginX, chunkOriginZ, cellSize, seed;
         uint32_t vertexResolution, paddedRes;
+        uint32_t depletionCount;
+        glm::vec4 depletionEntriesArr[4];
+        uint32_t _padding;   // ADD — explicit padding to match GLSL's actual 96-byte block size
     };
     VkPushConstantRange pushRange{};
     pushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     pushRange.offset = 0;
-    pushRange.size = sizeof(Pass1Push);
+    pushRange.size = 96;
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -175,13 +178,27 @@ void ChunkGenerator::CreatePass2Pipeline(TerrainBufferPool* pool) {
 }
 
 void ChunkGenerator::RecordGenerateChunk(VkCommandBuffer commandBuffer, uint32_t terrainSlot, uint32_t treeSlot,
-    float chunkOriginX, float chunkOriginZ, float cellSize, float seed) {
+    float chunkOriginX, float chunkOriginZ, float cellSize, float seed,
+    const std::vector<glm::vec4>& depletionEntries,
+    const std::unordered_set<int>& removedTreeIndices) {
    //std::cout << "About to record tree generation for slot " << treeSlot << std::endl;
     // ===== Pass 1: padded position/color =====
     struct Pass1Push {
         float chunkOriginX, chunkOriginZ, cellSize, seed;
         uint32_t vertexResolution, paddedRes;
-    } pass1Push{ chunkOriginX, chunkOriginZ, cellSize, seed, m_VertexResolution, m_PaddedRes };
+        uint32_t depletionCount;
+        glm::vec4 depletionEntriesArr[4];   // CHANGED
+    } pass1Push{};
+    pass1Push.chunkOriginX = chunkOriginX;
+    pass1Push.chunkOriginZ = chunkOriginZ;
+    pass1Push.cellSize = cellSize;
+    pass1Push.seed = seed;
+    pass1Push.vertexResolution = m_VertexResolution;
+    pass1Push.paddedRes = m_PaddedRes;
+    pass1Push.depletionCount = static_cast<uint32_t>(std::min(depletionEntries.size(), size_t(4)));   // CHANGED
+    for (uint32_t i = 0; i < pass1Push.depletionCount; i++) {
+        pass1Push.depletionEntriesArr[i] = depletionEntries[i];
+    }
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_Pass1Pipeline);
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_Pass1PipelineLayout, 0, 1, &m_Pass1DescSet, 0, nullptr);
@@ -252,14 +269,33 @@ void ChunkGenerator::RecordGenerateChunk(VkCommandBuffer commandBuffer, uint32_t
         float chunkOriginX, chunkOriginZ, chunkWorldSize, seed;
         uint32_t chunkSlot, maxTreesPerChunk, samplesPerAxis;
         float sampleSpacing;
-    } treePush{ chunkOriginX, chunkOriginZ, 32.0f, seed, treeSlot, m_TreePool->GetMaxTreesPerChunk(), 4, 8.0f };
+        uint32_t removedCount;
+        uint32_t removedIndicesArr[16];
+    } treePush{};
+    treePush.chunkOriginX = chunkOriginX;
+    treePush.chunkOriginZ = chunkOriginZ;
+    treePush.chunkWorldSize = 32.0f;
+    treePush.seed = seed;
+    treePush.chunkSlot = treeSlot;
+    treePush.maxTreesPerChunk = m_TreePool->GetMaxTreesPerChunk();
+    treePush.samplesPerAxis = 4;
+    treePush.sampleSpacing = 8.0f;
+    treePush.removedCount = static_cast<uint32_t>(std::min(removedTreeIndices.size(), size_t(16)));
+    {
+        uint32_t i = 0;
+        for (int idx : removedTreeIndices) {
+            if (i >= 16) break;
+            treePush.removedIndicesArr[i++] = static_cast<uint32_t>(idx);
+        }
+    }
 
     vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_TreeGenPipeline);
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_TreeGenPipelineLayout, 0, 1, &m_TreeGenDescSet, 0, nullptr);
     vkCmdPushConstants(commandBuffer, m_TreeGenPipelineLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(TreeGenPush), &treePush);
 
-    uint32_t totalSamples = 4 * 4;   // samplesPerAxis=4 -> 16 total sample points
+    uint32_t totalSamples = 4 * 4;
     vkCmdDispatch(commandBuffer, (totalSamples + 63) / 64, 1, 1);
+
 
     // Barrier: tree generation's writes must complete before the culling shader reads instance/metadata buffers
     VkBufferMemoryBarrier treeBarriers[2]{};
@@ -314,10 +350,12 @@ void ChunkGenerator::CreateTreeGenPipeline(TreeInstanceBufferPool* treePool) {
     writes[1] = { VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET, nullptr, m_TreeGenDescSet, 1, 0, 1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, nullptr, &metaInfo, nullptr };
     vkUpdateDescriptorSets(device, 2, writes, 0, nullptr);
 
-    struct TreeGenPush {
+    struct TreeGenPush {   // MUST match RecordGenerateChunk's TreeGenPush exactly
         float chunkOriginX, chunkOriginZ, chunkWorldSize, seed;
         uint32_t chunkSlot, maxTreesPerChunk, samplesPerAxis;
         float sampleSpacing;
+        uint32_t removedCount;
+        uint32_t removedIndicesArr[16];
     };
     VkPushConstantRange pushRange{};
     pushRange.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;

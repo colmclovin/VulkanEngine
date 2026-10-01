@@ -171,11 +171,13 @@
     <None Include="Shaders\mesh_Instanced.vert" />
     <None Include="Shaders\noise_test.comp" />
     <None Include="Shaders\Include\ore.glsl" />
+    <None Include="Shaders\ridged_debug.comp" />
     <None Include="Shaders\shadow.frag" />
     <None Include="Shaders\shadow.vert" />
     <None Include="Shaders\shadow_instanced.vert" />
     <None Include="Shaders\shadow_skinned.frag" />
     <None Include="Shaders\shadow_skinned.vert" />
+    <None Include="Shaders\simplex_debug.comp" />
     <None Include="Shaders\skinned.frag" />
     <None Include="Shaders\skinned.vert" />
     <None Include="Shaders\terrain.frag" />
@@ -248,12 +250,14 @@
     <ClCompile Include="src\Systems\PlayerAnimationSystem.cpp" />
     <ClCompile Include="src\Systems\PowerSystem.cpp" />
     <ClCompile Include="src\Utils\GameSettings.cpp" />
+    <ClCompile Include="src\Utils\GpuNoiseMatch.cpp" />
     <ClCompile Include="src\Utils\TextureLoader.cpp" />
     <ClCompile Include="src\World\DayNightCycle.cpp" />
     <ClCompile Include="src\World\DepletionMap.cpp" />
     <ClCompile Include="src\World\ResourceMap.cpp" />
     <ClCompile Include="src\World\TerrainGenerator.cpp" />
     <ClCompile Include="src\World\TerrainRaycast.cpp" />
+    <ClCompile Include="src\World\TreePlacement.cpp" />
     <ClCompile Include="src\World\WorldGenerator.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -349,6 +353,7 @@
     <ClInclude Include="src\Systems\PlayerAnimationSystem.h" />
     <ClInclude Include="src\Systems\PowerSystem.h" />
     <ClInclude Include="src\Utils\GameSettings.h" />
+    <ClInclude Include="src\Utils\GpuNoiseMatch.h" />
     <ClInclude Include="src\Utils\TextureLoader.h" />
     <ClInclude Include="src\World\Chunk.h" />
     <ClInclude Include="src\World\ChunkCoord.h" />
@@ -360,6 +365,8 @@
     <ClInclude Include="src\World\ResourceMap.h" />
     <ClInclude Include="src\World\TerrainGenerator.h" />
     <ClInclude Include="src\World\TerrainRaycast.h" />
+    <ClInclude Include="src\World\TreeHealthMap.h" />
+    <ClInclude Include="src\World\TreePlacement.h" />
     <ClInclude Include="src\World\WorldGenerator.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -4,7 +4,7 @@
 
 glm::vec3 TerrainRaycast::RaycastToTerrain(glm::vec3 rayOrigin, glm::vec3 rayDir, const TerrainSettings &terrainSettings) {
 	const float stepSize = 0.25f;
-	const float maxDistance = 200.0f;
+	const float maxDistance = 600.0f;
 
 	glm::vec3 pos = rayOrigin;
 	for (float t = 0.0f; t < maxDistance; t += stepSize) {

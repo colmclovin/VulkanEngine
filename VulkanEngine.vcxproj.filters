@@ -49,6 +49,8 @@
     <None Include="Shaders\tree_cull.comp" />
     <None Include="Shaders\tree_instanced.vert" />
     <None Include="Shaders\tree_instanced.frag" />
+    <None Include="Shaders\simplex_debug.comp" />
+    <None Include="Shaders\ridged_debug.comp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Main.cpp">
@@ -250,6 +252,12 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Rendering\TreeCuller.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\World\TreePlacement.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Utils\GpuNoiseMatch.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -564,6 +572,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Rendering\TreeCuller.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\World\TreePlacement.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\World\TreeHealthMap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Utils\GpuNoiseMatch.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

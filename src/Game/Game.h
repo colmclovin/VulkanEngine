@@ -15,6 +15,7 @@
 #include "../World/DepletionMap.h"
 #include "../World/RemovedTreesMap.h"
 #include "../Renderer/TerrainRenderer.h"
+#include "../World/TreeHealthMap.h"
 class TerrainGenerator;
 class VulkanEngine;
 class RenderSystem;
@@ -99,7 +100,7 @@ private:
     bool m_Initialized = false;
     entt::entity m_InspectedEntity = entt::null;
     float m_LoadingProgress = 0.0f; // 0.0 to 1.0
-
+    TreeHealthMap m_TreeHealthMap;
     std::unique_ptr<TerrainRenderer> m_TerrainRenderer;
     bool m_TerrainTestActive = false;
 
@@ -122,7 +123,7 @@ private:
     };
 
     void RunBiomeLibraryTest();
-
-
+    void RunSimplexDebugTest(glm::vec2 testPoint);
+    void RunRidgedDebugTest(glm::vec2 pos, int octaves, float frequency, float lacunarity, float gain);
     void RunBiomeGridTest();
 };

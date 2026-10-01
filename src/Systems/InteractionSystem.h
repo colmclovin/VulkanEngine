@@ -9,7 +9,9 @@
 #include "../Engine/VulkanEngine.h"
 #include "../Renderer/MeshRenderer.h"
 #include "../World/DepletionMap.h"
-
+#include "../Game/ChunkManager.h"
+#include "../World/TreeHealthMap.h"
+#include "../Components/Components.h"
 class AudioEventSystem;
 
 class InteractionSystem {
@@ -22,10 +24,11 @@ public:
 	static bool TryMineGround(ResourceMap &resourceMap, entt::registry &registry, entt::entity player,
 							  glm::vec3 playerPos, glm::vec3 targetPos, float maxRange,
 							  float extractAmount, AudioEventSystem *audio);
-	static bool TryMineAtCursor(entt::registry &registry, DepletionMap &depletionMap, entt::entity player,
-								glm::vec3 rayOrigin, glm::vec3 rayDir, const TerrainSettings &terrainSettings,
-								float maxRange, AudioEventSystem *audio, VulkanEngine *engine, MeshRenderer *meshRenderer,
-                                PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap);
+	static bool TryMineAtCursor(entt::registry& registry, DepletionMap& depletionMap, entt::entity player,
+		glm::vec3 rayOrigin, glm::vec3 rayDir, const TerrainSettings& terrainSettings,
+		float maxRange, AudioEventSystem* audio, VulkanEngine* engine, MeshRenderer* meshRenderer,
+		PlacementGrid& placementGrid, RemovedTreesMap& removedTreesMap, ChunkManager& chunkManager,
+		TreeHealthMap& treeHealthMap, TreeRenderer& treeRenderer);
 	static entt::entity FindEntityAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
 	static bool TryFuelMiner(entt::registry &registry, entt::entity minerEntity, entt::entity player, ItemId selectedItem, int amount);
 	static bool TryCollectMinerOutput(entt::registry &registry, entt::entity minerEntity, entt::entity player);
@@ -37,4 +40,9 @@ public:
 	static bool TryRotateMachine(entt::registry &registry, entt::entity target);
 	static bool TryPickupMachine(entt::registry &registry, entt::entity target, entt::entity player, PlacementGrid &placementGrid, float gridSize);
 	static bool TryFuelGenerator(entt::registry &registry, entt::entity generatorEntity, entt::entity player, ItemId selectedItem, int amount);
+	bool TryChopTreeAtCursor(glm::vec3 cursorWorldPos, RemovedTreesMap& removedTreesMap, ChunkManager& chunkManager,
+		const TerrainSettings& settings, InventoryComponent& inventory);
+	static int FindTreeAlongRay(const std::vector<TreeInstanceReadback>& treeInstances,
+		const RemovedTreesMap& removedTreesMap, ChunkCoord coord,
+		glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
 };

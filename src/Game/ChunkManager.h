@@ -74,10 +74,12 @@ public:
     void Update(entt::registry& registry, glm::vec3 playerPosition, const TerrainSettings& settings,
         VulkanEngine* engine, MeshRenderer* meshRenderer, int seed, DepletionMap& depletionMap,
                 PlacementGrid &placementGrid, TerrainRenderer *terrainRenderer, RemovedTreesMap &removedTreesMap, glm::vec3 cameraForward, float isoDistance, TreeRenderer* treeRenderer);
-
+    void RequestChunkRegeneration(ChunkCoord coord);
     void RecordPendingGeneration(VkCommandBuffer commandBuffer, ChunkGenerator* generator,
-        TerrainRenderer* terrainRenderer, TreeRenderer* treeRenderer, const TerrainSettings& settings);
-   
+        TerrainRenderer* terrainRenderer, TreeRenderer* treeRenderer,
+        const TerrainSettings& settings, DepletionMap& depletionMap,
+        RemovedTreesMap& removedTreesMap);
+    std::optional<uint32_t> GetTreeSlotForChunk(ChunkCoord coord) const;
     void Reset() {
         m_LoadedChunks.clear();
         {

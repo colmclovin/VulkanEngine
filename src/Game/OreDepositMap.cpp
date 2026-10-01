@@ -2,14 +2,15 @@
 #include "OreDepositMap.h"
 #include <cmath>
 #include <array>
+#include "../Utils/GpuNoiseMatch.h"
 
 float OreDepositMap::Fract(float x) {
     return x - std::floor(x);
 }
 
 float OreDepositMap::HashToFloat(float cellX, float cellZ, float seed, float saltX, float saltZ) {
-    // Matches ore.glsl's hashToFloat(cell + vec2(saltX, saltZ), seed) exactly
-    float h = (cellX + saltX) * 73856093.0f + (cellZ + saltZ) * 19349663.0f + seed;
+    float seedOffset = GpuNoiseMatch::HashSeed(seed);   // CHANGED — reuse the shared, fixed HashSeed
+    float h = (cellX + saltX) * 12.9898f + (cellZ + saltZ) * 78.233f + seedOffset;
     return Fract(std::sin(h) * 43758.5453f);
 }
 

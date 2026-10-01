@@ -76,7 +76,7 @@ void ChunkManager::Update(entt::registry& registry, glm::vec3 playerPosition, co
         m_LoadedChunks[coord] = chunk;
         m_PendingGpuGeneration.push_back({ coord });
     }
-    std::cout << "Update: loaded=" << m_LoadedChunks.size() << " pending=" << m_PendingGpuGeneration.size() << std::endl;
+    //std::cout << "Update: loaded=" << m_LoadedChunks.size() << " pending=" << m_PendingGpuGeneration.size() << std::endl;
     //std::cout << "Slot allocation loop complete, m_PendingGpuGeneration=" << m_PendingGpuGeneration.size() << std::endl;
     /*
     // --- Trees: unchanged, still async CPU worker thread ---
@@ -545,7 +545,9 @@ float ChunkManager::GetInitialLoadProgress() const {
 }
 
 void ChunkManager::RecordPendingGeneration(VkCommandBuffer commandBuffer, ChunkGenerator* generator,
-    TerrainRenderer* terrainRenderer, TreeRenderer* treeRenderer, const TerrainSettings& settings) {
+    TerrainRenderer* terrainRenderer, TreeRenderer* treeRenderer,
+    const TerrainSettings& settings, DepletionMap& depletionMap,
+    RemovedTreesMap& removedTreesMap) {   // ADD these two
     for (auto& req : m_PendingGpuGeneration) {
         auto it = m_LoadedChunks.find(req.coord);
         if (it == m_LoadedChunks.end()) continue;
@@ -555,15 +557,46 @@ void ChunkManager::RecordPendingGeneration(VkCommandBuffer commandBuffer, ChunkG
         float chunkOriginZ = req.coord.z * CHUNK_WORLD_SIZE;
         float cellSize = CHUNK_WORLD_SIZE / (CHUNK_VERTEX_RESOLUTION - 1);
 
+        // Gather this chunk's relevant depletion entries (within its world-space bounds)
+        std::vector<glm::vec4> depletionEntries;
+        for (auto& [gridCoord, fraction] : depletionMap.GetAll()) {
+            float wx = static_cast<float>(gridCoord.x);
+            float wz = static_cast<float>(gridCoord.z);
+            if (wx >= chunkOriginX && wx < chunkOriginX + CHUNK_WORLD_SIZE &&
+                wz >= chunkOriginZ && wz < chunkOriginZ + CHUNK_WORLD_SIZE) {
+                depletionEntries.push_back(glm::vec4(wx, wz, fraction, 0.0f));
+                if (depletionEntries.size() >= 8) break;   // matches shader's fixed array size
+            }
+        }
+
+        // Gather this chunk's removed tree indices
+        auto removedIndices = removedTreesMap.GetAll().count(req.coord) ? removedTreesMap.GetAll().at(req.coord) : std::unordered_set<int>{};
+
         generator->RecordGenerateChunk(commandBuffer, it->second.terrainSlot, it->second.treeSlot,
-            chunkOriginX, chunkOriginZ, cellSize, (float)settings.seed);
+            chunkOriginX, chunkOriginZ, cellSize, (float)settings.seed,
+            depletionEntries, removedIndices);
 
         glm::vec3 boundsCenter(chunkOriginX + CHUNK_WORLD_SIZE * 0.5f, 0.0f, chunkOriginZ + CHUNK_WORLD_SIZE * 0.5f);
         float boundsRadius = CHUNK_WORLD_SIZE * 0.75f;
         terrainRenderer->UploadChunkBounds(it->second.terrainSlot, boundsCenter, boundsRadius);
-        treeRenderer->UploadChunkBounds(it->second.treeSlot, boundsCenter, boundsRadius);   // NEW — same bounds work for tree culling too
+        treeRenderer->UploadChunkBounds(it->second.treeSlot, boundsCenter, boundsRadius);
 
         it->second.isGenerated = true;
     }
     m_PendingGpuGeneration.clear();
+}
+
+void ChunkManager::RequestChunkRegeneration(ChunkCoord coord) {
+    auto it = m_LoadedChunks.find(coord);
+    if (it == m_LoadedChunks.end()) return;   // chunk isn't loaded, nothing to regenerate
+
+    // Re-queue it for generation, reusing the EXACT same slots it already owns
+    m_PendingGpuGeneration.push_back({ coord });
+    it->second.isGenerated = false;   // allows RecordPendingGeneration to pick it up again
+}
+
+std::optional<uint32_t> ChunkManager::GetTreeSlotForChunk(ChunkCoord coord) const {
+    auto it = m_LoadedChunks.find(coord);
+    if (it == m_LoadedChunks.end() || !it->second.isGenerated) return std::nullopt;
+    return it->second.treeSlot;
 }

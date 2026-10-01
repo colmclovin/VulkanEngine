@@ -3,6 +3,8 @@
 #include <vulkan/vulkan.h>
 #include <glm/glm.hpp>
 #include "../Rendering/TreeInstanceBufferPool.h"
+#include <unordered_set>
+
 class VulkanEngine;
 class TerrainBufferPool;
 class TreeInstanceBufferPool;
@@ -13,7 +15,9 @@ public:
     void Shutdown();
 
     void RecordGenerateChunk(VkCommandBuffer commandBuffer, uint32_t terrainSlot, uint32_t treeSlot,
-        float chunkOriginX, float chunkOriginZ, float cellSize, float seed);
+        float chunkOriginX, float chunkOriginZ, float cellSize, float seed,
+        const std::vector<glm::vec4>& depletionEntries,
+        const std::unordered_set<int>& removedTreeIndices);
 
 private:
     void CreatePass1Pipeline();

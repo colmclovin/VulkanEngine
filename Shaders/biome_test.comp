@@ -26,7 +26,7 @@ void main() {
     if (pc.sampleType == 0) {
         values[idx] = getAridity(x, z, pc.seed);
     } else if (pc.sampleType == 1) {
-        values[idx] = getElevationTrigger(x, z, pc.seed);
+    values[idx] = getElevationTrigger(x, z, pc.seed);   // REVERTED — back to the real function
     } else if (pc.sampleType == 2) {
         values[idx] = getLatitude(z);
     } else if (pc.sampleType == 3) {

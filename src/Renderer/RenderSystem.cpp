@@ -21,7 +21,7 @@
 #include <glm/glm.hpp>
 #include "../Game/ChunkManager.h"
 #include "../Rendering/ModelLoader.h"
-
+#include "../World/TreePlacement.h"
 RenderSystem::RenderSystem(VulkanEngine *engine) : m_Engine(engine) {
 }
 
@@ -100,7 +100,7 @@ void RenderSystem::Init(uint32_t terrainVertsPerChunk, uint32_t terrainIndicesPe
 
 PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& camera, GameSettings& settings, AudioEngine& audioEngine,
     entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId& selectedItem,
-    TechState& techState, bool isPaused, bool& showOptionsInPause, DayNightCycle& dayNightCycle, ChunkManager& chunkManager) {
+    TechState& techState, bool isPaused, bool& showOptionsInPause, DayNightCycle& dayNightCycle, ChunkManager& chunkManager, DepletionMap& depletionMap, RemovedTreesMap& removedTreesMap) {
     m_Engine->SetClearColor(settings.clearColor);
 
     glm::vec3 focusPoint = registry.valid(m_PlayerEntity) ? registry.get<TransformComponent>(m_PlayerEntity).Position : glm::vec3(0.0f);
@@ -130,7 +130,7 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
 
     bool began = m_Engine->BeginFrame([&](VkCommandBuffer cmd) {
        // std::cout << "about to call RecordPendingGeneration  rendersystem.cpp" << std::endl;
-        chunkManager.RecordPendingGeneration(cmd, m_ChunkGenerator.get(), m_TerrainRenderer.get(), m_TreeRenderer.get(), settings.terrain);   // ADD — generate new chunks first
+        chunkManager.RecordPendingGeneration(cmd, m_ChunkGenerator.get(), m_TerrainRenderer.get(), m_TreeRenderer.get(), settings.terrain, depletionMap, removedTreesMap);   // ADD — generate new chunks first
        // std::cout << "RecordPendingGeneration complete rendersystem.cpp" << std::endl;
 
         m_ShadowMapRenderer->BeginShadowPass(*m_ShadowMap);
@@ -168,15 +168,31 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
     if (settings.showBoundsDebug) {
         auto view = registry.view<TransformComponent, BoundsComponent>();
         for (auto entity : view) {
-            auto &t = view.get<TransformComponent>(entity);
-            auto &b = view.get<BoundsComponent>(entity);
+            auto& t = view.get<TransformComponent>(entity);
+            auto& b = view.get<BoundsComponent>(entity);
             glm::vec3 center = t.Position + glm::vec3(0, b.halfExtents.y, 0);
             m_DebugLineRenderer->AddBox(center - b.halfExtents, center + b.halfExtents, glm::vec3(0, 1, 0));
+        }
+
+        // MOVED HERE — correct block
+        if (registry.valid(m_PlayerEntity)) {
+            auto& playerTransform = registry.get<TransformComponent>(m_PlayerEntity);
+            ChunkCoord playerChunk = ChunkManager::WorldToChunkCoord(playerTransform.Position);
+            auto treeSlotOpt = chunkManager.GetTreeSlotForChunk(playerChunk);
+
+            if (treeSlotOpt.has_value()) {
+                auto treeInstances = m_TreeRenderer->ReadBackChunkInstances(*treeSlotOpt);
+                for (auto& instance : treeInstances) {
+                    if (removedTreesMap.IsRemoved(playerChunk, instance.gridIndex)) continue;
+                    glm::vec3 boxMin = instance.position + glm::vec3(-0.6f, 0.0f, -0.6f);
+                    glm::vec3 boxMax = instance.position + glm::vec3(0.6f, 3.0f, 0.6f);
+                    m_DebugLineRenderer->AddBox(boxMin, boxMax, glm::vec3(1.0f, 0.0f, 1.0f));
+                }
+            }
         }
     }
 
     if (settings.showGridDebug) {
-        // Draw a flat grid across the terrain extent — simplest: lines every GRID_SIZE units
         float gridSize = settings.terrain.cellSize;
         float worldW = settings.terrain.gridWidth * gridSize;
         float worldD = settings.terrain.gridDepth * gridSize;
@@ -188,9 +204,7 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
         }
     }
 
-
-    m_DebugLineRenderer->Render(camera, aspect);
-
+    m_DebugLineRenderer->Render(camera, aspect);   // MOVED OUTSIDE both blocks — always runs once per frame
 
 
     m_ImGuiVulkanUtil->RenderDrawData(m_Engine->GetCurrentCommandBuffer());

@@ -26,10 +26,13 @@ layout(push_constant) uniform PushConstants {
     float chunkOriginX, chunkOriginZ, chunkWorldSize, seed;
     uint chunkSlot, maxTreesPerChunk, samplesPerAxis;
     float sampleSpacing;
+    uint removedCount;              // NEW
+    uint removedIndices[16];        // NEW — candidate indices (0..15 for a 4x4 grid) that should be skipped
 } pc;
 
 float hashJitter(vec2 pos, float salt) {
-    float h = dot(pos, vec2(12.9898, 78.233)) + salt;
+    vec2 wrapped = mod(pos, 1000.0);   // keep magnitude bounded, avoiding sin() precision loss at large inputs
+    float h = dot(wrapped, vec2(12.9898, 78.233)) + salt;
     return fract(sin(h) * 43758.5453);
 }
 
@@ -39,6 +42,10 @@ void main() {
 
     uint sx = idx % pc.samplesPerAxis;
     uint sz = idx / pc.samplesPerAxis;
+
+        for (uint i = 0; i < pc.removedCount; i++) {
+        if (pc.removedIndices[i] == idx) return;   // this candidate was chopped, skip entirely
+    }
 
     float worldX = pc.chunkOriginX + float(sx) * pc.sampleSpacing;
     float worldZ = pc.chunkOriginZ + float(sz) * pc.sampleSpacing;
@@ -61,19 +68,22 @@ void main() {
     float effectiveDensity = treeDensity * wetness;
 
     float roll = hashJitter(vec2(worldX, worldZ), 1.0);
-    float threshold = 1.0 - (effectiveDensity * 2.0);
-    if (roll < threshold) return;
+float threshold = 1.0 - (effectiveDensity * 2.0);
+const float EPSILON = 0.001;   // generous margin above the observed ~0.00001 CPU/GPU drift
+if (roll < threshold - EPSILON) return;   // only reject if CLEARLY below threshold
 
     float jitterX = (hashJitter(vec2(worldX, worldZ), 2.0) - 0.5) * pc.sampleSpacing;
     float jitterZ = (hashJitter(vec2(worldX, worldZ), 3.0) - 0.5) * pc.sampleSpacing;
     float finalX = worldX + jitterX;
     float finalZ = worldZ + jitterZ;
 
-    TerrainSample terrainSample = sampleTerrain(finalX, finalZ, pc.seed);
+vec4 emptyDepletion[4] = vec4[4](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0));
+TerrainSample terrainSample = sampleTerrain(finalX, finalZ, pc.seed, 0, emptyDepletion);
+
 
     uint outputIndex = atomicAdd(chunks[pc.chunkSlot].instanceCount, 1);   // CHANGED — direct metadata write
     if (outputIndex >= pc.maxTreesPerChunk) return;
 
     uint bufferIndex = pc.chunkSlot * pc.maxTreesPerChunk + outputIndex;
-    treeInstances[bufferIndex] = vec4(finalX, terrainSample.height, finalZ, 0.3);
+    treeInstances[bufferIndex] = vec4(finalX, terrainSample.height, finalZ, float(idx));   // CHANGED — w now holds the grid index, not scale
 }

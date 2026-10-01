@@ -17,7 +17,8 @@ struct OreInfo {
 // Simple hash-based RNG, deterministic per (cellX, cellZ, seed) — mirrors std::mt19937 usage conceptually,
 // though NOT bit-identical to it (a real hash function, not the same PRNG algorithm)
 float hashToFloat(vec2 cell, float seed) {
-    float h = dot(cell, vec2(73856093.0, 19349663.0)) + seed;
+    float seedOffset = hashSeed(seed);   // CHANGED — bound the seed before combining with cell coords
+    float h = dot(cell, vec2(12.9898, 78.233)) + seedOffset;
     return fract(sin(h) * 43758.5453);
 }
 

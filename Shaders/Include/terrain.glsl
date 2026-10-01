@@ -75,7 +75,7 @@ struct TerrainSample {
     vec3 color;
 };
 
-TerrainSample sampleTerrain(float worldX, float worldZ, float seed) {
+TerrainSample sampleTerrain(float worldX, float worldZ, float seed, uint depletionCount, vec4 depletionEntries[4]) {
     // --- Climate biome, ring-blended ---
     float weights[6];
     sampleBiomeWeights(worldX, worldZ, seed, weights);
@@ -116,16 +116,26 @@ TerrainSample sampleTerrain(float worldX, float worldZ, float seed) {
                      + mix(climateColor, hillsColor, 0.5) * hillsWeight
                      + mix(climateColor, mountainsColor, 0.7) * mountainsWeight;
 
-    OreInfo ore = getOreDepositAt(worldX, worldZ, seed);
+     OreInfo ore = getOreDepositAt(worldX, worldZ, seed);
     if (ore.oreType != ORE_NONE) {
+        float remaining = 1.0;   // default: undepleted
+        int cellX = int(round(worldX));
+        int cellZ = int(round(worldZ));
+        for (uint i = 0; i < depletionCount; i++) {
+            if (int(depletionEntries[i].x) == cellX && int(depletionEntries[i].y) == cellZ) {
+                remaining = depletionEntries[i].z;
+                break;
+            }
+        }
         vec3 oreColor = getOreColor(ore.oreType);
-        finalColor = mix(finalColor, oreColor, 0.5);   // matches your CPU version's 0.5 blend factor
+        finalColor = mix(finalColor, oreColor, 0.5 * remaining);   // matches your CPU version's depletion-aware fade
     }
 
     TerrainSample result;
     result.height = finalHeight;
     result.color = finalColor;
     return result;
+
 }
 
 
