@@ -43,10 +43,13 @@ public:
     void RecordDraw(VkCommandBuffer commandBuffer, const Camera3D& camera, DayNightCycle& dayNightCycle,
         const glm::mat4& lightSpaceMatrix, const std::vector<PointLight>& activeLights);
     std::vector<TreeInstanceReadback> ReadBackChunkInstances(uint32_t slot) const { return m_Pool.ReadBackChunkInstances(slot); }
+    void RecordShadowPass(VkCommandBuffer commandBuffer, const glm::mat4& lightSpaceMatrix);
 
 private:
     void CreateGraphicsPipeline();
-
+    void CreateShadowPipeline();
+    VkPipeline m_ShadowPipeline = VK_NULL_HANDLE;
+    VkPipelineLayout m_ShadowPipelineLayout = VK_NULL_HANDLE;
     VulkanEngine* m_Engine;
     TreeInstanceBufferPool m_Pool;
     TreeCuller m_Culler;

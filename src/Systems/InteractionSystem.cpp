@@ -150,84 +150,101 @@ bool InteractionSystem::TryMineAtCursor(entt::registry& registry, DepletionMap& 
 	float maxRange, AudioEventSystem* audio, VulkanEngine* engine, MeshRenderer* meshRenderer,
 	PlacementGrid& placementGrid, RemovedTreesMap& removedTreesMap, ChunkManager& chunkManager,
 	TreeHealthMap& treeHealthMap, TreeRenderer& treeRenderer) {
-		{   // ADD chunkManager
-			auto& playerTransform = registry.get<TransformComponent>(player);
+	auto& playerTransform = registry.get<TransformComponent>(player);
 
-			glm::vec3 groundHit = TerrainRaycast::RaycastToTerrain(rayOrigin, rayDir, terrainSettings);
-			float groundDist = glm::length(groundHit - playerTransform.Position);
+	glm::vec3 groundHit = TerrainRaycast::RaycastToTerrain(rayOrigin, rayDir, terrainSettings);
+	float groundDist = glm::length(groundHit - playerTransform.Position);
 
-			if (groundDist > maxRange) return false;
+	if (groundDist > maxRange) return false;
 
-			// --- Try ore first (unchanged, already working) ---
-			auto deposit = OreDepositMap::GetDepositAt(groundHit.x, groundHit.z, terrainSettings.seed);
-			if (deposit) {
-				int cellX = static_cast<int>(std::round(groundHit.x));
-				int cellZ = static_cast<int>(std::round(groundHit.z));
-				float remaining = depletionMap.GetRemainingFraction(cellX, cellZ);
+	// --- Try ore first (unchanged, already working) ---
+	auto deposit = OreDepositMap::GetDepositAt(groundHit.x, groundHit.z, terrainSettings.seed);
+	if (deposit) {
+		int cellX = static_cast<int>(std::round(groundHit.x));
+		int cellZ = static_cast<int>(std::round(groundHit.z));
+		float remaining = depletionMap.GetRemainingFraction(cellX, cellZ);
 
-				if (remaining > 0.0f) {
-					auto& inventory = registry.get<InventoryComponent>(player);
-					inventory.AddItem(deposit->item, 1);
-					depletionMap.Deplete(cellX, cellZ, 1.0f, deposit->amount);
-					audio->Trigger(AudioEvent::OreCollected);
+		if (remaining > 0.0f) {
+			auto& inventory = registry.get<InventoryComponent>(player);
+			inventory.AddItem(deposit->item, 1);
+			depletionMap.Deplete(cellX, cellZ, 1.0f, deposit->amount);
+			//audio->Trigger(AudioEvent::OreCollected);
 
-					ChunkCoord affectedChunk = ChunkManager::WorldToChunkCoord(glm::vec3(groundHit.x, 0, groundHit.z));
-					chunkManager.RequestChunkRegeneration(affectedChunk);
-					return true;
-				}
-			}
-
-			const float TREE_MAX_HEALTH = 100.0f;
-			const float TREE_DAMAGE_PER_HIT = 25.0f;
-			const int WOOD_PER_HIT = 1;
-			const int WOOD_ON_DESTROY = 5;
-
-			ChunkCoord coord = ChunkManager::WorldToChunkCoord(groundHit);
-			auto treeSlotOpt = chunkManager.GetTreeSlotForChunk(coord);
-			if (treeSlotOpt.has_value()) {
-				auto treeInstances = treeRenderer.ReadBackChunkInstances(*treeSlotOpt);
-
-				int closestIndex = FindTreeAlongRay(treeInstances, removedTreesMap, coord, rayOrigin, rayDir, 600.0f);   // generous ray-travel cap, not player-interaction range
-
-				if (closestIndex >= 0) {
-					glm::vec3 treeBasePos = treeInstances[closestIndex].position;
-					float playerToTreeDist = glm::length(treeBasePos - playerTransform.Position);   // NEW — the REAL interaction-range check
-					if (playerToTreeDist > maxRange) {
-						return false;   // tree exists and is visible, but too far from the player to interact with
-					}
-					int gridIndex = treeInstances[closestIndex].gridIndex;
-
-					treeHealthMap.Damage(coord, gridIndex, TREE_DAMAGE_PER_HIT, TREE_MAX_HEALTH);
-					audio->Trigger(AudioEvent::TreeChopped);
-
-					int woodAmount = WOOD_PER_HIT;
-					bool destroyed = treeHealthMap.IsDead(coord, gridIndex, TREE_MAX_HEALTH);
-					if (destroyed) {
-						woodAmount = WOOD_ON_DESTROY;
-						removedTreesMap.MarkRemoved(coord, gridIndex);
-						treeHealthMap.Clear(coord, gridIndex);
-						chunkManager.RequestChunkRegeneration(coord);
-					}
-
-					float scatterRadius = 1.0f;
-					float angle = static_cast<float>(rand()) / RAND_MAX * glm::two_pi<float>();
-					float scatterDist = static_cast<float>(rand()) / RAND_MAX * scatterRadius;
-					glm::vec3 offset(cos(angle) * scatterDist, 0.0f, sin(angle) * scatterDist);
-
-					auto pickupEntity = registry.create();
-					auto& pickupTransform = registry.emplace<TransformComponent>(pickupEntity);
-					pickupTransform.Position = treeBasePos + offset;
-					pickupTransform.Scale = glm::vec3(0.3f);
-					registry.emplace<PickupComponent>(pickupEntity, PickupComponent{ ItemId::Wood, woodAmount });
-					auto dropMesh = ItemDatabase::GetWorldMesh(ItemId::Wood, engine, meshRenderer);
-					if (dropMesh) registry.emplace<MeshComponent>(pickupEntity, dropMesh);
-
-					return true;
-				}
-			}
-
-			return false;
+			ChunkCoord affectedChunk = ChunkManager::WorldToChunkCoord(glm::vec3(groundHit.x, 0, groundHit.z));
+			chunkManager.RequestChunkRegeneration(affectedChunk);
+			return true;
 		}
+	}
+
+	// --- Tree chopping: search a 3x3 chunk neighborhood, not just the ground-hit chunk ---
+	const float TREE_MAX_HEALTH = 100.0f;
+	const float TREE_DAMAGE_PER_HIT = 25.0f;
+	const int WOOD_PER_HIT = 1;
+	const int WOOD_ON_DESTROY = 5;
+
+	ChunkCoord centerCoord = ChunkManager::WorldToChunkCoord(groundHit);
+
+	int bestIndex = -1;
+	float bestT = 200.0f;   // generous ray-travel cap, not the player-interaction range
+	ChunkCoord bestCoord{};
+	std::vector<TreeInstanceReadback> bestInstances;
+
+	for (int dz = -1; dz <= 1; dz++) {
+		for (int dx = -1; dx <= 1; dx++) {
+			ChunkCoord checkCoord{ centerCoord.x + dx, centerCoord.z + dz };
+			auto treeSlotOpt = chunkManager.GetTreeSlotForChunk(checkCoord);
+			if (!treeSlotOpt.has_value()) continue;
+
+			auto treeInstances = treeRenderer.ReadBackChunkInstances(*treeSlotOpt);
+			float localT = bestT;
+			int localIndex = FindTreeAlongRayWithT(treeInstances, removedTreesMap, checkCoord, rayOrigin, rayDir, bestT, localT);
+
+			if (localIndex >= 0 && localT < bestT) {
+				bestT = localT;
+				bestIndex = localIndex;
+				bestCoord = checkCoord;
+				bestInstances = treeInstances;
+			}
+		}
+	}
+
+	if (bestIndex >= 0) {
+		glm::vec3 treeBasePos = bestInstances[bestIndex].position;
+		float playerToTreeDist = glm::length(treeBasePos - playerTransform.Position);
+
+		if (playerToTreeDist <= maxRange) {
+			int gridIndex = bestInstances[bestIndex].gridIndex;
+
+			treeHealthMap.Damage(bestCoord, gridIndex, TREE_DAMAGE_PER_HIT, TREE_MAX_HEALTH);
+			//audio->Trigger(AudioEvent::TreeChopped);
+
+			int woodAmount = WOOD_PER_HIT;
+			bool destroyed = treeHealthMap.IsDead(bestCoord, gridIndex, TREE_MAX_HEALTH);
+			if (destroyed) {
+				woodAmount = WOOD_ON_DESTROY;
+				removedTreesMap.MarkRemoved(bestCoord, gridIndex);
+				treeHealthMap.Clear(bestCoord, gridIndex);
+				chunkManager.RequestChunkRegeneration(bestCoord);
+			}
+
+			float scatterRadius = 1.0f;
+			float angle = static_cast<float>(rand()) / RAND_MAX * glm::two_pi<float>();
+			float scatterDist = static_cast<float>(rand()) / RAND_MAX * scatterRadius;
+			glm::vec3 offset(cos(angle) * scatterDist, 0.0f, sin(angle) * scatterDist);
+
+			auto pickupEntity = registry.create();
+			auto& pickupTransform = registry.emplace<TransformComponent>(pickupEntity);
+			pickupTransform.Position = treeBasePos + offset;
+			pickupTransform.Scale = glm::vec3(0.3f);
+			registry.emplace<PickupComponent>(pickupEntity, PickupComponent{ ItemId::Wood, woodAmount });
+			auto dropMesh = ItemDatabase::GetWorldMesh(ItemId::Wood, engine, meshRenderer);
+			if (dropMesh) registry.emplace<MeshComponent>(pickupEntity, dropMesh);
+
+			return true;
+		}
+	}
+
+	return false;
 }
 
 static bool RayIntersectsAABB(glm::vec3 rayOrigin, glm::vec3 rayDir, glm::vec3 boxMin, glm::vec3 boxMax, float &outT) {
@@ -583,5 +600,29 @@ int InteractionSystem::FindTreeAlongRay(const std::vector<TreeInstanceReadback>&
 	}
 	std::cout << "rayOrigin=(" << rayOrigin.x << "," << rayOrigin.y << "," << rayOrigin.z
 		<< ") rayDir=(" << rayDir.x << "," << rayDir.y << "," << rayDir.z << ") length=" << glm::length(rayDir) << std::endl;
+	return closestIndex;
+}
+int InteractionSystem::FindTreeAlongRayWithT(const std::vector<TreeInstanceReadback>& treeInstances,
+	const RemovedTreesMap& removedTreesMap, ChunkCoord coord,
+	glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance, float& outClosestT) {
+	int closestIndex = -1;
+	float closestT = maxDistance;
+
+	for (int i = 0; i < static_cast<int>(treeInstances.size()); i++) {
+		int gridIndex = treeInstances[i].gridIndex;
+		if (removedTreesMap.IsRemoved(coord, gridIndex)) continue;
+
+		glm::vec3 base = treeInstances[i].position;
+		glm::vec3 boxMin = base + glm::vec3(-0.6f, 0.0f, -0.6f);
+		glm::vec3 boxMax = base + glm::vec3(0.6f, 3.0f, 0.6f);
+
+		float t;
+		if (RayIntersectsAABB(rayOrigin, rayDir, boxMin, boxMax, t) && t < closestT) {
+			closestT = t;
+			closestIndex = i;
+		}
+	}
+
+	outClosestT = closestT;
 	return closestIndex;
 }

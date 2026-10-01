@@ -516,7 +516,7 @@ void Game::Update(float deltaTime) {
     if (m_Registry->valid(m_PlayerEntity)) {
         auto& transform = m_Registry->get<TransformComponent>(m_PlayerEntity);
         m_Camera->SetIsoTarget(transform.Position);
-        entt::entity nearbyPickup = InteractionSystem::FindNearestPickup(*m_Registry, transform.Position, 1.0f); // small radius
+        entt::entity nearbyPickup = InteractionSystem::FindNearestPickup(*m_Registry, transform.Position, 8.0f); // small radius
         if (m_Registry->valid(nearbyPickup)) {
             std::cout << "Game::Update registry address: " << m_Registry.get() << std::endl;
             InteractionSystem::CollectPickup(*m_Registry, nearbyPickup, m_PlayerEntity, m_AudioEvents.get());

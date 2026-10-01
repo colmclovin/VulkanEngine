@@ -177,6 +177,7 @@
     <None Include="Shaders\shadow_instanced.vert" />
     <None Include="Shaders\shadow_skinned.frag" />
     <None Include="Shaders\shadow_skinned.vert" />
+    <None Include="Shaders\shadow_tree_instanced.vert" />
     <None Include="Shaders\simplex_debug.comp" />
     <None Include="Shaders\skinned.frag" />
     <None Include="Shaders\skinned.vert" />

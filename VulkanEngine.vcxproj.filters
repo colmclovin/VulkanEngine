@@ -51,6 +51,7 @@
     <None Include="Shaders\tree_instanced.frag" />
     <None Include="Shaders\simplex_debug.comp" />
     <None Include="Shaders\ridged_debug.comp" />
+    <None Include="Shaders\shadow_tree_instanced.vert" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Main.cpp">

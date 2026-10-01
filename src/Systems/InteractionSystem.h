@@ -45,4 +45,7 @@ public:
 	static int FindTreeAlongRay(const std::vector<TreeInstanceReadback>& treeInstances,
 		const RemovedTreesMap& removedTreesMap, ChunkCoord coord,
 		glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
+	static int FindTreeAlongRayWithT(const std::vector<TreeInstanceReadback>& treeInstances,
+		const RemovedTreesMap& removedTreesMap, ChunkCoord coord,
+		glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance, float& outClosestT);
 };

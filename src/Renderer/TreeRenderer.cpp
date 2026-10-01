@@ -27,6 +27,7 @@ void TreeRenderer::Init(uint32_t maxTreesPerChunk, uint32_t maxChunks, ShadowMap
     m_Culler.Init(m_Engine, &m_Pool, maxChunks, cullerSubmeshInfo);
 
     CreateGraphicsPipeline();
+    CreateShadowPipeline();
 
     VkDeviceSize lightingBufferSize = sizeof(LightingUBO);
     for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
@@ -355,4 +356,113 @@ void TreeRenderer::CreateGraphicsPipeline() {
 
     vkDestroyShaderModule(device, fragModule, nullptr);
     vkDestroyShaderModule(device, vertModule, nullptr);
+}
+
+// TreeRenderer.cpp
+void TreeRenderer::CreateShadowPipeline() {
+    VkDevice device = m_Engine->GetDevice();
+
+    VkPushConstantRange pushRange{};
+    pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+    pushRange.offset = 0;
+    pushRange.size = sizeof(glm::mat4);
+
+    VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
+    pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pipelineLayoutInfo.setLayoutCount = 1;
+    pipelineLayoutInfo.pSetLayouts = &m_InstanceDescSetLayout;   // reuse the existing instance buffer descriptor set layout
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &pushRange;
+    vkCreatePipelineLayout(device, &pipelineLayoutInfo, nullptr, &m_ShadowPipelineLayout);
+
+    auto vertCode = m_Engine->ReadFile("Shaders/shadow_tree_instanced_vert.spv");
+    VkShaderModule vertModule = m_Engine->CreateShaderModule(vertCode);
+
+    VkPipelineShaderStageCreateInfo vertStage{};
+    vertStage.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    vertStage.stage = VK_SHADER_STAGE_VERTEX_BIT;
+    vertStage.module = vertModule;
+    vertStage.pName = "main";
+
+    auto bindingDesc = Vertex::getBindingDescription();
+    auto attrDescs = Vertex::getAttributeDescriptions();
+    // Shadow pass only needs position — but binding description must still match the vertex buffer's real stride
+    VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
+    vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+    vertexInputInfo.vertexBindingDescriptionCount = 1;
+    vertexInputInfo.pVertexBindingDescriptions = &bindingDesc;
+    vertexInputInfo.vertexAttributeDescriptionCount = 1;   // only position (location 0)
+    vertexInputInfo.pVertexAttributeDescriptions = &attrDescs[0];
+
+    VkPipelineInputAssemblyStateCreateInfo inputAssembly{};
+    inputAssembly.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+    inputAssembly.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+
+    VkPipelineViewportStateCreateInfo viewportState{};
+    viewportState.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+    viewportState.viewportCount = 1;
+    viewportState.scissorCount = 1;
+
+    VkDynamicState dynamicStates[] = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
+    VkPipelineDynamicStateCreateInfo dynamicState{};
+    dynamicState.sType = VK_STRUCTURE_TYPE_PIPELINE_DYNAMIC_STATE_CREATE_INFO;
+    dynamicState.dynamicStateCount = 2;
+    dynamicState.pDynamicStates = dynamicStates;
+
+    VkPipelineRasterizationStateCreateInfo rasterizer{};
+    rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+    rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+    rasterizer.lineWidth = 1.0f;
+    rasterizer.cullMode = VK_CULL_MODE_NONE;   // match your existing shadow pass convention
+    rasterizer.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+
+    VkPipelineMultisampleStateCreateInfo multisampling{};
+    multisampling.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+    multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+    VkPipelineDepthStencilStateCreateInfo depthStencil{};
+    depthStencil.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+    depthStencil.depthTestEnable = VK_TRUE;
+    depthStencil.depthWriteEnable = VK_TRUE;
+    depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+
+    VkPipelineRenderingCreateInfo renderingInfo{};
+    renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    renderingInfo.depthAttachmentFormat = m_Engine->GetDepthFormat();   // match your ShadowMap's format
+
+    VkGraphicsPipelineCreateInfo pipelineInfo{};
+    pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.pNext = &renderingInfo;
+    pipelineInfo.stageCount = 1;   // vertex only
+    pipelineInfo.pStages = &vertStage;
+    pipelineInfo.pVertexInputState = &vertexInputInfo;
+    pipelineInfo.pInputAssemblyState = &inputAssembly;
+    pipelineInfo.pViewportState = &viewportState;
+    pipelineInfo.pRasterizationState = &rasterizer;
+    pipelineInfo.pMultisampleState = &multisampling;
+    pipelineInfo.pDepthStencilState = &depthStencil;
+    pipelineInfo.pDynamicState = &dynamicState;
+    pipelineInfo.layout = m_ShadowPipelineLayout;
+    pipelineInfo.renderPass = VK_NULL_HANDLE;
+
+    if (vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_ShadowPipeline) != VK_SUCCESS) {
+        throw std::runtime_error("Failed to create tree shadow pipeline");
+    }
+    vkDestroyShaderModule(device, vertModule, nullptr);
+}
+
+void TreeRenderer::RecordShadowPass(VkCommandBuffer commandBuffer, const glm::mat4& lightSpaceMatrix) {
+    vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_ShadowPipeline);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_ShadowPipelineLayout, 0, 1, &m_InstanceDescSet, 0, nullptr);
+    vkCmdPushConstants(commandBuffer, m_ShadowPipelineLayout, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(glm::mat4), &lightSpaceMatrix);
+
+    VkBuffer vertexBuffers[] = { m_TreeVertexBuffer };
+    VkDeviceSize offsets[] = { 0 };
+    vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
+    vkCmdBindIndexBuffer(commandBuffer, m_TreeIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+    for (uint32_t s = 0; s < m_Culler.GetSubmeshCount(); s++) {
+        vkCmdDrawIndexedIndirectCount(commandBuffer, m_Culler.GetDrawCommandBuffer(s), 0,
+            m_Culler.GetDrawCountBuffer(s), 0, m_MaxChunks, sizeof(GpuDrawCommand));
+    }
 }

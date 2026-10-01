@@ -387,7 +387,19 @@ if exist "Shaders\ridged_debug.comp" (
 ) else (
 	echo WARNING: ridged_debug.comp not found
 )
-
+REM Compile tree instanced shadow vertex shader
+if exist "Shaders\shadow_tree_instanced.vert" (
+	echo Compiling tree instanced shadow vertex shader...
+	glslc -I Shaders Shaders\shadow_tree_instanced.vert -o Shaders\shadow_tree_instanced_vert.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Tree instanced shadow vertex shader compiled successfully
+	) else (
+		echo   Tree instanced shadow vertex shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: shadow_tree_instanced.vert not found
+)
 
 echo.
 echo Shader compilation complete!

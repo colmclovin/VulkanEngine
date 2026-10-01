@@ -136,8 +136,8 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
         m_ShadowMapRenderer->BeginShadowPass(*m_ShadowMap);
         m_ShadowMapRenderer->RenderStatic(registry, lightSpaceMatrix);
         m_SkinnedMeshRenderer->RenderShadowPass(registry, lightSpaceMatrix);
+        m_TreeRenderer->RecordShadowPass(cmd, lightSpaceMatrix);   // NEW
         m_ShadowMapRenderer->EndShadowPass(*m_ShadowMap);
-
         m_TerrainRenderer->RecordCullingPass(cmd, cameraFrustum);   // NEW — compute pass, before vkCmdBeginRendering
         m_TreeRenderer->RecordCullingPass(cmd, cameraFrustum);
         });
