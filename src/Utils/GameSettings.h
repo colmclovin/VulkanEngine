@@ -25,6 +25,8 @@ struct GameSettings {
 	float isoZoomSpeed = 1.0f;
 	float playerMoveSpeed = 5.0f;
 	float playerRunSpeed = 10.0f;
+	float isoPanSpeed = 5.0f;
+	float isoPanRunSpeed = 10.0f;
 	TerrainSettings terrain;
 	bool wireframeMode = false;
 	glm::vec4 clearColor = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);

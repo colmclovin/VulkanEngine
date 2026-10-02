@@ -42,6 +42,8 @@ void main() {
     float shadow = CalculateShadow(fragPosLightSpace);   // NEW
     diffuse *= shadow;                                     // NEW
 
+    float slopeFactor = 1.0 - normal.y;   // 0 = flat ground, ~1 = vertical cliff
     vec3 litColor = fragColor * lighting.sunColor.rgb * (ambient + diffuse * 0.8);
+    litColor *= (1.0 - slopeFactor * 0.15);   // constant shape cue, independent of sun angle
     outColor = vec4(litColor, 1.0);
 }

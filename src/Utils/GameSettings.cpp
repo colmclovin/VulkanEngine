@@ -26,6 +26,8 @@ void GameSettings::SaveToFile(const std::string& path) const {
 	j["isoZoomSpeed"] = isoZoomSpeed;
 	j["playerMoveSpeed"] = playerMoveSpeed;
 	j["playerRunSpeed"] = playerRunSpeed;
+	j["isoPanSpeed"] = isoPanSpeed;
+	j["isoPanRunSpeed"] = isoPanRunSpeed;
 	j["terrain"] = terrain;   // uses the macro-generated conversion
 	j["wireframeMode"] = wireframeMode;
 	j["clearColor"] = clearColor;
@@ -65,6 +67,8 @@ GameSettings GameSettings::LoadFromFile(const std::string& path) {
 		settings.isoZoomSpeed = j.value("isoZoomSpeed", settings.isoZoomSpeed);
 		settings.playerMoveSpeed = j.value("playerMoveSpeed", settings.playerMoveSpeed);
 		settings.playerRunSpeed = j.value("playerRunSpeed", settings.playerRunSpeed);
+		settings.isoPanSpeed = j.value("isoPanSpeed", settings.isoPanSpeed);
+		settings.isoPanRunSpeed = j.value("isoPanRunSpeed", settings.isoPanRunSpeed);
 		settings.masterVolume = j.value("MasterVolume", settings.masterVolume);
 		settings.musicVolume = j.value("MusicVolume", settings.musicVolume);
 		settings.sfxVolume = j.value("SFXVolume", settings.sfxVolume);

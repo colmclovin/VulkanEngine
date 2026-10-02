@@ -52,9 +52,13 @@ void ImGuiVulkanUtil::NewFrame() {
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
 
- //   ImGuiIO& io = ImGui::GetIO();
- //  std::cout << "DisplaySize: " << io.DisplaySize.x << "," << io.DisplaySize.y
- //       << "  MousePos: " << io.MousePos.x << "," << io.MousePos.y << std::endl;
+//    ImGuiIO& io = ImGui::GetIO();
+//    static int frameCount = 0;
+//  if (frameCount++ % 60 == 0) {   // print once per second, avoid spam
+//       std::cout << "DisplaySize: " << io.DisplaySize.x << "," << io.DisplaySize.y
+//            << "  MousePos: " << io.MousePos.x << "," << io.MousePos.y
+//          << "  SwapchainExtent: " << m_Engine->GetSwapChainExtent().width << "," << m_Engine->GetSwapChainExtent().height << std::endl;
+//    }
 }
 
 void ImGuiVulkanUtil::RenderDrawData(VkCommandBuffer commandBuffer) {

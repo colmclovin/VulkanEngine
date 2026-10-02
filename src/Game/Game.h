@@ -48,6 +48,7 @@ private:
     void CreateInitialEntities();
     void HandleInput(float deltaTime);
     void HandleIsoInput(GLFWwindow* window, float deltaTime);
+    void HandleIsoRTSInput(GLFWwindow* window, float deltaTime);
     void HandleFreeFlyInput(GLFWwindow* window, float deltaTime);
     void MovePlayer(glm::vec3 direction, float deltaTime);
     void Update(float deltaTime);

@@ -104,12 +104,14 @@ void Camera3D::UpdateIso(float deltaTime) {
     }
 }
 
-void Camera3D::PanIso(glm::vec3 direction, float deltaTime) {
-    // pan along screen-relative ground axes, so WASD stays intuitive as the view rotates
+void Camera3D::PanIso(glm::vec3 direction, float deltaTime, bool sprint) {
+
+    float speed = sprint ? isoPanRunSpeed : isoPanSpeed;   // CHANGED — use dedicated pan speed, not movementSpeed
+
     glm::vec3 forward = glm::normalize(glm::vec3(cos(glm::radians(isoYaw)), 0.0f, sin(glm::radians(isoYaw))));
     glm::vec3 right = glm::normalize(glm::cross(forward, worldUp));
 
-    isoTarget += (forward * direction.z + right * direction.x) * movementSpeed * deltaTime;
+    isoTarget += (forward * direction.z + right * direction.x) * speed * deltaTime;
 }
 glm::vec3 Camera3D::GetIsoPosition() const {
     glm::vec3 isoPos;
@@ -130,7 +132,7 @@ glm::mat4 Camera3D::GetIsoViewMatrix() const {
 
 // Camera3D.cpp
 glm::mat4 Camera3D::GetActiveViewMatrix() const {
-    return (m_Mode == Mode::Isometric) ? GetIsoViewMatrix() : GetViewMatrix();
+    return (m_Mode == Mode::Isometric || m_Mode == Mode::IsoRTS) ? GetIsoViewMatrix() : GetViewMatrix();
 }
 
 
@@ -153,7 +155,7 @@ glm::vec3 Camera3D::ScreenPointToRay(float mouseX, float mouseY, float screenWid
 }
 
 glm::vec3 Camera3D::GetEyePosition() const{
-    return (m_Mode == Mode::Isometric) ? GetIsoPosition() : position;
+    return (m_Mode == Mode::Isometric || m_Mode == Mode::IsoRTS) ? GetIsoPosition() : position;
 }
 glm::vec3 Camera3D::GetForwardDirection() const {
     float yaw = GetIsoYaw(); // or however you access the camera's current yaw

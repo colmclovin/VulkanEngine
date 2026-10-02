@@ -56,13 +56,13 @@ void DebugUI::DrawStats(entt::registry &registry) {
     ImGui::Text("Total entities: %zu", liveCount);
     ImGui::Checkbox("Show Demo Window", &m_ShowDemo);
 }
-void DebugUI::DrawInventory(entt::registry &registry, entt::entity player, ItemId &selectedItem) {
+void DebugUI::DrawInventory(entt::registry& registry, entt::entity player, ItemId& selectedItem) {
     if (!registry.valid(player) || !registry.any_of<InventoryComponent>(player)) return;
-    auto &inv = registry.get<InventoryComponent>(player);
+    auto& inv = registry.get<InventoryComponent>(player);
 
     ImGui::Begin("Inventory");
     for (int i = 0; i < (int)inv.slots.size(); i++) {
-        auto &slot = inv.slots[i];
+        auto& slot = inv.slots[i];
         if (slot.item == ItemId::None) continue;
 
         ImGui::PushID(i);
@@ -127,8 +127,8 @@ void DebugUI::DrawSettingsTab(Camera3D* camera, GameSettings& settings, AudioEng
             camera->SetIsoPitch(settings.isoPitch);
         }
         ImGui::SliderFloat("Zoom Speed", &settings.isoZoomSpeed, 0.1f, 10.0f);
-           
-        
+
+
     }
     if (ImGui::CollapsingHeader("Audio", ImGuiTreeNodeFlags_DefaultOpen)) {
         if (ImGui::SliderFloat("Master Volume", &settings.masterVolume, 0.0f, 1.0f)) {
@@ -145,6 +145,14 @@ void DebugUI::DrawSettingsTab(Camera3D* camera, GameSettings& settings, AudioEng
     if (ImGui::CollapsingHeader("Player", ImGuiTreeNodeFlags_DefaultOpen)) {
         ImGui::SliderFloat("Move Speed##player", &settings.playerMoveSpeed, 0.5f, 200.0f);
         ImGui::SliderFloat("Run Speed##player", &settings.playerRunSpeed, 0.5f, 200.0f);
+        if (ImGui::SliderFloat("Pan Speed", &settings.isoPanSpeed, 0.5f, 200.0f))
+        {
+            camera->SetIsoPanSpeed(settings.isoPanSpeed);
+        }
+        if(ImGui::SliderFloat("Pan Run Speed", &settings.isoPanRunSpeed, 0.5f, 200.0f)){
+			camera->SetIsoPanRunSpeed(settings.isoPanRunSpeed);
+
+        }
         // consumed directly by Game::MovePlayer each frame — see note below
     }
 

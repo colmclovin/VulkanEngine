@@ -102,10 +102,12 @@ bool VulkanEngine::BeginFrame(const std::function<void(VkCommandBuffer)>& preRen
     VkResult result = vkAcquireNextImageKHR(m_Device, m_SwapChain, UINT64_MAX,
                                             m_ImageAvailableSemaphores[m_CurrentFrame], VK_NULL_HANDLE, &m_CurrentImageIndex);
 
-    if (result == VK_ERROR_OUT_OF_DATE_KHR) {
+    if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_FramebufferResized) {   // CHANGED
+        m_FramebufferResized = false;   // ADD — reset after handling
         RecreateSwapChain();
         return false;
-    } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
+    }
+    else if (result != VK_SUCCESS) {   // CHANGED — removed the VK_SUBOPTIMAL_KHR exception, now handled above
         throw std::runtime_error("Failed to acquire swap chain image");
     }
 
@@ -640,6 +642,14 @@ void VulkanEngine::RecreateSwapChain() {
             throw std::runtime_error("Failed to create sync objects");
         }
     }
+    m_ImageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
+    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+        if (vkCreateSemaphore(m_Device, &semaphoreInfo, nullptr, &m_ImageAvailableSemaphores[i]) != VK_SUCCESS) {
+            throw std::runtime_error("Failed to create sync objects");
+        }
+    }
+
+
     std::cout << "Swapchain recreated: " << m_SwapChainExtent.width << "x" << m_SwapChainExtent.height << std::endl;
 }
 
@@ -931,6 +941,7 @@ void VulkanEngine::ToggleFullscreen()
         // Restore windowed mode
         glfwSetWindowMonitor(m_Window, nullptr, m_WindowedX, m_WindowedY, m_WindowedWidth, m_WindowedHeight, 0);
     }
+    m_FramebufferResized = true;
 }
 GLFWscrollfun VulkanEngine::s_ImGuiScrollCallback = nullptr;
 
@@ -953,4 +964,11 @@ void VulkanEngine::CopyBufferRegion(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDe
     copyRegion.size = size;
     vkCmdCopyBuffer(cmd, srcBuffer, dstBuffer, 1, &copyRegion);
     EndSingleTimeCommands(cmd);
+}
+
+
+
+void VulkanEngine::FramebufferResizeCallback(GLFWwindow* window, int width, int height) {
+    auto engine = reinterpret_cast<VulkanEngine*>(glfwGetWindowUserPointer(window));
+    engine->m_FramebufferResized = true;
 }

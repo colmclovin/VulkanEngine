@@ -27,7 +27,7 @@ public:
     void ProcessIsoZoom(float deltaDistance);
 
     void SnapRotateIso(bool clockwise);            // call once per Q/E press, not per frame
-    void PanIso(glm::vec3 direction, float deltaTime); // WASD ground-plane panning
+    void PanIso(glm::vec3 direction, float deltaTime, bool sprint = false); // WASD ground-plane panning
     void UpdateIso(float deltaTime);                // smooth the snap animation
     glm::mat4 GetIsoViewMatrix() const;
     glm::vec3 GetIsoPosition() const;
@@ -39,9 +39,10 @@ public:
     // Accessors
     glm::vec3 GetPosition() const { return position; }
     float GetZoom() const { return zoom; }
-    enum class Mode { FreeFly, Isometric };
+    enum class Mode { FreeFly, Isometric, IsoRTS };
     float GetIsoYaw() const { return isoYaw; }
     float GetIsoDistance() const { return isoDistance; }
+	glm::vec3 GetIsoTarget() const { return isoTarget; }
     void SetMode(Mode mode) { m_Mode = mode; }
     Mode GetMode() const { return m_Mode; }
     void SetIsoTarget(glm::vec3 pos) { isoTarget = pos; }
@@ -49,14 +50,16 @@ public:
     glm::vec3 ScreenPointToRay(float mouseX, float mouseY, float screenWidth, float screenHeight, float aspect) const;
     glm::vec3 GetForwardDirection() const;
 
-
+    float GetIsoPanSpeed() const { return isoPanSpeed; }
+    float GetIsoPanRunSpeed() const { return isoPanRunSpeed; }
     //Setters
     void SetMovementSpeed(float speed) { movementSpeed = speed; }
     void SetMouseSensitivity(float s) { mouseSensitivity = s; }
     void SetIsoRotateSpeed(float s) { isoRotateSpeed = s; }
     void SetIsoDistance(float d) { isoDistance = d; }
     void SetIsoPitch(float p) { isoPitch = p; }
-
+    void SetIsoPanSpeed(float speed) { isoPanSpeed = speed; }
+    void SetIsoPanRunSpeed(float speed) { isoPanRunSpeed = speed; }
 
 private:
     Mode m_Mode = Mode::Isometric;   // default to gameplay camera
@@ -66,7 +69,8 @@ private:
     float isoYaw = -45.0f;                        // current snapped facing
     float isoTargetYaw = -45.0f;                   // where we're snapping toward
     float isoRotateSpeed = 8.0f;                   // degrees/sec while animating the snap
-
+    float isoPanSpeed = 20.0f;      // base pan speed, world units/sec
+    float isoPanRunSpeed = 50.0f;   // faster pan speed when sprint/shift held
 	float sprintMultiplier = 2.0f;   // multiplier for free-fly speed when Shift is held    
 
     glm::vec3 position;

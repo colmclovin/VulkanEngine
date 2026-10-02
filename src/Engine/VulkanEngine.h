@@ -57,7 +57,7 @@ public:
 
     VkCommandBuffer BeginSingleTimeCommands();
     void EndSingleTimeCommands(VkCommandBuffer commandBuffer);
-
+    static void FramebufferResizeCallback(GLFWwindow* window, int width, int height);
     VkShaderModule CreateShaderModule(const std::vector<char> &code);
     std::vector<char> ReadFile(const std::string &filename);
     void CopyBufferRegion(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset);
@@ -90,7 +90,7 @@ public:
 
 
 private:
-    glm::vec4 m_ClearColor = glm::vec4(0.1f, 0.1f, 0.1f, 1.0f);
+    glm::vec4 m_ClearColor = glm::vec4(0.45f, 0.65f, 0.85f, 1.0f);
     //GLFW variables
     GLFWwindow *m_Window = nullptr;
     uint32_t m_WindowWidth = 1280;
@@ -110,7 +110,7 @@ private:
     VkQueue m_GraphicsQueue = VK_NULL_HANDLE;
     VkQueue m_PresentQueue = VK_NULL_HANDLE;
     VkSurfaceKHR m_Surface = VK_NULL_HANDLE;
-
+    
     // Swapchain
     VkSwapchainKHR m_SwapChain = VK_NULL_HANDLE;
     std::vector<VkImage> m_SwapChainImages;

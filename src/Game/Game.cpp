@@ -267,8 +267,8 @@ void Game::HandleInput(float deltaTime) {
         m_FirstMouse = true;
     }
     f2WasDown = f2IsDown;
-
-    if (m_Camera->GetMode() == Camera3D::Mode::Isometric) {
+ 
+    if (m_Camera->GetMode() == Camera3D::Mode::Isometric || m_Camera->GetMode() == Camera3D::Mode::IsoRTS) {
         HandleIsoInput(window, deltaTime);
     }
     else {
@@ -297,15 +297,26 @@ void Game::HandleInput(float deltaTime) {
 
 }
 
+
 void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     static bool qWasDown = false, eWasDown = false, f11WasDown = false, interactWasDown = false, 
         placeWasDown = false, rotateWasDown = false, inspectWasDown = false, rotatePlacedWasDown = false, pickupWasDown = false, saveWasDown = false,
-        loadWasDown = false;
+        loadWasDown = false, tabWasDown = false;
     
      double mx, my;
     glfwGetCursorPos(window, &mx, &my);
-    VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();
+    int windowWidth, windowHeight;
+    glfwGetWindowSize(window, &windowWidth, &windowHeight);   // logical size
+    VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();   // physical size (framebuffer)
+
+    float dpiScaleX = (windowWidth > 0) ? static_cast<float>(extent.width) / windowWidth : 1.0f;
+    float dpiScaleY = (windowHeight > 0) ? static_cast<float>(extent.height) / windowHeight : 1.0f;
+
+    mx *= dpiScaleX;   // NEW — convert logical cursor position to physical pixel position
+    my *= dpiScaleY;   // NEW
+
     float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+
 
     glm::vec3 rayOrigin = m_Camera->GetEyePosition();
     glm::vec3 rayDir = m_Camera->ScreenPointToRay(static_cast<float>(mx), static_cast<float>(my),
@@ -327,6 +338,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     bool inspectIsDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
     bool saveIsDown = glfwGetKey(window, GLFW_KEY_F5) == GLFW_PRESS;
     bool loadIsDown = glfwGetKey(window, GLFW_KEY_F9) == GLFW_PRESS;
+    bool tabIsDown = glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS;
 
 
     if (placeIsDown && !placeWasDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity, m_PlacementGrid, m_Settings.terrain);
@@ -380,8 +392,18 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     if (inspectIsDown && !inspectWasDown && !ImGui::GetIO().WantCaptureMouse) {
         double mx, my;
         glfwGetCursorPos(window, &mx, &my);
-        VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();
-        float aspect = static_cast<float>(extent.width) / extent.height;
+        int windowWidth, windowHeight;
+        glfwGetWindowSize(window, &windowWidth, &windowHeight);   // logical size
+        VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();   // physical size (framebuffer)
+
+        float dpiScaleX = (windowWidth > 0) ? static_cast<float>(extent.width) / windowWidth : 1.0f;
+        float dpiScaleY = (windowHeight > 0) ? static_cast<float>(extent.height) / windowHeight : 1.0f;
+
+        mx *= dpiScaleX;   // NEW — convert logical cursor position to physical pixel position
+        my *= dpiScaleY;   // NEW
+
+        float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+
         glm::vec3 rayOrigin = m_Camera->GetEyePosition();
         glm::vec3 rayDir = m_Camera->ScreenPointToRay((float)mx, (float)my, (float)extent.width, (float)extent.height, aspect);
 
@@ -415,7 +437,14 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
             m_PlayerEntity = loadedPlayer;
         }
     }
-
+    if (tabIsDown && !tabWasDown) {
+        if (m_Camera->GetMode() == Camera3D::Mode::IsoRTS) {
+            m_Camera->SetMode(Camera3D::Mode::Isometric);   // isoTarget stays exactly where it currently is — seamless transition
+        }
+        else {
+            m_Camera->SetMode(Camera3D::Mode::IsoRTS);
+        }
+    }
 
     qWasDown = qIsDown;
     eWasDown = eIsDown;
@@ -428,15 +457,34 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     pickupWasDown = pickupIsDown;
     saveWasDown = saveIsDown;
     loadWasDown = loadIsDown;
+    tabWasDown = tabIsDown;
 
-    glm::vec3 moveDir(0.0f);
-    if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveDir.z += 1.0f;
-    if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) moveDir.z -= 1.0f;
-    if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) moveDir.x -= 1.0f;
-    if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) moveDir.x += 1.0f;
-    if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) m_Camera->ProcessKeyboard(CameraMovement::Up, deltaTime);
-    if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) m_Camera->ProcessKeyboard(CameraMovement::Down, deltaTime);
-    // Game::HandleIsoInput
+    if (m_Camera->GetMode() == Camera3D::Mode::IsoRTS) {
+        glm::vec3 panDir(0.0f);
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) panDir.z -= 1.0f;
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) panDir.z += 1.0f;
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) panDir.x += 1.0f;
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) panDir.x -= 1.0f;
+        bool runHeld = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+        if (glm::length(panDir) > 0.001f) {
+            m_Camera->PanIso(glm::normalize(panDir), deltaTime, runHeld);
+        }
+        
+    }
+    else if (m_Camera->GetMode() == Camera3D::Mode::Isometric)
+    {
+        glm::vec3 moveDir(0.0f);
+        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) moveDir.z += 1.0f;
+        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) moveDir.z -= 1.0f;
+        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) moveDir.x -= 1.0f;
+        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) moveDir.x += 1.0f;
+        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) m_Camera->ProcessKeyboard(CameraMovement::Up, deltaTime);
+        if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) m_Camera->ProcessKeyboard(CameraMovement::Down, deltaTime);
+        // Game::HandleIsoInput
+        if (glm::length(moveDir) > 0.0f && m_Registry->valid(m_PlayerEntity)) {
+            MovePlayer(glm::normalize(moveDir), deltaTime);
+        }
+    }
     float scrollDelta = m_VulkanEngine->GetScrollDelta();
     if (scrollDelta != 0.0f && !ImGui::GetIO().WantCaptureMouse) {
         //std::cout << "process iso zoom " << scrollDelta * m_Settings.isoZoomSpeed << std::endl;
@@ -455,9 +503,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     }
 
 
-    if (glm::length(moveDir) > 0.0f && m_Registry->valid(m_PlayerEntity)) {
-        MovePlayer(glm::normalize(moveDir), deltaTime);
-    }
+    
 
     m_Camera->UpdateIso(deltaTime);
 }
@@ -515,7 +561,10 @@ void Game::Update(float deltaTime) {
     GLFWwindow* window = m_VulkanEngine->GetWindow();
     if (m_Registry->valid(m_PlayerEntity)) {
         auto& transform = m_Registry->get<TransformComponent>(m_PlayerEntity);
-        m_Camera->SetIsoTarget(transform.Position);
+        if(m_Camera->GetMode() == Camera3D::Mode::Isometric)
+        {
+            m_Camera->SetIsoTarget(transform.Position);
+        }
         entt::entity nearbyPickup = InteractionSystem::FindNearestPickup(*m_Registry, transform.Position, 8.0f); // small radius
         if (m_Registry->valid(nearbyPickup)) {
             std::cout << "Game::Update registry address: " << m_Registry.get() << std::endl;
@@ -523,24 +572,6 @@ void Game::Update(float deltaTime) {
         }
     }
 
-   /* if (m_RenderSystem->GetDebugUI()->ConsumeRegenerateRequest()) {
-        m_VulkanEngine->WaitIdle();
-
-        auto oldTerrainMesh = m_Registry->get<MeshComponent>(m_TerrainEntity).mesh;
-        oldTerrainMesh->DestroyGPUResources(m_VulkanEngine->GetDevice());
-
-        m_ResourceMap.Generate(m_Settings.terrain.gridWidth, m_Settings.terrain.gridDepth,
-            m_Settings.terrain.cellSize, m_Settings.terrain.seed);
-
-        auto newTerrainMesh = TerrainGenerator::GenerateHeightmapTerrain(
-            m_Settings.terrain, m_ResourceMap);
-
-        m_Registry->replace<MeshComponent>(m_TerrainEntity, newTerrainMesh);
-
-        WorldGenerator::ClearHarvestables(*m_Registry);
-        WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain, m_ResourceMap, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
-    }
-    */
     if (m_Registry->valid(m_PlayerEntity)) {
         auto &transform = m_Registry->get<TransformComponent>(m_PlayerEntity);
         m_CurrentTarget = InteractionSystem::FindNearestInteractable(*m_Registry, transform.Position, 20.0f); // 3 unit range
@@ -548,8 +579,18 @@ void Game::Update(float deltaTime) {
 
     double mx, my;
     glfwGetCursorPos(window, &mx, &my);
-    VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();
+    int windowWidth, windowHeight;
+    glfwGetWindowSize(window, &windowWidth, &windowHeight);   // logical size
+    VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();   // physical size (framebuffer)
+
+    float dpiScaleX = (windowWidth > 0) ? static_cast<float>(extent.width) / windowWidth : 1.0f;
+    float dpiScaleY = (windowHeight > 0) ? static_cast<float>(extent.height) / windowHeight : 1.0f;
+
+    mx *= dpiScaleX;   // NEW — convert logical cursor position to physical pixel position
+    my *= dpiScaleY;   // NEW
+
     float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
+
 
     m_PlacementSystem->Update(*m_Registry, m_PlayerEntity, *m_Camera, m_SelectedItem,
         m_Settings.terrain, static_cast<float>(mx), static_cast<float>(my),
