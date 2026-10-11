@@ -17,9 +17,14 @@ struct OreInfo {
 // Simple hash-based RNG, deterministic per (cellX, cellZ, seed) — mirrors std::mt19937 usage conceptually,
 // though NOT bit-identical to it (a real hash function, not the same PRNG algorithm)
 float hashToFloat(vec2 cell, float seed) {
-    float seedOffset = hashSeed(seed);   // CHANGED — bound the seed before combining with cell coords
-    float h = dot(cell, vec2(12.9898, 78.233)) + seedOffset;
-    return fract(sin(h) * 43758.5453);
+    float s  = hashSeed(seed);          // whole number 0..1023
+    float cx = mod(cell.x, 512.0);      // cell coords are whole numbers (cellX + integer salt)
+    float cz = mod(cell.y, 512.0);
+
+    float h = mod(cx * 37.0 + cz * 91.0 + s * 13.0 + 7.0, 1024.0);
+    h = mod(h * h + h * 31.0 + 17.0, 1024.0);
+    h = mod(h * 73.0 + cx * 11.0 + cz * 29.0, 1024.0);
+    return h / 1024.0;                  // 0..1
 }
 
 OreInfo getOreDepositAt(float worldX, float worldZ, float seed) {

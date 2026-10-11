@@ -47,6 +47,7 @@ public:
     TreeRenderer* GetTreeRenderer() const { return m_TreeRenderer.get(); }
     DebugUI* GetDebugUI() const;
     ImGuiVulkanUtil *GetImGuiUtil() const;
+    void SetSelectionRect(bool active, glm::vec2 a, glm::vec2 b) { m_SelActive = active; m_SelA = a; m_SelB = b; }
 
 private:
     VulkanEngine *m_Engine = nullptr;
@@ -65,4 +66,6 @@ private:
 	std::unique_ptr<ImGuiVulkanUtil> m_ImGuiVulkanUtil;
     std::unique_ptr<DebugUI> m_DebugUI;
     bool m_initialized = false;
+    bool m_SelActive = false;
+    glm::vec2 m_SelA{}, m_SelB{};
 };

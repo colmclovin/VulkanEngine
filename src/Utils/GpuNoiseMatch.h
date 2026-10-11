@@ -16,7 +16,7 @@ namespace GpuNoiseMatch {
     float SampleRawHeightForBiome(float worldX, float worldZ, int biomeId, float seed);
     void SampleBiomeWeights(float worldX, float worldZ, float seed, float weights[6]);
     float SampleHeight(float worldX, float worldZ, float seed);   // the real height-matching function
-
+    float SampleMeshHeight(float worldX, float worldZ, float seed, float cellSize);
 }
 
 // Match biome.glsl's constants exactly

@@ -626,3 +626,25 @@ int InteractionSystem::FindTreeAlongRayWithT(const std::vector<TreeInstanceReadb
 	outClosestT = closestT;
 	return closestIndex;
 }
+
+entt::entity InteractionSystem::FindSelectableAlongRay(entt::registry& registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance) {
+	entt::entity closest = entt::null;
+	float closestT = maxDistance;
+
+	auto view = registry.view<TransformComponent, BoundsComponent, SelectableComponent>();
+	for (auto entity : view) {
+		auto& transform = view.get<TransformComponent>(entity);
+		auto& bounds = view.get<BoundsComponent>(entity);
+
+		glm::vec3 center = transform.Position + glm::vec3(0.0f, bounds.halfExtents.y, 0.0f);
+		glm::vec3 boxMin = center - bounds.halfExtents;
+		glm::vec3 boxMax = center + bounds.halfExtents;
+
+		float t;
+		if (RayIntersectsAABB(rayOrigin, rayDir, boxMin, boxMax, t) && t < closestT) {
+			closestT = t;
+			closest = entity;
+		}
+	}
+	return closest;
+}

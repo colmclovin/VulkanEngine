@@ -14,9 +14,10 @@ namespace GpuNoiseMatch {
 
     // Exact port of noise.glsl's hashSeed
     float HashSeed(float seed) {
-        float wrapped = Mod(seed, 1000.0f);
-        float x = Fract(std::sin(wrapped * 12.9898f) * 43758.5453f);
-        return x * 1000.0f;
+        float s = Mod(seed, 4096.0f);
+        float h = Mod(s * 37.0f + 11.0f, 1024.0f);
+        h = Mod(h * h + s * 7.0f, 1024.0f);
+        return h;
     }
 
     // Exact port of noise.glsl's permute
@@ -113,20 +114,17 @@ namespace GpuNoiseMatch {
         return glm::clamp(std::abs(worldZ) / LATITUDE_BAND_SIZE, 0.0f, 1.0f);
     }
 
-    static int DetermineClimateBiome(float latitude, float aridity) {
-        const float EPSILON = 0.001f;
-        if (latitude >= 0.6f - EPSILON && latitude <= 1.0f) return BIOME_TUNDRA;
-        if (latitude >= 0.0f && latitude <= 0.5f + EPSILON && aridity >= 0.6f - EPSILON && aridity <= 1.0f) return BIOME_DESERT;
-        if (aridity >= 0.0f && aridity <= 0.5f + EPSILON) return BIOME_LAKE;
+    int DetermineClimateBiome(float latitude, float aridity) {
+        if (latitude >= 0.6f && latitude <= 1.0f) return BIOME_TUNDRA;
+        if (latitude >= 0.0f && latitude <= 0.5f && aridity >= 0.6f && aridity <= 1.0f) return BIOME_DESERT;
+        if (aridity >= 0.0f && aridity <= 0.5f) return BIOME_LAKE;
         return BIOME_PLAINS;
     }
 
     int DetermineBiome(float worldX, float worldZ, float seed) {
         float elevationTrigger = GetElevationTrigger(worldX, worldZ, seed);
-        const float EPSILON = 0.001f;
-        if (elevationTrigger > 0.6f - EPSILON) return BIOME_MOUNTAINS;
-        if (elevationTrigger > 0.35f - EPSILON) return BIOME_HILLS;
-
+        if (elevationTrigger > 0.6f) return BIOME_MOUNTAINS;
+        if (elevationTrigger > 0.35f) return BIOME_HILLS;
         float latitude = GetLatitude(worldZ);
         float aridity = GetAridity(worldX, worldZ, seed);
         return DetermineClimateBiome(latitude, aridity);
@@ -213,5 +211,17 @@ namespace GpuNoiseMatch {
         float mountainsHeight = SampleRawHeightForBiome(worldX, worldZ, BIOME_MOUNTAINS, seed);
 
         return climateHeight * baseWeight + hillsHeight * hillsWeight + mountainsHeight * mountainsWeight;
+    }
+    float SampleMeshHeight(float worldX, float worldZ, float seed, float cellSize) {
+        float fx = worldX / cellSize, fz = worldZ / cellSize;
+        float gx = std::floor(fx), gz = std::floor(fz);
+        float u = fx - gx, v = fz - gz;
+
+        auto H = [&](float ix, float iz) { return SampleHeight(ix * cellSize, iz * cellSize, seed); };
+        float tl = H(gx, gz), tr = H(gx + 1, gz), bl = H(gx, gz + 1), br = H(gx + 1, gz + 1);
+
+        // Index buffer triangles: (tl, bl, tr) and (tr, bl, br); the diagonal runs tr to bl
+        if (u + v <= 1.0f) return tl + u * (tr - tl) + v * (bl - tl);
+        return br + (1.0f - u) * (bl - br) + (1.0f - v) * (tr - br);
     }
 }

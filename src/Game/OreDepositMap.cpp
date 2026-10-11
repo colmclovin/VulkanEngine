@@ -7,11 +7,17 @@
 float OreDepositMap::Fract(float x) {
     return x - std::floor(x);
 }
+static float FloorMod(float x, float y) { return x - y * std::floor(x / y); }
 
 float OreDepositMap::HashToFloat(float cellX, float cellZ, float seed, float saltX, float saltZ) {
-    float seedOffset = GpuNoiseMatch::HashSeed(seed);   // CHANGED — reuse the shared, fixed HashSeed
-    float h = (cellX + saltX) * 12.9898f + (cellZ + saltZ) * 78.233f + seedOffset;
-    return Fract(std::sin(h) * 43758.5453f);
+    float s = GpuNoiseMatch::HashSeed(seed);
+    float cx = FloorMod(cellX + saltX, 512.0f);
+    float cz = FloorMod(cellZ + saltZ, 512.0f);
+
+    float h = FloorMod(cx * 37.0f + cz * 91.0f + s * 13.0f + 7.0f, 1024.0f);
+    h = FloorMod(h * h + h * 31.0f + 17.0f, 1024.0f);
+    h = FloorMod(h * 73.0f + cx * 11.0f + cz * 29.0f, 1024.0f);
+    return h / 1024.0f;
 }
 
 std::optional<OreDepositInfo> OreDepositMap::GetDepositAt(float worldX, float worldZ, int seed) {

@@ -200,6 +200,8 @@
     <ClCompile Include="..\External\imgui\imgui_widgets.cpp" />
     <ClCompile Include="src\Audio\AudioEngine.cpp" />
     <ClCompile Include="src\Audio\AudioEventSystem.cpp" />
+    <ClCompile Include="src\Components\MoveOrderComponent.h" />
+    <ClCompile Include="src\Components\SelectableComponent.h" />
     <ClCompile Include="src\Game\BiomeDatabase.cpp" />
     <ClCompile Include="src\Game\BiomeMap.cpp" />
     <ClCompile Include="src\Game\Camera3D.cpp" />
@@ -247,6 +249,7 @@
     <ClCompile Include="src\Systems\InserterSystem.cpp" />
     <ClCompile Include="src\Systems\InteractionSystem.cpp" />
     <ClCompile Include="src\Systems\MinerSystem.cpp" />
+    <ClCompile Include="src\Systems\MoveOrderSystem.cpp" />
     <ClCompile Include="src\Systems\PlacementSystem.cpp" />
     <ClCompile Include="src\Systems\PlayerAnimationSystem.cpp" />
     <ClCompile Include="src\Systems\PowerSystem.cpp" />
@@ -350,6 +353,7 @@
     <ClInclude Include="src\Systems\InserterSystem.h" />
     <ClInclude Include="src\Systems\InteractionSystem.h" />
     <ClInclude Include="src\Systems\MinerSystem.h" />
+    <ClInclude Include="src\Systems\MoveOrderSystem.h" />
     <ClInclude Include="src\Systems\PlacementSystem.h" />
     <ClInclude Include="src\Systems\PlayerAnimationSystem.h" />
     <ClInclude Include="src\Systems\PowerSystem.h" />

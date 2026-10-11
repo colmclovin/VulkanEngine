@@ -30,28 +30,16 @@ float getLatitude(float worldZ) {   // CHANGED — worldExtentZ parameter remove
     return clamp(abs(worldZ) / LATITUDE_BAND_SIZE, 0.0, 1.0);
 }
 int determineClimateBiome(float latitude, float aridity) {
-    const float EPSILON = 0.001;
-    if (latitude >= 0.6 - EPSILON && latitude <= 1.0) {
-        return BIOME_TUNDRA;
-    }
-    if (latitude >= 0.0 && latitude <= 0.5 + EPSILON && aridity >= 0.6 - EPSILON && aridity <= 1.0) {
-        return BIOME_DESERT;
-    }
-    if (aridity >= 0.0 && aridity <= 0.5 + EPSILON) {
-        return BIOME_LAKE;
-    }
+    if (latitude >= 0.6 && latitude <= 1.0) return BIOME_TUNDRA;
+    if (latitude >= 0.0 && latitude <= 0.5 && aridity >= 0.6 && aridity <= 1.0) return BIOME_DESERT;
+    if (aridity >= 0.0 && aridity <= 0.5) return BIOME_LAKE;
     return BIOME_PLAINS;
 }
+
 int determineBiome(float worldX, float worldZ, float seed) {
     float elevationTrigger = getElevationTrigger(worldX, worldZ, seed);
-
-    if (elevationTrigger > 0.6 - EPSILON) {   // CHANGED — lean toward Mountains when close
-        return BIOME_MOUNTAINS;
-    }
-    if (elevationTrigger > 0.35 - EPSILON) {   // CHANGED — lean toward Hills when close
-        return BIOME_HILLS;
-    }
-
+    if (elevationTrigger > 0.6) return BIOME_MOUNTAINS;
+    if (elevationTrigger > 0.35) return BIOME_HILLS;
     float latitude = getLatitude(worldZ);
     float aridity = getAridity(worldX, worldZ, seed);
     return determineClimateBiome(latitude, aridity);

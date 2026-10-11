@@ -54,6 +54,7 @@ private:
     void Update(float deltaTime);
     void Render();
     void Shutdown();
+    void HandleRTSInput(GLFWwindow* window, float deltaTime);
     // Core systems
     std::unique_ptr<AudioEngine> m_AudioEngine;
     std::unique_ptr<AudioEventSystem> m_AudioEvents;
@@ -105,6 +106,16 @@ private:
     std::unique_ptr<TerrainRenderer> m_TerrainRenderer;
     bool m_TerrainTestActive = false;
 
+    
+
+    std::vector<entt::entity> m_SelectedUnits;
+    bool m_IsBoxSelecting = false;
+    glm::vec2 m_BoxSelectStart{};     // physical pixels, used for the selection math
+    glm::vec2 m_BoxSelectStartUI{};      // ImGui space, used only for drawing the rectangle
+    bool m_LeftWasDown = false;
+    bool m_RightWasDown = false;
+
+
 
     struct NoiseTestPush {
         float startX;
@@ -113,7 +124,6 @@ private:
         uint32_t sampleType;   // 0 = raw simplex, 1 = fbm, 2 = ridged
     };
     void RunNoiseLibraryTest();
-
     struct BiomeTestPush {
         float startX;
         float startZ;
@@ -122,6 +132,7 @@ private:
         uint32_t sampleType;
         float worldExtentZ;
     };
+    void CompareTerrainHeightAt(float x, float z);
 
     void RunBiomeLibraryTest();
     void RunSimplexDebugTest(glm::vec2 testPoint);

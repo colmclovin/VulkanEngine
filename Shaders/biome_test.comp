@@ -2,7 +2,7 @@
 #version 450
 #extension GL_GOOGLE_include_directive : require
 
-#include "Include/biome.glsl"
+#include "Include/terrain.glsl"
 
 layout(local_size_x = 64) in;
 
@@ -31,5 +31,19 @@ void main() {
         values[idx] = getLatitude(z);
     } else if (pc.sampleType == 3) {
         values[idx] = float(determineBiome(x, z, pc.seed));
-    }
+    } else if (pc.sampleType == 4) {
+    vec4 noDepletion[4] = vec4[4](vec4(0.0), vec4(0.0), vec4(0.0), vec4(0.0));
+    values[idx] = sampleTerrain(x, z, pc.seed, 0u, noDepletion).height;
+    } else if (pc.sampleType == 5) {
+    float v = 0.0;
+    if (idx == 0u) v = getElevationTrigger(x, z, pc.seed);
+    else if (idx == 1u) v = sampleRawHeightForBiome(x, z, BIOME_HILLS, pc.seed);
+    else if (idx == 2u) v = sampleRawHeightForBiome(x, z, BIOME_MOUNTAINS, pc.seed);
+    else if (idx == 3u) v = sampleRawHeightForBiome(x, z, BIOME_PLAINS, pc.seed);
+    else if (idx == 4u) v = float(determineBiome(x, z, pc.seed));
+    else if (idx == 5u) v = getAridity(x, z, pc.seed);
+    else if (idx == 6u) v = hashSeed(pc.seed);
+    else if (idx == 7u) v = pc.seed;   // confirms what the GPU actually received
+    values[idx] = v;
+}
 }

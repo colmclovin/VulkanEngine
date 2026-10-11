@@ -61,9 +61,10 @@ float ridgedNoise(vec2 pos, int octaves, float frequency, float lacunarity, floa
     return sum;
 }
 float hashSeed(float seed) {
-    float wrapped = mod(seed, 1000.0);   // bound the input before it ever reaches sin()
-    float x = fract(sin(wrapped * 12.9898) * 43758.5453);
-    return x * 1000.0;
+    float s = mod(seed, 4096.0);                 // exact in float
+    float h = mod(s * 37.0 + 11.0, 1024.0);      // small integers, exact
+    h = mod(h * h + s * 7.0, 1024.0);            // still < 2^24, exact
+    return h;                                    // 0..1024
 }
 
 #endif

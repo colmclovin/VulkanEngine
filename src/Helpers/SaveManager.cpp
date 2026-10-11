@@ -214,7 +214,8 @@ outPlayer = registry.create();
     registry.emplace<SkinnedMeshComponent>(outPlayer, playerMesh); // CHANGED — was MeshComponent/Mesh
     registry.emplace<AnimationComponent>(outPlayer);
     registry.emplace<NameTag>(outPlayer, "Player");
-
+    registry.emplace<SelectableComponent>(outPlayer);
+    registry.emplace<BoundsComponent>(outPlayer, BoundsComponent{ glm::vec3(0.5f, 1.0f, 0.5f) });
 
     std::cout << "Game loaded from " << path << std::endl;
     return true;

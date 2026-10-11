@@ -24,6 +24,7 @@
 #include "../Systems/AssemblerSystem.h"
 #include "../Systems/BeltSystem.h"
 #include "../Systems/InserterSystem.h"
+#include "../Systems/MoveOrderSystem.h"
 #include "FuelDatabase.h"
 #include "../Systems/PowerSystem.h"
 #include "../Helpers/SaveManager.h"
@@ -228,7 +229,9 @@ void Game::CreateInitialEntities() {
         playerTransform.Position = spawnPos;
         m_Registry->emplace<PlayerComponent>(m_PlayerEntity);
         m_Registry->emplace<InventoryComponent>(m_PlayerEntity);
+        m_Registry->emplace<SelectableComponent>(m_PlayerEntity);
 
+        m_Registry->emplace<BoundsComponent>(m_PlayerEntity, BoundsComponent{ glm::vec3(0.5f, 1.0f, 0.5f) });
         auto playerMesh = std::make_shared<SkinnedMesh>(ModelLoader::LoadSkinnedModel("Assets/Models/Test1.glb", m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer())); // swap for a real player model later
         m_Registry->emplace<AnimationComponent>(m_PlayerEntity);
         m_Registry->emplace<SkinnedMeshComponent>(m_PlayerEntity, playerMesh);
@@ -340,6 +343,19 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     bool loadIsDown = glfwGetKey(window, GLFW_KEY_F9) == GLFW_PRESS;
     bool tabIsDown = glfwGetKey(window, GLFW_KEY_TAB) == GLFW_PRESS;
 
+    //Testing
+    static bool f10WasDown = false;
+    bool f10Down = glfwGetKey(window, GLFW_KEY_F10) == GLFW_PRESS;
+    if (f10Down && !f10WasDown && m_Registry->valid(m_PlayerEntity)) {
+        auto& pt = m_Registry->get<TransformComponent>(m_PlayerEntity);
+        CompareTerrainHeightAt(pt.Position.x, pt.Position.z);
+        std::cout << "player Position.y=" << pt.Position.y << std::endl;
+    }
+    f10WasDown = f10Down;
+    //Testing
+
+
+
 
     if (placeIsDown && !placeWasDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity, m_PlacementGrid, m_Settings.terrain);
     if (qIsDown && !qWasDown) m_Camera->SnapRotateIso(false);
@@ -389,6 +405,8 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
         }
     }
     
+
+
     if (inspectIsDown && !inspectWasDown && !ImGui::GetIO().WantCaptureMouse) {
         double mx, my;
         glfwGetCursorPos(window, &mx, &my);
@@ -409,6 +427,10 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
 
         m_InspectedEntity = InteractionSystem::FindMachineAlongRay(*m_Registry, rayOrigin, rayDir, 100.0f);
     }
+
+
+
+
     if (rotatePlacedIsDown && !rotatePlacedWasDown) {
 
         if (m_Registry->valid(machineTarget)) {
@@ -440,6 +462,14 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     if (tabIsDown && !tabWasDown) {
         if (m_Camera->GetMode() == Camera3D::Mode::IsoRTS) {
             m_Camera->SetMode(Camera3D::Mode::Isometric);   // isoTarget stays exactly where it currently is — seamless transition
+
+            auto selectables = m_Registry->view<SelectableComponent>();
+            for (auto e : selectables) selectables.get<SelectableComponent>(e).isSelected = false;
+            m_SelectedUnits.clear();
+            m_IsBoxSelecting = false;
+            m_LeftWasDown = false;
+            m_RightWasDown = false;
+            m_RenderSystem->SetSelectionRect(false, {}, {});
         }
         else {
             m_Camera->SetMode(Camera3D::Mode::IsoRTS);
@@ -460,6 +490,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     tabWasDown = tabIsDown;
 
     if (m_Camera->GetMode() == Camera3D::Mode::IsoRTS) {
+        HandleRTSInput(window, deltaTime);
         glm::vec3 panDir(0.0f);
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) panDir.z -= 1.0f;
         if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) panDir.z += 1.0f;
@@ -482,6 +513,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
         if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) m_Camera->ProcessKeyboard(CameraMovement::Down, deltaTime);
         // Game::HandleIsoInput
         if (glm::length(moveDir) > 0.0f && m_Registry->valid(m_PlayerEntity)) {
+            m_Registry->remove<MoveOrderComponent>(m_PlayerEntity);   // manual input overrides any queued order
             MovePlayer(glm::normalize(moveDir), deltaTime);
         }
     }
@@ -525,8 +557,119 @@ void Game::MovePlayer(glm::vec3 direction, float deltaTime) {
 		transform.Position += (forward * direction.z + right * direction.x) * player.moveSpeed * deltaTime;
 	}
 
-    transform.Position.y = GpuNoiseMatch::SampleHeight(transform.Position.x, transform.Position.z, static_cast<float>(m_Settings.terrain.seed));
+    float cellSize = ChunkManager::CHUNK_WORLD_SIZE / (ChunkManager::CHUNK_VERTEX_RESOLUTION - 1);
+   // std::cout << "exact=" << GpuNoiseMatch::SampleHeight(transform.Position.x, transform.Position.z, (float)m_Settings.terrain.seed)    
+   //     << " mesh=" << GpuNoiseMatch::SampleMeshHeight(transform.Position.x, transform.Position.z, (float)m_Settings.terrain.seed, cellSize);
+    transform.Position.y = GpuNoiseMatch::SampleMeshHeight(transform.Position.x, transform.Position.z, (float)m_Settings.terrain.seed, cellSize);
 }
+
+void Game::HandleRTSInput(GLFWwindow* window, float deltaTime) {    
+    ImGuiIO& io = ImGui::GetIO();
+
+    // Cursor in physical pixels (same DPI correction as HandleIsoInput)
+    double rawX, rawY;
+    glfwGetCursorPos(window, &rawX, &rawY);
+    int winW, winH;
+    glfwGetWindowSize(window, &winW, &winH);
+    VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();
+    float mx = static_cast<float>(rawX) * (winW > 0 ? (float)extent.width / winW : 1.0f);
+    float my = static_cast<float>(rawY) * (winH > 0 ? (float)extent.height / winH : 1.0f);
+    float aspect = static_cast<float>(extent.width) / extent.height;
+
+    bool leftDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS;
+    bool rightDown = glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS;
+
+    // Don't let clicks on UI windows start or finish a selection
+    bool uiCaptured = io.WantCaptureMouse && !m_IsBoxSelecting;
+
+    // ---- Left mouse: press starts a drag, release finalizes ----
+    if (leftDown && !m_LeftWasDown && !uiCaptured) {
+        m_IsBoxSelecting = true;
+        m_BoxSelectStart = glm::vec2(mx, my);
+        m_BoxSelectStartUI = glm::vec2(io.MousePos.x, io.MousePos.y);   // was: = io.MousePos;    
+    }
+
+    if (!leftDown && m_LeftWasDown && m_IsBoxSelecting) {
+        glm::vec2 boxEnd(mx, my);
+        bool additive = glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS;
+
+        auto selectables = m_Registry->view<TransformComponent, SelectableComponent>();
+
+        if (!additive) {
+            for (auto e : selectables) selectables.get<SelectableComponent>(e).isSelected = false;
+            m_SelectedUnits.clear();
+        }
+
+        auto addToSelection = [&](entt::entity e) {
+            auto& sel = m_Registry->get<SelectableComponent>(e);
+            if (sel.isSelected) return;
+            sel.isSelected = true;
+            m_SelectedUnits.push_back(e);
+            };
+
+        float dragDist = glm::length(boxEnd - m_BoxSelectStart);
+        if (dragDist < 5.0f) {
+            // Single click: ray-pick the nearest selectable
+            glm::vec3 rayOrigin = m_Camera->GetEyePosition();
+            glm::vec3 rayDir = m_Camera->ScreenPointToRay(mx, my, (float)extent.width, (float)extent.height, aspect);
+            entt::entity clicked = InteractionSystem::FindSelectableAlongRay(*m_Registry, rayOrigin, rayDir, 500.0f);
+            if (m_Registry->valid(clicked)) addToSelection(clicked);
+        }
+        else {
+            // Box select: project each unit to screen space
+            glm::vec2 boxMin = glm::min(m_BoxSelectStart, boxEnd);
+            glm::vec2 boxMax = glm::max(m_BoxSelectStart, boxEnd);
+            glm::mat4 viewProj = m_Camera->GetProjectionMatrix(aspect) * m_Camera->GetActiveViewMatrix();
+
+            for (auto e : selectables) {
+                glm::vec3 worldPos = selectables.get<TransformComponent>(e).Position + glm::vec3(0, 1.0f, 0);
+                glm::vec4 clip = viewProj * glm::vec4(worldPos, 1.0f);
+                if (clip.w <= 0.0f) continue;   // behind the camera
+
+                glm::vec2 ndc = glm::vec2(clip.x, clip.y) / clip.w;
+                // GetProjectionMatrix already flips Y for Vulkan, so ndc.y = -1 is the top of the screen
+                glm::vec2 screen((ndc.x * 0.5f + 0.5f) * extent.width,
+                    (ndc.y * 0.5f + 0.5f) * extent.height);
+
+                if (screen.x >= boxMin.x && screen.x <= boxMax.x &&
+                    screen.y >= boxMin.y && screen.y <= boxMax.y) {
+                    addToSelection(e);
+                }
+            }
+        }
+        m_IsBoxSelecting = false;
+    }
+
+    // ---- Right mouse: move order for every selected unit ----
+    if (rightDown && !m_RightWasDown && !io.WantCaptureMouse) {
+        glm::vec3 rayOrigin = m_Camera->GetEyePosition();
+        glm::vec3 rayDir = m_Camera->ScreenPointToRay(mx, my, (float)extent.width, (float)extent.height, aspect);
+        glm::vec3 ground = TerrainRaycast::RaycastToTerrain(rayOrigin, rayDir, m_Settings.terrain);
+
+        // Fan multiple units out so they don't stack on one point
+        int n = static_cast<int>(m_SelectedUnits.size());
+        int side = static_cast<int>(std::ceil(std::sqrt((float)std::max(n, 1))));
+        int i = 0;
+        for (auto unit : m_SelectedUnits) {
+            if (!m_Registry->valid(unit)) continue;
+            glm::vec3 offset((i % side - (side - 1) * 0.5f) * 2.0f, 0.0f,
+                (i / side - (side - 1) * 0.5f) * 2.0f);
+            m_Registry->emplace_or_replace<MoveOrderComponent>(unit, MoveOrderComponent{ ground + offset });
+            i++;
+        }
+    }
+
+    // ---- Drag rectangle overlay ----
+
+        bool showRect = m_IsBoxSelecting && leftDown &&
+            glm::length(glm::vec2(io.MousePos.x, io.MousePos.y) - m_BoxSelectStartUI) > 5.0f;
+        m_RenderSystem->SetSelectionRect(showRect, m_BoxSelectStartUI, glm::vec2(io.MousePos.x, io.MousePos.y));
+
+    m_LeftWasDown = leftDown;
+    m_RightWasDown = rightDown;
+}
+
+
 
 void Game::HandleFreeFlyInput(GLFWwindow* window, float deltaTime) {
 
@@ -605,7 +748,7 @@ void Game::Update(float deltaTime) {
     BeltRenderSystem::SyncItemEntities(*m_Registry, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.cellSize);
     InserterSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
     PowerSystem::Update(*m_Registry, deltaTime);
-
+    MoveOrderSystem::Update(*m_Registry, deltaTime, m_Settings.terrain);
 
     if (m_Registry->valid(m_PlayerEntity)) {
         auto &playerTransform = m_Registry->get<TransformComponent>(m_PlayerEntity);
@@ -1420,4 +1563,88 @@ void Game::RunRidgedDebugTest(glm::vec2 pos, int octaves, float frequency, float
     vkDestroyDescriptorSetLayout(device, descSetLayout, nullptr);
     vkDestroyBuffer(device, outputBuffer, nullptr);
     vkFreeMemory(device, outputMemory, nullptr);
+}
+
+
+void Game::CompareTerrainHeightAt(float x, float z) {
+    VkDevice device = m_VulkanEngine->GetDevice();
+    const uint32_t count = 64;                       // shader is local_size_x = 64
+    VkDeviceSize size = count * sizeof(float);
+
+    VkBuffer buf; VkDeviceMemory mem;
+    m_VulkanEngine->CreateBuffer(size, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, buf, mem);
+    void* mapped; vkMapMemory(device, mem, 0, size, 0, &mapped);
+
+    VkDescriptorSetLayoutBinding b{}; b.binding = 0;
+    b.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER; b.descriptorCount = 1;
+    b.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    VkDescriptorSetLayoutCreateInfo li{}; li.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    li.bindingCount = 1; li.pBindings = &b;
+    VkDescriptorSetLayout dsl; vkCreateDescriptorSetLayout(device, &li, nullptr, &dsl);
+
+    VkDescriptorPoolSize ps{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 1 };
+    VkDescriptorPoolCreateInfo pi{}; pi.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    pi.poolSizeCount = 1; pi.pPoolSizes = &ps; pi.maxSets = 1;
+    VkDescriptorPool pool; vkCreateDescriptorPool(device, &pi, nullptr, &pool);
+
+    VkDescriptorSetAllocateInfo ai{}; ai.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    ai.descriptorPool = pool; ai.descriptorSetCount = 1; ai.pSetLayouts = &dsl;
+    VkDescriptorSet set; vkAllocateDescriptorSets(device, &ai, &set);
+
+    VkDescriptorBufferInfo bi{ buf, 0, size };
+    VkWriteDescriptorSet w{}; w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    w.dstSet = set; w.dstBinding = 0; w.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    w.descriptorCount = 1; w.pBufferInfo = &bi;
+    vkUpdateDescriptorSets(device, 1, &w, 0, nullptr);
+
+
+
+    VkPushConstantRange pr{ VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(BiomeTestPush) };
+    VkPipelineLayoutCreateInfo pli{}; pli.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+    pli.setLayoutCount = 1; pli.pSetLayouts = &dsl;
+    pli.pushConstantRangeCount = 1; pli.pPushConstantRanges = &pr;
+    VkPipelineLayout layout; vkCreatePipelineLayout(device, &pli, nullptr, &layout);
+
+    auto code = m_VulkanEngine->ReadFile("Shaders/biome_test_comp.spv");
+    VkShaderModule mod = m_VulkanEngine->CreateShaderModule(code);
+    VkPipelineShaderStageCreateInfo st{}; st.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+    st.stage = VK_SHADER_STAGE_COMPUTE_BIT; st.module = mod; st.pName = "main";
+    VkComputePipelineCreateInfo ci{}; ci.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+    ci.stage = st; ci.layout = layout;
+    VkPipeline pipe; vkCreateComputePipelines(device, VK_NULL_HANDLE, 1, &ci, nullptr, &pipe);
+    vkDestroyShaderModule(device, mod, nullptr);
+
+    // sampleType 4 = terrain height; spacing 0 so every thread samples the same point
+    BiomeTestPush push{ x, z, 0.0f, (float)m_Settings.terrain.seed, 5, 0.0f };
+
+    VkCommandBuffer cmd = m_VulkanEngine->BeginSingleTimeCommands();
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, pipe);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, layout, 0, 1, &set, 0, nullptr);
+    vkCmdPushConstants(cmd, layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(BiomeTestPush), &push);
+    vkCmdDispatch(cmd, 1, 1, 1);
+    m_VulkanEngine->EndSingleTimeCommands(cmd);
+
+
+    float* g = static_cast<float*>(mapped);
+    float s = (float)m_Settings.terrain.seed;
+    std::cout << "elev   GPU=" << g[0] << " CPU=" << GpuNoiseMatch::GetElevationTrigger(x, z, s) << "\n"
+        << "hills  GPU=" << g[1] << " CPU=" << GpuNoiseMatch::SampleRawHeightForBiome(x, z, BIOME_HILLS, s) << "\n"
+        << "mtns   GPU=" << g[2] << " CPU=" << GpuNoiseMatch::SampleRawHeightForBiome(x, z, BIOME_MOUNTAINS, s) << "\n"
+        << "plains GPU=" << g[3] << " CPU=" << GpuNoiseMatch::SampleRawHeightForBiome(x, z, BIOME_PLAINS, s) << "\n"
+        << "biome  GPU=" << g[4] << " CPU=" << GpuNoiseMatch::DetermineBiome(x, z, s) << "\n"
+        << "arid   GPU=" << g[5] << " CPU=" << GpuNoiseMatch::GetAridity(x, z, s) << "\n"
+        << "hashSeed GPU=" << g[6] << " CPU=" << GpuNoiseMatch::HashSeed(s) << "\n"
+        << "  seed GPU=" << g[7] << " CPU=" << s << std::endl;
+/*    float gpu = static_cast<float*>(mapped)[0];
+    float cpu = GpuNoiseMatch::SampleHeight(x, z, (float)m_Settings.terrain.seed);
+    std::cout << "(" << x << "," << z << ") GPU=" << gpu << " CPU=" << cpu
+        << " diff=" << (gpu - cpu) << std::endl;
+        */
+    vkDestroyPipeline(device, pipe, nullptr);
+    vkDestroyPipelineLayout(device, layout, nullptr);
+    vkDestroyDescriptorPool(device, pool, nullptr);
+    vkDestroyDescriptorSetLayout(device, dsl, nullptr);
+    vkDestroyBuffer(device, buf, nullptr);
+    vkFreeMemory(device, mem, nullptr);
 }

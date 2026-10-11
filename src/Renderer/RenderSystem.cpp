@@ -149,6 +149,14 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
 
     m_ImGuiVulkanUtil->NewFrame();
     m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine, m_PlayerEntity, m_InspectedEntity, selectedItem, techState);
+    if (m_SelActive) {
+        ImVec2 a(m_SelA.x, m_SelA.y), b(m_SelB.x, m_SelB.y);
+        auto* dl = ImGui::GetForegroundDrawList();
+        dl->AddRectFilled(a, b, IM_COL32(80, 200, 120, 40));
+        dl->AddRect(a, b, IM_COL32(80, 200, 120, 255));
+    }
+
+
     m_TerrainRenderer->ProcessPendingFrees();
     m_TreeRenderer->ProcessPendingFrees();
     m_TerrainRenderer->RecordDraw(m_Engine->GetCurrentCommandBuffer(), camera, dayNightCycle, lightSpaceMatrix, activeLights, settings.wireframeMode);   // CHANGED — RecordDraw, not Render
@@ -164,7 +172,12 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
     }
 
     m_DebugLineRenderer->BeginFrame();
-
+    auto selView = registry.view<TransformComponent, SelectableComponent>();
+    for (auto e : selView) {
+        if (!selView.get<SelectableComponent>(e).isSelected) continue;
+        glm::vec3 p = selView.get<TransformComponent>(e).Position;
+        m_DebugLineRenderer->AddBox(p + glm::vec3(-1.5f, 0.2f, -1.5f), p + glm::vec3(1.5f, 0.4f, 1.5f), glm::vec3(0.2f, 1.0f, 0.4f));
+    }
     if (settings.showBoundsDebug) {
         auto view = registry.view<TransformComponent, BoundsComponent>();
         for (auto entity : view) {

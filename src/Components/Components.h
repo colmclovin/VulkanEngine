@@ -21,3 +21,5 @@
 #include "PointLightComponent.h"
 #include "TreeOriginComponent.h"
 #include "ChunkBoundsComponent.h"
+#include "SelectableComponent.h"
+#include "MoveOrderComponent.h"
