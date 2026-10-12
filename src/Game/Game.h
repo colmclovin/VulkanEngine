@@ -16,6 +16,8 @@
 #include "../World/RemovedTreesMap.h"
 #include "../Renderer/TerrainRenderer.h"
 #include "../World/TreeHealthMap.h"
+#include "FogOfWar.h"
+
 class TerrainGenerator;
 class VulkanEngine;
 class RenderSystem;
@@ -70,6 +72,7 @@ private:
     ResourceMap m_ResourceMap;
     PlacementGrid m_PlacementGrid;
     TechState m_TechState;
+    void IssueMoveCommand(const glm::vec3& groundTarget);
 
     ItemId GetSelectedItem() const {
         return (m_SelectedHotbarSlot >= 0 && m_SelectedHotbarSlot < HOTBAR_SIZE) ? m_Hotbar[m_SelectedHotbarSlot] : ItemId::None;
@@ -114,6 +117,8 @@ private:
     glm::vec2 m_BoxSelectStartUI{};      // ImGui space, used only for drawing the rectangle
     bool m_LeftWasDown = false;
     bool m_RightWasDown = false;
+    FogOfWar m_Fog;
+
 
 
 

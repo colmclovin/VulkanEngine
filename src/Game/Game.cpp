@@ -43,6 +43,7 @@
 #include "ChunkManager.h"
 #include "../World/TreePlacement.h"
 #include "../Utils/GpuNoiseMatch.h"
+#include "FogOfWar.h"
 Game::Game() {
 
 }
@@ -236,6 +237,8 @@ void Game::CreateInitialEntities() {
         m_Registry->emplace<AnimationComponent>(m_PlayerEntity);
         m_Registry->emplace<SkinnedMeshComponent>(m_PlayerEntity, playerMesh);
         m_Registry->emplace<NameTag>(m_PlayerEntity, "Player");
+        m_Registry->emplace<VisionComponent>(m_PlayerEntity, 24.0f);
+        m_Registry->emplace<TeamComponent>(m_PlayerEntity, 0);
 
         m_ResourceMap.Generate(m_Settings.terrain.gridWidth, m_Settings.terrain.gridDepth,
             m_Settings.terrain.cellSize, m_Settings.terrain.seed);
@@ -299,7 +302,18 @@ void Game::HandleInput(float deltaTime) {
     escWasDown = escIsDown;
 
 }
-
+void Game::IssueMoveCommand(const glm::vec3& ground) {
+    int n = static_cast<int>(m_SelectedUnits.size());
+    int side = static_cast<int>(std::ceil(std::sqrt((float)std::max(n, 1))));
+    int i = 0;
+    for (auto unit : m_SelectedUnits) {
+        if (!m_Registry->valid(unit)) continue;
+        glm::vec3 offset((i % side - (side - 1) * 0.5f) * 2.0f, 0.0f,
+            (i / side - (side - 1) * 0.5f) * 2.0f);
+        m_Registry->emplace_or_replace<MoveOrderComponent>(unit, MoveOrderComponent{ ground + offset });
+        i++;
+    }
+}
 
 void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     static bool qWasDown = false, eWasDown = false, f11WasDown = false, interactWasDown = false, 
@@ -647,16 +661,8 @@ void Game::HandleRTSInput(GLFWwindow* window, float deltaTime) {
         glm::vec3 ground = TerrainRaycast::RaycastToTerrain(rayOrigin, rayDir, m_Settings.terrain);
 
         // Fan multiple units out so they don't stack on one point
-        int n = static_cast<int>(m_SelectedUnits.size());
-        int side = static_cast<int>(std::ceil(std::sqrt((float)std::max(n, 1))));
-        int i = 0;
-        for (auto unit : m_SelectedUnits) {
-            if (!m_Registry->valid(unit)) continue;
-            glm::vec3 offset((i % side - (side - 1) * 0.5f) * 2.0f, 0.0f,
-                (i / side - (side - 1) * 0.5f) * 2.0f);
-            m_Registry->emplace_or_replace<MoveOrderComponent>(unit, MoveOrderComponent{ ground + offset });
-            i++;
-        }
+
+        IssueMoveCommand(ground);
     }
 
     // ---- Drag rectangle overlay ----
@@ -749,6 +755,8 @@ void Game::Update(float deltaTime) {
     InserterSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
     PowerSystem::Update(*m_Registry, deltaTime);
     MoveOrderSystem::Update(*m_Registry, deltaTime, m_Settings.terrain);
+    
+    //m_Fog.Update(m_Registry)
 
     if (m_Registry->valid(m_PlayerEntity)) {
         auto &playerTransform = m_Registry->get<TransformComponent>(m_PlayerEntity);

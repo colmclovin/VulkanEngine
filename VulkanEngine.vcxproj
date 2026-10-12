@@ -208,6 +208,7 @@
     <ClCompile Include="src\Game\ChunkGenerator.cpp" />
     <ClCompile Include="src\Game\ChunkManager.cpp" />
     <ClCompile Include="src\Game\CraftingSystem.cpp" />
+    <ClCompile Include="src\Game\FogOfWar.cpp" />
     <ClCompile Include="src\Game\FuelDatabase.cpp" />
     <ClCompile Include="src\Game\FurnaceRecipeDatabase.cpp" />
     <ClCompile Include="src\Game\Game.cpp" />
@@ -290,8 +291,10 @@
     <ClInclude Include="src\Components\PowerComponent.h" />
     <ClInclude Include="src\Components\SkinnedMeshComponent.h" />
     <ClInclude Include="src\Components\SpriteComponent.h" />
+    <ClInclude Include="src\Components\TeamComponent.h" />
     <ClInclude Include="src\Components\TransformComponent.h" />
     <ClInclude Include="src\Components\TreeOriginComponent.h" />
+    <ClInclude Include="src\Components\VisionComponent.h" />
     <ClInclude Include="src\Engine\VulkanEngine.h" />
     <ClInclude Include="src\Game\BiomeDatabase.h" />
     <ClInclude Include="src\Game\BiomeMap.h" />
@@ -299,6 +302,7 @@
     <ClInclude Include="src\Game\ChunkGenerator.h" />
     <ClInclude Include="src\Game\ChunkManager.h" />
     <ClInclude Include="src\Game\CraftingSystem.h" />
+    <ClInclude Include="src\Game\FogOfWar.h" />
     <ClInclude Include="src\Game\FuelDatabase.h" />
     <ClInclude Include="src\Game\FurnaceRecipeDatabase.h" />
     <ClInclude Include="src\Game\Game.h" />

@@ -23,3 +23,5 @@
 #include "ChunkBoundsComponent.h"
 #include "SelectableComponent.h"
 #include "MoveOrderComponent.h"
+#include "VisionComponent.h"
+#include "TeamComponent.h"
