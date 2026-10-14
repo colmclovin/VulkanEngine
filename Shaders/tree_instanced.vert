@@ -20,10 +20,12 @@ layout(location = 2) in vec2 inTexCoord;
 layout(location = 0) out vec3 fragNormal;
 layout(location = 1) out vec2 fragTexCoord;
 layout(location = 2) out vec4 fragPosLightSpace;
+layout(location = 3) out vec3 fragWorldPos;
 
 void main() {
 vec4 instance = instances[gl_InstanceIndex];
 vec3 worldPos = inPosition * 1.0 + instance.xyz;   // CHANGED — fixed scale of 1.0, since w is now the grid index
+fragWorldPos = worldPos;
 
     gl_Position = lighting.viewProj * vec4(worldPos, 1.0);
     fragNormal = inNormal;

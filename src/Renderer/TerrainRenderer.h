@@ -7,7 +7,9 @@
 #include "../Rendering/ChunkCuller.h"
 #include "../Rendering/Frustum.h"
 #include "../Renderer/ShadowMap.h"
+#include "../Rendering/FogTexture.h"
 
+class FogTexture;
 class VulkanEngine;
 class Camera3D;
 class DayNightCycle;
@@ -16,7 +18,7 @@ struct PointLight;
 class TerrainRenderer {
 public:
     TerrainRenderer(VulkanEngine* engine);
-    void Init(uint32_t vertsPerChunk, uint32_t indicesPerChunk, uint32_t maxChunks, ShadowMap* shadowMap);
+    void Init(uint32_t vertsPerChunk, uint32_t indicesPerChunk, uint32_t maxChunks, ShadowMap *shadowMap, FogTexture *fogTexture);
     void Shutdown();
     TerrainBufferPool* GetBufferPool() { return &m_Pool; }
     // Called by ChunkManager when a chunk finishes generating
@@ -46,6 +48,8 @@ private:
     VkPipelineLayout m_PipelineLayout = VK_NULL_HANDLE;
     VkDescriptorSetLayout m_LightingDescriptorSetLayout = VK_NULL_HANDLE;
     VkDescriptorPool m_LightingDescriptorPool = VK_NULL_HANDLE;
+
+    FogTexture *m_FogTexture = nullptr;
 
     static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
     VkBuffer m_LightingUBOBuffers[MAX_FRAMES_IN_FLIGHT];

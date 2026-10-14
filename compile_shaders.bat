@@ -51,7 +51,7 @@ if exist "Shaders\mesh.vert" (
 REM Compile mesh fragment shader
 if exist "Shaders\mesh.frag" (
 	echo Compiling mesh fragment shader...
-	glslc Shaders\mesh.frag -o Shaders\mesh_frag.spv
+	glslc -I Shaders Shaders\mesh.frag -o Shaders\mesh_frag.spv
 	if %ERRORLEVEL% EQU 0 (
 		echo   Mesh fragment shader compiled successfully
 	) else (
@@ -182,7 +182,7 @@ if exist "Shaders\mesh_instanced.vert" (
 REM Compile mesh instanced fragment shader
 if exist "Shaders\mesh_instanced.frag" (
 	echo Compiling mesh instanced fragment shader...
-	glslc Shaders\mesh_instanced.frag -o Shaders\mesh_instanced_frag.spv
+	glslc -I Shaders Shaders\mesh_instanced.frag -o Shaders\mesh_instanced_frag.spv
 	if %ERRORLEVEL% EQU 0 (
 		echo   Mesh Instanced fragment shader compiled successfully
 	) else (
@@ -234,7 +234,7 @@ if exist "Shaders\terrain.vert" (
 REM Compile terrain fragment shader
 if exist "Shaders\terrain.frag" (
 	echo Compiling terrain fragment shader...
-	glslc Shaders\terrain.frag -o Shaders\terrain_frag.spv
+	glslc -I Shaders Shaders\terrain.frag -o Shaders\terrain_frag.spv
 	if %ERRORLEVEL% EQU 0 (
 		echo   Terrain fragment shader compiled successfully
 	) else (
@@ -400,6 +400,46 @@ if exist "Shaders\shadow_tree_instanced.vert" (
 ) else (
 	echo WARNING: shadow_tree_instanced.vert not found
 )
+REM Compile fog layer vertex shader
+if exist "Shaders\fog_layer.vert" (
+	echo Compiling fog layer vertex shader...
+	glslc -I Shaders Shaders\fog_layer.vert -o Shaders\fog_layer_vert.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Fog layer vertex shader compiled successfully
+	) else (
+		echo   Fog layer vertex shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: fog_layer.vert not found
+)
+REM Compile fog layer fragment shader
+if exist "Shaders\fog_layer.frag" (
+	echo Compiling fog layer fragment shader...
+	glslc -I Shaders Shaders\fog_layer.frag -o Shaders\fog_layer_frag.spv
+	if %ERRORLEVEL% EQU 0 (
+		echo   Fog layer fragment shader compiled successfully
+	) else (
+		echo   Fog layer fragment shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: fog_layer.frag not found
+)
+REM Compile minimap compute shader
+if exist "Shaders\minimap.comp" (
+	echo Compiling minimap compute shader...
+	glslc -I Shaders Shaders\minimap.comp -o Shaders\minimap_comp.spv	
+	if %ERRORLEVEL% EQU 0 (
+		echo   minimap compute shader compiled successfully
+	) else (
+		echo   minimap compute shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: minimap.comp not found
+)
+
 
 echo.
 echo Shader compilation complete!

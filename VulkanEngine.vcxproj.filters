@@ -52,6 +52,10 @@
     <None Include="Shaders\simplex_debug.comp" />
     <None Include="Shaders\ridged_debug.comp" />
     <None Include="Shaders\shadow_tree_instanced.vert" />
+    <None Include="Shaders\Include\fogfx.glsl" />
+    <None Include="Shaders\fog_layer.vert" />
+    <None Include="Shaders\fog_layer.frag" />
+    <None Include="Shaders\minimap.comp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Main.cpp">
@@ -271,6 +275,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Game\FogOfWar.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Rendering\FogTexture.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Renderer\FogLayerRenderer.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\Rendering\Minimap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -606,6 +619,15 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Game\FogOfWar.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rendering\FogTexture.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Renderer\FogLayerRenderer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="src\Rendering\Minimap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -8,6 +8,7 @@
 #include "../Renderer/ShadowMap.h"
 
 class VulkanEngine;
+class FogTexture;
 class Camera3D;
 class DayNightCycle;
 class ShadowMap;
@@ -31,7 +32,7 @@ public:
     TreeRenderer(VulkanEngine* engine);
     void Init(uint32_t maxTreesPerChunk, uint32_t maxChunks, ShadowMap* shadowMap,
         VkBuffer treeVertexBuffer, VkBuffer treeIndexBuffer, const std::vector<TreeSubmeshRenderInfo>& submeshes,
-        VkImageView defaultTextureView, VkSampler defaultTextureSampler);
+              VkImageView defaultTextureView, VkSampler defaultTextureSampler, FogTexture *fogTex);
     void Shutdown();
     TreeInstanceBufferPool* GetBufferPool() { return &m_Pool; }
     std::optional<uint32_t> AllocateChunkSlot();

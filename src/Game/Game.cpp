@@ -44,6 +44,9 @@
 #include "../World/TreePlacement.h"
 #include "../Utils/GpuNoiseMatch.h"
 #include "FogOfWar.h"
+#include "../Rendering/FogTexture.h"
+#include <chrono>
+
 Game::Game() {
 
 }
@@ -152,11 +155,16 @@ void Game::Init() {
 
  
     m_RenderSystem->Init(vertsPerChunk, indicesPerChunk, maxChunks);
+    m_Camera = std::make_unique<Camera3D>(glm::vec3(0.0f, 5.0f, 5.0f));
 
-     m_VulkanEngine->ChainScrollCallback(); 
+    //m_Minimap.Init(m_VulkanEngine.get());
+    m_VulkanEngine->ChainScrollCallback(); 
+    m_Minimap.Init(m_VulkanEngine.get(), m_RenderSystem->GetFogTexture());
+    m_RenderSystem->SetPreRenderCallback([this](VkCommandBuffer cmd) {
+        m_Minimap.Record(cmd, m_MinimapCenter, m_MinimapRange, (float)m_Settings.terrain.seed);
+    });
+    m_RenderSystem->SetUICallback([this]() { DrawMinimap(); }); // ADD
 
-
-	m_Camera = std::make_unique<Camera3D>(glm::vec3(0.0f, 5.0f, 5.0f));
     //glfwSetInputMode(m_VulkanEngine->GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 
@@ -237,8 +245,8 @@ void Game::CreateInitialEntities() {
         m_Registry->emplace<AnimationComponent>(m_PlayerEntity);
         m_Registry->emplace<SkinnedMeshComponent>(m_PlayerEntity, playerMesh);
         m_Registry->emplace<NameTag>(m_PlayerEntity, "Player");
-        m_Registry->emplace<VisionComponent>(m_PlayerEntity, 24.0f);
-        m_Registry->emplace<TeamComponent>(m_PlayerEntity, 0);
+        m_Registry->emplace<VisionComponent>(m_PlayerEntity, 256.0f);
+        m_Registry->emplace<TeamComponent>(m_PlayerEntity,0);
 
         m_ResourceMap.Generate(m_Settings.terrain.gridWidth, m_Settings.terrain.gridDepth,
             m_Settings.terrain.cellSize, m_Settings.terrain.seed);
@@ -708,6 +716,10 @@ void Game::HandleFreeFlyInput(GLFWwindow* window, float deltaTime) {
 }
 void Game::Update(float deltaTime) {
     GLFWwindow* window = m_VulkanEngine->GetWindow();
+
+    m_TotalTime += deltaTime;
+    m_RenderSystem->GetFogTexture()->SetTime(m_TotalTime);
+
     if (m_Registry->valid(m_PlayerEntity)) {
         auto& transform = m_Registry->get<TransformComponent>(m_PlayerEntity);
         if(m_Camera->GetMode() == Camera3D::Mode::Isometric)
@@ -741,10 +753,16 @@ void Game::Update(float deltaTime) {
     float aspect = static_cast<float>(extent.width) / static_cast<float>(extent.height);
 
 
+    //auto t0 = std::chrono::high_resolution_clock::now();
+
     m_PlacementSystem->Update(*m_Registry, m_PlayerEntity, *m_Camera, m_SelectedItem,
         m_Settings.terrain, static_cast<float>(mx), static_cast<float>(my),
         static_cast<float>(extent.width), static_cast<float>(extent.height), aspect, m_PlacementGrid, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
-
+   // auto t1 = std::chrono::high_resolution_clock::now();
+    //static int n = 0;
+    //if (++n % 60 == 0)
+    //    std::cout << "placement update ms: "
+    //              << std::chrono::duration<double, std::milli>(t1 - t0).count() << std::endl;
     m_DayNightCycle.Update(deltaTime);
 
     MinerSystem::Update(*m_Registry, m_DepletionMap, m_Settings.terrain, deltaTime, m_ChunkManager);
@@ -756,13 +774,36 @@ void Game::Update(float deltaTime) {
     PowerSystem::Update(*m_Registry, deltaTime);
     MoveOrderSystem::Update(*m_Registry, deltaTime, m_Settings.terrain);
     
-    //m_Fog.Update(m_Registry)
+    glm::vec3 mc = (m_Camera->GetMode() == Camera3D::Mode::IsoRTS) ? m_Camera->GetIsoTarget()
+             : (m_Registry->valid(m_PlayerEntity) ? m_Registry->get<TransformComponent>(m_PlayerEntity).Position
+                                                  : m_Camera->GetIsoTarget());
+m_MinimapCenter = glm::vec2(mc.x, mc.z);
+//
+//m_MinimapTimer += deltaTime;
+//if (m_MinimapTimer >= 0.25f) {
+//    m_MinimapTimer = 0.0f;
+//    m_MinimapTexCenter = m_MinimapCenter;
+    //m_Minimap->Update(m_Fog, m_MinimapCenter, m_MinimapRange, (float)m_Settings.terrain.seed);
+//}
+
+    m_FogTimer += deltaTime;
+    if (m_FogTimer >= 0.1f) {
+        m_FogTimer = 0.0f;
+        m_Fog.Update(*m_Registry, 0);
+        glm::vec3 c = m_Camera->GetIsoTarget();
+        FogTexture *fogTex = m_RenderSystem->GetFogTexture();
+        if (m_Fog.ConsumeDirty() || fogTex->WindowNeedsMove(c)) {
+            m_RenderSystem->GetFogTexture()->Update(m_Fog, c);
+        }
+    }
+        
 
     if (m_Registry->valid(m_PlayerEntity)) {
         auto &playerTransform = m_Registry->get<TransformComponent>(m_PlayerEntity);
         glm::vec3 velocity = (playerTransform.Position - m_LastPlayerPosition) / deltaTime;
         //PlayerAnimationSystem::Update(*m_Registry, m_PlayerEntity, velocity);
-        m_ChunkManager.Update(*m_Registry, playerTransform.Position, m_Settings.terrain,
+        glm::vec3 loadCenter = (m_Camera->GetMode() == Camera3D::Mode::IsoRTS) ? m_Camera->GetIsoTarget() : playerTransform.Position;
+        m_ChunkManager.Update(*m_Registry, loadCenter, m_Settings.terrain,
             m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.seed,
                               m_DepletionMap, m_PlacementGrid, m_RenderSystem->GetTerrainRenderer(), m_RemovedTreesMap, m_Camera->GetForwardDirection(), m_Camera->GetIsoDistance(), m_RenderSystem->GetTreeRenderer());
 
@@ -807,6 +848,10 @@ void Game::Shutdown() {
         m_AudioEngine->Shutdown();
         m_AudioEngine.reset();
     }
+  // if (m_Minimap)
+  // {
+  //     m_Minimap->Shutdown();
+  // }
 
     if (m_Registry) {
         m_Registry->clear();
@@ -1655,4 +1700,73 @@ void Game::CompareTerrainHeightAt(float x, float z) {
     vkDestroyDescriptorSetLayout(device, dsl, nullptr);
     vkDestroyBuffer(device, buf, nullptr);
     vkFreeMemory(device, mem, nullptr);
+}
+
+void Game::DrawMinimap() {
+    ImGuiIO &io = ImGui::GetIO();
+    const float size = 220.0f;
+
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x - 10.0f, io.DisplaySize.y - 10.0f), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
+    ImGui::SetNextWindowSize(ImVec2(size, size));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::Begin("Minimap", nullptr,
+                 ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings |
+                         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoBackground);
+
+    ImGui::Image((ImTextureID)(uintptr_t)m_Minimap.GetImGuiTexture(), ImVec2(size, size));
+    ImVec2 imgMin = ImGui::GetItemRectMin();
+    bool hovered = ImGui::IsItemHovered();
+
+    // world <-> minimap helpers, using the center the texture was drawn with
+    auto worldToScreen = [&](float wx, float wz) {
+        float u = (wx - m_MinimapCenter.x) / (m_MinimapRange * 2.0f) + 0.5f;
+        float v = (wz - m_MinimapCenter.y) / (m_MinimapRange * 2.0f) + 0.5f;
+        return ImVec2(imgMin.x + u * size, imgMin.y + v * size);
+    };
+
+    ImDrawList *dl = ImGui::GetWindowDrawList();
+    dl->AddRect(imgMin, ImVec2(imgMin.x + size, imgMin.y + size), IM_COL32(200, 200, 200, 255));
+
+    // unit dots: own team always, other teams only where currently visible
+    auto units = m_Registry->view<TransformComponent, TeamComponent>();
+    for (auto e : units) {
+        glm::vec3 p = units.get<TransformComponent>(e).Position;
+        uint8_t team = units.get<TeamComponent>(e).team;
+        if (team != 0 && m_Fog.GetState(p.x, p.z) != FogOfWar::Visible) continue;
+        ImVec2 s = worldToScreen(p.x, p.z);
+        if (s.x < imgMin.x || s.y < imgMin.y || s.x > imgMin.x + size || s.y > imgMin.y + size) continue;
+        dl->AddCircleFilled(s, 3.0f, team == 0 ? IM_COL32(80, 255, 120, 255) : IM_COL32(255, 70, 70, 255));
+    }
+
+    // camera marker
+    glm::vec3 cam = m_Camera->GetIsoTarget();
+    ImVec2 cs = worldToScreen(cam.x, cam.z);
+    dl->AddRect(ImVec2(cs.x - 5, cs.y - 5), ImVec2(cs.x + 5, cs.y + 5), IM_COL32(255, 255, 255, 255));
+
+    // input
+    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) m_MinimapDragging = true;
+    if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) m_MinimapDragging = false;
+
+    if (hovered && io.MouseWheel != 0.0f)
+        m_MinimapRange = glm::clamp(m_MinimapRange * (io.MouseWheel > 0 ? 0.85f : 1.18f), 50.0f, 2000.0f);
+
+    float u = (io.MousePos.x - imgMin.x) / size;
+    float v = (io.MousePos.y - imgMin.y) / size;
+    u = glm::clamp(u, 0.0f, 1.0f); // keep dragging inside the map edges
+    v = glm::clamp(v, 0.0f, 1.0f);
+    glm::vec2 world = m_MinimapCenter + glm::vec2(u - 0.5f, v - 0.5f) * (m_MinimapRange * 2.0f);
+
+    if (m_MinimapDragging) {
+        if (m_Camera->GetMode() != Camera3D::Mode::IsoRTS)
+            m_Camera->SetMode(Camera3D::Mode::IsoRTS);
+        m_Camera->SetIsoTarget(glm::vec3(world.x, 0.0f, world.y));
+    }
+
+    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !m_SelectedUnits.empty()) {
+        float h = GpuNoiseMatch::SampleHeight(world.x, world.y, (float)m_Settings.terrain.seed);
+        IssueMoveCommand(glm::vec3(world.x, h, world.y));
+    }
+
+    ImGui::End();
+    ImGui::PopStyleVar();
 }

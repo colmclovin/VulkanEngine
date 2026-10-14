@@ -1,5 +1,8 @@
 #version 450
 
+#extension GL_GOOGLE_include_directive : require
+#include "Include/fogfx.glsl"
+
 layout(push_constant) uniform PushConstants {
     vec4 baseColor;
 } pc;
@@ -15,6 +18,8 @@ layout(set = 1, binding = 0) uniform LightingData {
 } lighting;
 
 layout(set = 1, binding = 1) uniform sampler2D shadowMap;
+layout(set = 1, binding = 2) uniform sampler2D fogMap;
+layout(set = 1, binding = 3) uniform FogParams { vec4 fog; } fogUbo;
 
 layout(location = 0) in vec3 fragNormal;
 layout(location = 1) in vec2 fragTexCoord;
@@ -50,6 +55,10 @@ void main() {
     diffuse *= shadow;
 
     vec4 texColor = texture(texSampler, fragTexCoord);
-    vec3 litColor = pc.baseColor.rgb * fragColor * texColor.rgb * lighting.sunColor.rgb * (ambient + diffuse * 0.8);   // CHANGED — pc.baseColor instead of fragBaseColor
-    outColor = vec4(litColor, pc.baseColor.a * texColor.a);   // CHANGED
+    vec3 litColor = pc.baseColor.rgb * fragColor * texColor.rgb * lighting.sunColor.rgb * (ambient + diffuse * 0.8);
+
+    float f = texture(fogMap, (fragWorldPos.xz - fogUbo.fog.xy) * fogUbo.fog.z).r;
+    litColor = applyFog(litColor, fragWorldPos, f, fogUbo.fog.w);
+
+    outColor = vec4(litColor, pc.baseColor.a * texColor.a);
 }

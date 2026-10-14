@@ -18,8 +18,20 @@ void PlacementSystem::Update(entt::registry& registry, entt::entity player, Came
 	}
 
 	glm::vec3 rayOrigin = camera.GetEyePosition();
-	glm::vec3 rayDir = camera.ScreenPointToRay(mouseX, mouseY, screenWidth, screenHeight, aspect);
-	glm::vec3 hitPoint = TerrainRaycast::RaycastToTerrain(rayOrigin, rayDir, terrainSettings);
+    glm::vec3 rayDir = camera.ScreenPointToRay(mouseX, mouseY, screenWidth, screenHeight, aspect);
+
+    glm::vec3 hitPoint;
+    bool sameRay = m_HasCachedHit && glm::length(rayOrigin - m_LastEye) < 0.001f && glm::length(rayDir - m_LastRayDir) < 0.00001f;
+
+    if (sameRay) {
+        hitPoint = m_CachedHit; // cursor and camera unchanged, so the ground hit is unchanged
+    } else {
+        hitPoint = TerrainRaycast::RaycastToTerrain(rayOrigin, rayDir, terrainSettings);
+        m_CachedHit = hitPoint;
+        m_LastEye = rayOrigin;
+        m_LastRayDir = rayDir;
+        m_HasCachedHit = true;
+    }
 
 	float gridSize = 1.0f;   // tune — match your terrain's cellSize for visually clean alignment
 	glm::vec3 ghostPos = SnapToGrid(hitPoint, gridSize);
@@ -138,6 +150,7 @@ void PlacementSystem::CancelPlacement(entt::registry& registry) {
 	}
 	m_GhostEntity = entt::null;
 	m_PendingItem = ItemId::None;
+    m_HasCachedHit = false;
 }
 
 glm::vec3 PlacementSystem::SnapToGrid(glm::vec3 pos, float gridSize) {

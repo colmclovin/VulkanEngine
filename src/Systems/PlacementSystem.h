@@ -25,4 +25,9 @@ private:
 	entt::entity m_GhostEntity = entt::null;
 	ItemId m_PendingItem = ItemId::None;
 	int m_RotationSteps = 0; // 0-3, each step = 90 degrees
+    float m_LastMouseX = -1.0f, m_LastMouseY = -1.0f;
+    glm::vec3 m_LastEye{ 0.0f };
+    glm::vec3 m_LastRayDir{ 0.0f };
+    glm::vec3 m_CachedHit{ 0.0f };
+    bool m_HasCachedHit = false;
 };

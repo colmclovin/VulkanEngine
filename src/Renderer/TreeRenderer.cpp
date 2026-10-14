@@ -8,12 +8,13 @@
 #include <iostream>
 #include "../Rendering/GpuDrawCommand.h"
 #include "../Rendering/Vertex.h"
+#include "../Rendering/FogTexture.h"
 
 TreeRenderer::TreeRenderer(VulkanEngine* engine) : m_Engine(engine) {}
 
 void TreeRenderer::Init(uint32_t maxTreesPerChunk, uint32_t maxChunks, ShadowMap* shadowMap,
     VkBuffer treeVertexBuffer, VkBuffer treeIndexBuffer, const std::vector<TreeSubmeshRenderInfo>& submeshes,
-    VkImageView defaultTextureView, VkSampler defaultTextureSampler) {
+                        VkImageView defaultTextureView, VkSampler defaultTextureSampler, FogTexture *fogTex) {
     m_MaxChunks = maxChunks;
     m_TreeVertexBuffer = treeVertexBuffer;
     m_TreeIndexBuffer = treeIndexBuffer;
@@ -45,14 +46,22 @@ void TreeRenderer::Init(uint32_t maxTreesPerChunk, uint32_t maxChunks, ShadowMap
     allocInfo.pSetLayouts = layouts;
     vkAllocateDescriptorSets(m_Engine->GetDevice(), &allocInfo, m_LightingDescriptorSets);
 
-    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         VkDescriptorBufferInfo bufferInfo{ m_LightingUBOBuffers[i], 0, sizeof(LightingUBO) };
+
         VkDescriptorImageInfo shadowImageInfo{};
         shadowImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         shadowImageInfo.imageView = shadowMap->GetImageView();
         shadowImageInfo.sampler = shadowMap->GetSampler();
 
-        VkWriteDescriptorSet writes[2]{};
+        VkDescriptorImageInfo fogImageInfo{};
+        fogImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        fogImageInfo.imageView = fogTex->GetView();
+        fogImageInfo.sampler = fogTex->GetSampler();
+
+        VkDescriptorBufferInfo fogBufInfo{ fogTex->GetParamsBuffer(), 0, sizeof(glm::vec4) };
+
+        VkWriteDescriptorSet writes[4]{};
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[0].dstSet = m_LightingDescriptorSets[i];
         writes[0].dstBinding = 0;
@@ -67,7 +76,21 @@ void TreeRenderer::Init(uint32_t maxTreesPerChunk, uint32_t maxChunks, ShadowMap
         writes[1].descriptorCount = 1;
         writes[1].pImageInfo = &shadowImageInfo;
 
-        vkUpdateDescriptorSets(m_Engine->GetDevice(), 2, writes, 0, nullptr);
+        writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[2].dstSet = m_LightingDescriptorSets[i];
+        writes[2].dstBinding = 2;
+        writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[2].descriptorCount = 1;
+        writes[2].pImageInfo = &fogImageInfo;
+
+        writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[3].dstSet = m_LightingDescriptorSets[i];
+        writes[3].dstBinding = 3;
+        writes[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writes[3].descriptorCount = 1;
+        writes[3].pBufferInfo = &fogBufInfo;
+
+        vkUpdateDescriptorSets(m_Engine->GetDevice(), 4, writes, 0, nullptr);
     }
 
     std::cout << "TreeRenderer initialized" << std::endl;
@@ -133,7 +156,7 @@ void TreeRenderer::CreateGraphicsPipeline() {
     VkDevice device = m_Engine->GetDevice();
 
     // ===== Set 0: lighting UBO + shadow sampler =====
-    VkDescriptorSetLayoutBinding lightingBindings[2]{};
+    VkDescriptorSetLayoutBinding lightingBindings[4]{};
     lightingBindings[0].binding = 0;
     lightingBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     lightingBindings[0].descriptorCount = 1;
@@ -144,21 +167,25 @@ void TreeRenderer::CreateGraphicsPipeline() {
     lightingBindings[1].descriptorCount = 1;
     lightingBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    lightingBindings[2] = { 2, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr };
+    lightingBindings[3] = { 3, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr };
+
+
     VkDescriptorSetLayoutCreateInfo lightingLayoutInfo{};
     lightingLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    lightingLayoutInfo.bindingCount = 2;
+    lightingLayoutInfo.bindingCount = 4;
     lightingLayoutInfo.pBindings = lightingBindings;
     vkCreateDescriptorSetLayout(device, &lightingLayoutInfo, nullptr, &m_LightingDescriptorSetLayout);
 
     VkDescriptorPoolSize lightingPoolSizes[2]{
-        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_FRAMES_IN_FLIGHT },
-        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_FRAMES_IN_FLIGHT }
+        { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_FRAMES_IN_FLIGHT * 2 },
+        { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_FRAMES_IN_FLIGHT * 2 }
     };
     VkDescriptorPoolCreateInfo lightingPoolInfo{};
     lightingPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     lightingPoolInfo.poolSizeCount = 2;
     lightingPoolInfo.pPoolSizes = lightingPoolSizes;
-    lightingPoolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
+    lightingPoolInfo.maxSets = MAX_FRAMES_IN_FLIGHT * 2;
     vkCreateDescriptorPool(device, &lightingPoolInfo, nullptr, &m_LightingDescriptorPool);
 
     // ===== Set 1: instance buffer =====

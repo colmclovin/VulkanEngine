@@ -10,7 +10,7 @@
 #include "../Rendering/LightingUBO.h"
 #include "../Rendering/Frustum.h"
 #include <unordered_map>
-
+#include "../Rendering/FogTexture.h"
 
 MeshRenderer::MeshRenderer(VulkanEngine* engine) : m_Engine(engine) {
 }
@@ -19,7 +19,7 @@ MeshRenderer::~MeshRenderer() {
     Shutdown();
 }
 
-void MeshRenderer::Init(ShadowMap* shadowMap) {
+void MeshRenderer::Init(ShadowMap* shadowMap, FogTexture* fogTexture) {
     std::cout << "Initializing Mesh Renderer..." << std::endl;
     m_ShadowMap = shadowMap;
 
@@ -41,18 +41,25 @@ void MeshRenderer::Init(ShadowMap* shadowMap) {
     lightingAllocInfo.pSetLayouts = lightingLayouts;
     vkAllocateDescriptorSets(m_Engine->GetDevice(), &lightingAllocInfo, m_LightingDescriptorSets);
 
-    for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+ for (int i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
         VkDescriptorBufferInfo lightingBufferInfo{};
         lightingBufferInfo.buffer = m_LightingUBOBuffers[i];
         lightingBufferInfo.offset = 0;
         lightingBufferInfo.range = sizeof(LightingUBO);
 
-        VkDescriptorImageInfo shadowMapInfo{};                              // NEW
+        VkDescriptorImageInfo shadowMapInfo{};
         shadowMapInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         shadowMapInfo.imageView = shadowMap->GetImageView();
         shadowMapInfo.sampler = shadowMap->GetSampler();
 
-        VkWriteDescriptorSet writes[2]{};                                    // CHANGED — was a single write
+        VkDescriptorImageInfo fogImageInfo{}; // NEW
+        fogImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        fogImageInfo.imageView = fogTexture->GetView();
+        fogImageInfo.sampler = fogTexture->GetSampler();
+
+        VkDescriptorBufferInfo fogBufInfo{ fogTexture->GetParamsBuffer(), 0, sizeof(glm::vec4) }; // NEW
+
+        VkWriteDescriptorSet writes[4]{}; // CHANGED: was 2
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[0].dstSet = m_LightingDescriptorSets[i];
         writes[0].dstBinding = 0;
@@ -60,14 +67,28 @@ void MeshRenderer::Init(ShadowMap* shadowMap) {
         writes[0].descriptorCount = 1;
         writes[0].pBufferInfo = &lightingBufferInfo;
 
-        writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;            // NEW
+        writes[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[1].dstSet = m_LightingDescriptorSets[i];
         writes[1].dstBinding = 1;
         writes[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         writes[1].descriptorCount = 1;
         writes[1].pImageInfo = &shadowMapInfo;
 
-        vkUpdateDescriptorSets(m_Engine->GetDevice(), 2, writes, 0, nullptr);   // CHANGED — count 2, was 1
+        writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET; // NEW
+        writes[2].dstSet = m_LightingDescriptorSets[i];
+        writes[2].dstBinding = 2;
+        writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[2].descriptorCount = 1;
+        writes[2].pImageInfo = &fogImageInfo;
+
+        writes[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET; // NEW
+        writes[3].dstSet = m_LightingDescriptorSets[i];
+        writes[3].dstBinding = 3;
+        writes[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        writes[3].descriptorCount = 1;
+        writes[3].pBufferInfo = &fogBufInfo;
+
+        vkUpdateDescriptorSets(m_Engine->GetDevice(), 4, writes, 0, nullptr); // CHANGED: count 4
     }
 
 
@@ -309,36 +330,44 @@ void MeshRenderer::CreatePipeline() {
     vkCreateDescriptorPool(m_Engine->GetDevice(), &texturePoolInfo, nullptr, &m_TextureDescriptorPool);
 
     // --- Set 1: lighting UBO + shadow map ---
-    VkDescriptorSetLayoutBinding lightingBinding{};
-    lightingBinding.binding = 0;
-    lightingBinding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    lightingBinding.descriptorCount = 1;
-    lightingBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;   // CHANGED — vertex now needs lightSpaceMatrix too
+    VkDescriptorSetLayoutBinding lightingBindings[4]{};
 
-    VkDescriptorSetLayoutBinding shadowMapBinding{};                                            // NEW
-    shadowMapBinding.binding = 1;
-    shadowMapBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    shadowMapBinding.descriptorCount = 1;
-    shadowMapBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    lightingBindings[0].binding = 0;
+    lightingBindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    lightingBindings[0].descriptorCount = 1;
+    lightingBindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    VkDescriptorSetLayoutBinding lightingBindings[] = { lightingBinding, shadowMapBinding };     // CHANGED — array of 2 now
+    lightingBindings[1].binding = 1;
+    lightingBindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    lightingBindings[1].descriptorCount = 1;
+    lightingBindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    lightingBindings[2].binding = 2;
+    lightingBindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    lightingBindings[2].descriptorCount = 1;
+    lightingBindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+    lightingBindings[3].binding = 3;
+    lightingBindings[3].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+    lightingBindings[3].descriptorCount = 1;
+    lightingBindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
     VkDescriptorSetLayoutCreateInfo lightingLayoutInfo{};
     lightingLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    lightingLayoutInfo.bindingCount = 2;                                                         // CHANGED — was 1
-    lightingLayoutInfo.pBindings = lightingBindings;                                             // CHANGED — was &lightingBinding
+    lightingLayoutInfo.bindingCount = 4;
+    lightingLayoutInfo.pBindings = lightingBindings;
     vkCreateDescriptorSetLayout(m_Engine->GetDevice(), &lightingLayoutInfo, nullptr, &m_LightingDescriptorSetLayout);
 
-    VkDescriptorPoolSize lightingPoolSizes[2]{};                                                 // CHANGED — was single poolSize
+    VkDescriptorPoolSize lightingPoolSizes[2]{};
     lightingPoolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    lightingPoolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT;
+    lightingPoolSizes[0].descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
     lightingPoolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    lightingPoolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT;
+    lightingPoolSizes[1].descriptorCount = MAX_FRAMES_IN_FLIGHT * 2;
 
     VkDescriptorPoolCreateInfo lightingPoolInfo{};
     lightingPoolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    lightingPoolInfo.poolSizeCount = 2;                                                          // CHANGED — was 1
-    lightingPoolInfo.pPoolSizes = lightingPoolSizes;                                              // CHANGED
+    lightingPoolInfo.poolSizeCount = 2;
+    lightingPoolInfo.pPoolSizes = lightingPoolSizes;
     lightingPoolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
     vkCreateDescriptorPool(m_Engine->GetDevice(), &lightingPoolInfo, nullptr, &m_LightingDescriptorPool);
 

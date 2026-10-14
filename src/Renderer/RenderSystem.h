@@ -7,6 +7,8 @@
 #include "../World/DayNightCycle.h"
 #include "../Game/ChunkManager.h"
 #include "../Rendering/Mesh.h"
+#include <functional>
+
 
 class VulkanEngine;
 class QuadRenderer;
@@ -18,12 +20,14 @@ class ImGuiVulkanUtil;
 class AudioEngine;
 //class ResourceManager;
 class TreeRenderer;
+class FogLayerRenderer;
 class MeshRenderer;
 class DebugLineRenderer;
 class TerrainRenderer;
 class Camera3D;
 class DebugUI;
 struct GameSettings;
+class FogTexture;
 
 class RenderSystem {
 
@@ -44,14 +48,21 @@ public:
     DebugLineRenderer *GetDebugLineRenderer() const { return m_DebugLineRenderer.get(); }
     ChunkGenerator* GetChunkGenerator() const { return m_ChunkGenerator.get(); }
     TerrainRenderer* GetTerrainRenderer() const { return m_TerrainRenderer.get(); }
+    FogLayerRenderer *GetFogLayerRenderer() const { return m_FogLayerRenderer.get(); };
     TreeRenderer* GetTreeRenderer() const { return m_TreeRenderer.get(); }
     DebugUI* GetDebugUI() const;
     ImGuiVulkanUtil *GetImGuiUtil() const;
     void SetSelectionRect(bool active, glm::vec2 a, glm::vec2 b) { m_SelActive = active; m_SelA = a; m_SelB = b; }
-
+    FogTexture *GetFogTexture() const { return m_FogTexture.get(); }
+    //void SetUICallback(std::function<void()> cb) { m_UICallback = std::move(cb); }
+    void SetPreRenderCallback(std::function<void(VkCommandBuffer)> cb) { m_PreRenderCallback = std::move(cb); }
+    void SetUICallback(std::function<void()> cb) { m_UICallback = std::move(cb); }
 private:
     VulkanEngine *m_Engine = nullptr;
     Mesh m_TreeMesh;
+    //std::function<void()> m_UICallback;
+    std::function<void(VkCommandBuffer)> m_PreRenderCallback;
+    std::function<void()> m_UICallback;
     // Rendering subsystems
     //std::unique_ptr<ResourceManager> m_ResourceManager;
     std::unique_ptr<MeshRenderer> m_MeshRenderer;
@@ -64,6 +75,8 @@ private:
     std::unique_ptr<TreeRenderer> m_TreeRenderer;
     std::unique_ptr<DebugLineRenderer> m_DebugLineRenderer;
 	std::unique_ptr<ImGuiVulkanUtil> m_ImGuiVulkanUtil;
+    std::unique_ptr<FogLayerRenderer> m_FogLayerRenderer;
+    std::unique_ptr<FogTexture> m_FogTexture;
     std::unique_ptr<DebugUI> m_DebugUI;
     bool m_initialized = false;
     bool m_SelActive = false;

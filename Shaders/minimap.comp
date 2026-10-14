@@ -1,0 +1,36 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+#include "Include/terrain.glsl"
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(rgba8, set = 0, binding = 0) uniform writeonly image2D outImage;
+layout(set = 0, binding = 1) uniform sampler2D fogMap;
+
+layout(push_constant) uniform PC {
+    vec2 center;
+    float halfRange;
+    float seed;
+    vec2 fogOrigin;
+    float fogInvSize;
+    float pad;
+} pc;
+
+void main() {
+    ivec2 p = ivec2(gl_GlobalInvocationID.xy);
+    ivec2 size = imageSize(outImage);
+    if (p.x >= size.x || p.y >= size.y) return;
+
+    vec2 uv = (vec2(p) + 0.5) / vec2(size);
+    vec2 world = pc.center + (uv - 0.5) * pc.halfRange * 2.0;
+
+    float f = textureLod(fogMap, (world - pc.fogOrigin) * pc.fogInvSize, 0.0).r;
+    float explored = smoothstep(0.0, 0.5, f);
+    float visible  = smoothstep(0.5, 1.0, f);
+
+    vec3 c = getBiomeColor(determineBiome(world.x, world.y, pc.seed));
+    c *= mix(0.5, 1.0, visible);   // explored but not visible is dimmer
+    c *= explored;                 // unexplored is black
+
+    imageStore(outImage, p, vec4(c, 1.0));
+}

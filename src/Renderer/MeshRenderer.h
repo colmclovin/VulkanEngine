@@ -8,16 +8,17 @@
 #include "ShadowMap.h"
 #include "../Components/PointLightComponent.h"
 #include "../Rendering/LightingUBO.h"
+
 class VulkanEngine;
 class Mesh;
-
+class FogTexture;
 
 class MeshRenderer {
 
 public:
     MeshRenderer(VulkanEngine* m_Engine);
     ~MeshRenderer();
-    void Init(ShadowMap* shadowMap);
+    void Init(ShadowMap *shadowMap, FogTexture *fogTexture);
     void Render(entt::registry &registry, const Camera3D &camera, bool wireframe, DayNightCycle &dayNightCycle, const glm::mat4 &lightSpaceMatrix, const std::vector<PointLight> &activeLights);
     void Shutdown();
     VkImageView GetDefaultTextureView() const { return m_DefaultTexture->imageView; }

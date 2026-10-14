@@ -22,6 +22,8 @@
 #include "../Game/ChunkManager.h"
 #include "../Rendering/ModelLoader.h"
 #include "../World/TreePlacement.h"
+#include "../Rendering/FogTexture.h"
+#include "FogLayerRenderer.h"
 RenderSystem::RenderSystem(VulkanEngine *engine) : m_Engine(engine) {
 }
 
@@ -39,12 +41,16 @@ void RenderSystem::Init(uint32_t terrainVertsPerChunk, uint32_t terrainIndicesPe
     m_ShadowMap = std::make_unique<ShadowMap>();
     m_ShadowMap->Create(m_Engine, 2048);
 
+    m_FogTexture = std::make_unique<FogTexture>();
+    m_FogTexture->Init(m_Engine);
+
+
     m_ShadowMapRenderer = std::make_unique<ShadowMapRenderer>(m_Engine);
     m_ShadowMapRenderer->Init();
 
 
     m_MeshRenderer = std::make_unique<MeshRenderer>(m_Engine);
-    m_MeshRenderer->Init(m_ShadowMap.get());
+    m_MeshRenderer->Init(m_ShadowMap.get(), m_FogTexture.get());
 
     m_SkinnedMeshRenderer = std::make_unique<SkinnedMeshRenderer>(m_Engine);
     m_SkinnedMeshRenderer->Init(m_ShadowMap.get());
@@ -52,7 +58,14 @@ void RenderSystem::Init(uint32_t terrainVertsPerChunk, uint32_t terrainIndicesPe
 
 
     m_TerrainRenderer = std::make_unique<TerrainRenderer>(m_Engine);
-    m_TerrainRenderer->Init(terrainVertsPerChunk, terrainIndicesPerChunk, terrainMaxChunks, m_ShadowMap.get());
+    
+
+    m_FogLayerRenderer = std::make_unique<FogLayerRenderer>(m_Engine);
+    m_FogLayerRenderer->Init(m_FogTexture.get());
+
+
+    m_TerrainRenderer->Init(terrainVertsPerChunk, terrainIndicesPerChunk, terrainMaxChunks,
+                            m_ShadowMap.get(), m_FogTexture.get());
     m_TerrainRenderer->GetBufferPool()->InitializeSharedIndices();
     std::cout << "TerrainBufferPool sizing: vertsPerChunk=" << terrainVertsPerChunk << " indicesPerChunk=" << terrainIndicesPerChunk << std::endl;   // FIXED
    
@@ -80,7 +93,7 @@ void RenderSystem::Init(uint32_t terrainVertsPerChunk, uint32_t terrainIndicesPe
     m_TreeRenderer = std::make_unique<TreeRenderer>(m_Engine);
     m_TreeRenderer->Init(maxTreesPerChunk, maxTreeChunks, m_ShadowMap.get(),
         m_TreeMesh.vertexBuffer, m_TreeMesh.indexBuffer, treeSubmeshInfo,
-        m_MeshRenderer->GetDefaultTextureView(), m_MeshRenderer->GetDefaultTextureSampler());
+        m_MeshRenderer->GetDefaultTextureView(), m_MeshRenderer->GetDefaultTextureSampler(), m_FogTexture.get());
 
     m_ChunkGenerator = std::make_unique<ChunkGenerator>();
     m_ChunkGenerator->Init(m_Engine, m_TerrainRenderer->GetBufferPool(), m_TreeRenderer->GetBufferPool(), ChunkManager::CHUNK_VERTEX_RESOLUTION);
@@ -132,7 +145,7 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
        // std::cout << "about to call RecordPendingGeneration  rendersystem.cpp" << std::endl;
         chunkManager.RecordPendingGeneration(cmd, m_ChunkGenerator.get(), m_TerrainRenderer.get(), m_TreeRenderer.get(), settings.terrain, depletionMap, removedTreesMap);   // ADD — generate new chunks first
        // std::cout << "RecordPendingGeneration complete rendersystem.cpp" << std::endl;
-
+        if (m_PreRenderCallback) m_PreRenderCallback(cmd);
         m_ShadowMapRenderer->BeginShadowPass(*m_ShadowMap);
         m_ShadowMapRenderer->RenderStatic(registry, lightSpaceMatrix);
         m_SkinnedMeshRenderer->RenderShadowPass(registry, lightSpaceMatrix);
@@ -155,7 +168,7 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
         dl->AddRectFilled(a, b, IM_COL32(80, 200, 120, 40));
         dl->AddRect(a, b, IM_COL32(80, 200, 120, 255));
     }
-
+    if (m_UICallback) m_UICallback();
 
     m_TerrainRenderer->ProcessPendingFrees();
     m_TreeRenderer->ProcessPendingFrees();
@@ -164,6 +177,9 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
     m_TreeRenderer->RecordDraw(m_Engine->GetCurrentCommandBuffer(), camera, dayNightCycle, lightSpaceMatrix, activeLights);   // confirm this is also present
     m_MeshRenderer->Render(registry, camera, settings.wireframeMode, dayNightCycle, lightSpaceMatrix, activeLights);
     m_SkinnedMeshRenderer->Render(registry, camera, settings.wireframeMode, dayNightCycle, lightSpaceMatrix, activeLights);
+
+    m_FogLayerRenderer->Record(m_Engine->GetCurrentCommandBuffer(), proj * view);
+
     m_QuadRenderer->Render(registry);
 
     PauseMenuAction pauseAction = PauseMenuAction::None;
@@ -245,6 +261,10 @@ void RenderSystem::Shutdown() {
     if (m_SkinnedMeshRenderer) {
         m_SkinnedMeshRenderer->Shutdown();
     }
+    if (m_FogLayerRenderer) {
+        m_FogLayerRenderer->Shutdown();
+    }
+    if (m_FogTexture) m_FogTexture->Shutdown();
     if (m_ShadowMapRenderer) m_ShadowMapRenderer->Shutdown();
     if (m_ShadowMap) m_ShadowMap->Destroy(m_Engine->GetDevice());
 

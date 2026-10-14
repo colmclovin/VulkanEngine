@@ -17,6 +17,7 @@
 #include "../Renderer/TerrainRenderer.h"
 #include "../World/TreeHealthMap.h"
 #include "FogOfWar.h"
+#include "../Rendering/Minimap.h"
 
 class TerrainGenerator;
 class VulkanEngine;
@@ -108,8 +109,13 @@ private:
     TreeHealthMap m_TreeHealthMap;
     std::unique_ptr<TerrainRenderer> m_TerrainRenderer;
     bool m_TerrainTestActive = false;
-
-    
+    float m_FogTimer = 0.0f;
+    float m_TotalTime = 0.0f;
+    void DrawMinimap();
+    Minimap m_Minimap;
+    float m_MinimapRange = 150.0f; // half-width in world units
+    glm::vec2 m_MinimapCenter{};
+    float m_MinimapTimer = 0.0f;
 
     std::vector<entt::entity> m_SelectedUnits;
     bool m_IsBoxSelecting = false;
@@ -118,8 +124,8 @@ private:
     bool m_LeftWasDown = false;
     bool m_RightWasDown = false;
     FogOfWar m_Fog;
-
-
+    glm::vec2 m_MinimapTexCenter{}; // center the texture was last drawn with
+    bool m_MinimapDragging = false;
 
 
     struct NoiseTestPush {

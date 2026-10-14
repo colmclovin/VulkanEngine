@@ -224,4 +224,10 @@ namespace GpuNoiseMatch {
         if (u + v <= 1.0f) return tl + u * (tr - tl) + v * (bl - tl);
         return br + (1.0f - u) * (bl - br) + (1.0f - v) * (tr - br);
     }
-}
+
+    float SampleHeightFast(float worldX, float worldZ, float seed) {
+        int biome = DetermineBiome(worldX, worldZ, seed);
+        return SampleRawHeightForBiome(worldX, worldZ, biome, seed);
+    }
+    }
+

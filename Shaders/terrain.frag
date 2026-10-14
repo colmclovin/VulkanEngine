@@ -1,6 +1,9 @@
 // terrain.frag — updated
 #version 450
 
+#extension GL_GOOGLE_include_directive : require
+#include "Include/fogfx.glsl"   // brings fbm; use only the noise part if you split the file
+
 layout(set = 0, binding = 0) uniform LightingData {
     mat4 viewProj;
     vec4 sunDirection;
@@ -10,6 +13,8 @@ layout(set = 0, binding = 0) uniform LightingData {
 } lighting;
 
 layout(set = 0, binding = 1) uniform sampler2D shadowMap;   // NEW — second binding in the same set
+layout(set = 0, binding = 2) uniform sampler2D fogMap;
+layout(push_constant) uniform Fog { vec2 origin; float invSize; float pad; } fog;
 
 layout(location = 0) in vec3 fragNormal;
 layout(location = 1) in vec3 fragColor;
@@ -44,6 +49,14 @@ void main() {
 
     float slopeFactor = 1.0 - normal.y;   // 0 = flat ground, ~1 = vertical cliff
     vec3 litColor = fragColor * lighting.sunColor.rgb * (ambient + diffuse * 0.8);
-    litColor *= (1.0 - slopeFactor * 0.15);   // constant shape cue, independent of sun angle
+
+    vec2 uv = (fragWorldPos.xz - fog.origin) * fog.invSize;
+    float px = fog.invSize * 4.0;   // one cell
+    float f = texture(fogMap, (fragWorldPos.xz - fog.origin) * fog.invSize).r;   // trees: fogUbo.fog.xy / .z
+    litColor = applyFog(litColor, fragWorldPos, f, fog.pad);    
     outColor = vec4(litColor, 1.0);
+
+
+   // litColor *= (1.0 - slopeFactor * 0.15);   // constant shape cue, independent of sun angle
+    //outColor = vec4(litColor, 1.0);
 }

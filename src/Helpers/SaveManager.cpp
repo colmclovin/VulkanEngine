@@ -11,7 +11,6 @@
 #include "../Rendering/ModelLoader.h"
 #include "../Rendering/Mesh.h"
 #include "../World/TerrainGenerator.h"
-#include "../Components/Components.h"
 
 using json = nlohmann::json;
 

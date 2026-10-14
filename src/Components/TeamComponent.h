@@ -3,5 +3,5 @@
 
 struct TeamComponent
 {
-	uint8_t team = 0;
+	int team = 0;
 };

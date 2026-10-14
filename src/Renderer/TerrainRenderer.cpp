@@ -12,17 +12,18 @@
 #include "../Rendering/Frustum.h"
 #include <unordered_map>
 #include "../Rendering/GpuDrawCommand.h"
+#include "../Rendering/FogTexture.h"
 
 TerrainRenderer::TerrainRenderer(VulkanEngine* engine) : m_Engine(engine) {}
 
-void TerrainRenderer::Init(uint32_t vertsPerChunk, uint32_t indicesPerChunk, uint32_t maxChunks, ShadowMap* shadowMap) {
+void TerrainRenderer::Init(uint32_t vertsPerChunk, uint32_t indicesPerChunk, uint32_t maxChunks, ShadowMap* shadowMap, FogTexture* fogTexture) {
     m_VertsPerChunk = vertsPerChunk;
     m_IndicesPerChunk = indicesPerChunk;
     m_MaxChunks = maxChunks;
 
     m_Pool.Init(m_Engine, vertsPerChunk, indicesPerChunk, maxChunks);
     m_Culler.Init(m_Engine, &m_Pool, maxChunks, indicesPerChunk, vertsPerChunk);
-
+    m_FogTexture = fogTexture;
     CreateGraphicsPipeline();
 
     // Lighting UBO — same pattern as MeshRenderer's, terrain needs the same sun/shadow data
@@ -50,7 +51,12 @@ void TerrainRenderer::Init(uint32_t vertsPerChunk, uint32_t indicesPerChunk, uin
         shadowImageInfo.imageView = shadowMap->GetImageView();
         shadowImageInfo.sampler = shadowMap->GetSampler();
 
-        VkWriteDescriptorSet writes[2]{};
+        VkDescriptorImageInfo fogImageInfo{};
+        fogImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        fogImageInfo.imageView = fogTexture->GetView();
+        fogImageInfo.sampler = fogTexture->GetSampler();
+
+        VkWriteDescriptorSet writes[3]{};
         writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         writes[0].dstSet = m_LightingDescriptorSets[i];
         writes[0].dstBinding = 0;
@@ -65,7 +71,16 @@ void TerrainRenderer::Init(uint32_t vertsPerChunk, uint32_t indicesPerChunk, uin
         writes[1].descriptorCount = 1;
         writes[1].pImageInfo = &shadowImageInfo;
 
-        vkUpdateDescriptorSets(m_Engine->GetDevice(), 2, writes, 0, nullptr);   // CHANGED — 2 writes now
+        writes[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        writes[2].dstSet = m_LightingDescriptorSets[i];
+        writes[2].dstBinding = 2;
+        writes[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        writes[2].descriptorCount = 1;
+        writes[2].pImageInfo = &fogImageInfo;
+
+
+
+        vkUpdateDescriptorSets(m_Engine->GetDevice(), 3, writes, 0, nullptr);   // CHANGED — 3 writes now
     }
 }
 
@@ -86,27 +101,31 @@ void TerrainRenderer::FreeChunkSlot(uint32_t slot) {
 
 void TerrainRenderer::CreateGraphicsPipeline() {
     // Lighting descriptor set layout: just the UBO, binding 0
-    VkDescriptorSetLayoutBinding bindings[2]{};
+    VkDescriptorSetLayoutBinding bindings[3]{};
     bindings[0].binding = 0;
     bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     bindings[0].descriptorCount = 1;
     bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
-    bindings[1].binding = 1;   // NEW — shadow map sampler
+    bindings[1].binding = 1;
     bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
     bindings[1].descriptorCount = 1;
     bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+    bindings[2].binding = 2;
+    bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    bindings[2].descriptorCount = 1;
+    bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 2;   // CHANGED — was 1
+    layoutInfo.bindingCount = 3;
     layoutInfo.pBindings = bindings;
     vkCreateDescriptorSetLayout(m_Engine->GetDevice(), &layoutInfo, nullptr, &m_LightingDescriptorSetLayout);
 
     VkDescriptorPoolSize poolSizes[2]{};
     poolSizes[0] = { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, MAX_FRAMES_IN_FLIGHT };
-    poolSizes[1] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_FRAMES_IN_FLIGHT };   // NEW
-
+    poolSizes[1] = { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, MAX_FRAMES_IN_FLIGHT * 2 }; // was MAX_FRAMES_IN_FLIGHT
   
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
@@ -115,10 +134,21 @@ void TerrainRenderer::CreateGraphicsPipeline() {
     poolInfo.maxSets = MAX_FRAMES_IN_FLIGHT;
     vkCreateDescriptorPool(m_Engine->GetDevice(), &poolInfo, nullptr, &m_LightingDescriptorPool);
 
+
+    VkPushConstantRange fogRange{};
+    fogRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    fogRange.offset = 0;
+    fogRange.size = 16; // vec2 origin + float invSize + float pad
+
+
+
+
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &m_LightingDescriptorSetLayout;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+    pipelineLayoutInfo.pPushConstantRanges = &fogRange;
     vkCreatePipelineLayout(m_Engine->GetDevice(), &pipelineLayoutInfo, nullptr, &m_PipelineLayout);
     // NOTE: no push constants needed — terrain vertices already have absolute world position baked in,
     // and lighting comes entirely from the UBO. gl_Position = viewProj * vec4(inPosition, 1.0) directly.
@@ -311,6 +341,18 @@ void TerrainRenderer::RecordDraw(VkCommandBuffer commandBuffer, const Camera3D& 
     VkDeviceSize offsets[] = { 0 };
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
     vkCmdBindIndexBuffer(commandBuffer, m_Pool.GetIndexBuffer(), 0, VK_INDEX_TYPE_UINT32);
+
+
+    struct FogPush {
+        glm::vec2 origin;
+        float invSize;
+        float pad;
+    } fogPC;
+    fogPC.origin = m_FogTexture->GetOrigin();
+    fogPC.invSize = m_FogTexture->GetInvWorldSize();
+    fogPC.pad = m_FogTexture->GetTime();
+    vkCmdPushConstants(commandBuffer, m_PipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(fogPC), &fogPC);
+
 
     vkCmdDrawIndexedIndirectCount(commandBuffer, m_Culler.GetDrawCommandBuffer(), 0,
         m_Culler.GetDrawCountBuffer(), 0, m_MaxChunks, sizeof(GpuDrawCommand));
