@@ -173,6 +173,7 @@
     <None Include="Shaders\mesh_instanced.frag" />
     <None Include="Shaders\mesh_Instanced.vert" />
     <None Include="Shaders\minimap.comp" />
+    <None Include="Shaders\minimap_trees.comp" />
     <None Include="Shaders\noise_test.comp" />
     <None Include="Shaders\Include\ore.glsl" />
     <None Include="Shaders\ridged_debug.comp" />

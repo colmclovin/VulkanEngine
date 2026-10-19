@@ -46,6 +46,7 @@
 #include "FogOfWar.h"
 #include "../Rendering/FogTexture.h"
 #include <chrono>
+#include "../Renderer/TreeRenderer.h" 
 
 Game::Game() {
 
@@ -161,7 +162,7 @@ void Game::Init() {
     m_VulkanEngine->ChainScrollCallback(); 
     m_Minimap.Init(m_VulkanEngine.get(), m_RenderSystem->GetFogTexture());
     m_RenderSystem->SetPreRenderCallback([this](VkCommandBuffer cmd) {
-        m_Minimap.Record(cmd, m_MinimapCenter, m_MinimapRange, (float)m_Settings.terrain.seed);
+        m_Minimap.Record(cmd, GetMinimapCenter(), m_MinimapRange, (float)m_Settings.terrain.seed);
     });
     m_RenderSystem->SetUICallback([this]() { DrawMinimap(); }); // ADD
 
@@ -1719,8 +1720,8 @@ void Game::DrawMinimap() {
 
     // world <-> minimap helpers, using the center the texture was drawn with
     auto worldToScreen = [&](float wx, float wz) {
-        float u = (wx - m_MinimapCenter.x) / (m_MinimapRange * 2.0f) + 0.5f;
-        float v = (wz - m_MinimapCenter.y) / (m_MinimapRange * 2.0f) + 0.5f;
+        float u = (wx - GetMinimapCenter().x) / (m_MinimapRange * 2.0f) + 0.5f;
+        float v = (wz - GetMinimapCenter().y) / (m_MinimapRange * 2.0f) + 0.5f;
         return ImVec2(imgMin.x + u * size, imgMin.y + v * size);
     };
 
@@ -1738,13 +1739,32 @@ void Game::DrawMinimap() {
         dl->AddCircleFilled(s, 3.0f, team == 0 ? IM_COL32(80, 255, 120, 255) : IM_COL32(255, 70, 70, 255));
     }
 
+    auto placed = m_Registry->view<TransformComponent, BoundsComponent>(entt::exclude<SelectableComponent, PickupComponent>);
+    float pxPerUnit = size / (m_MinimapRange * 2.0f);
+    for (auto e : placed) {
+        glm::vec3 p = placed.get<TransformComponent>(e).Position;
+        if (m_Fog.GetState(p.x, p.z) == FogOfWar::Unexplored) continue;
+
+        glm::vec3 he = placed.get<BoundsComponent>(e).halfExtents;
+        ImVec2 s = worldToScreen(p.x, p.z);
+        float hx = std::max(he.x * pxPerUnit, 1.5f);
+        float hz = std::max(he.z * pxPerUnit, 1.5f);
+        if (s.x + hx < imgMin.x || s.y + hz < imgMin.y || s.x - hx > imgMin.x + size || s.y - hz > imgMin.y + size) continue;
+
+        dl->AddRectFilled(ImVec2(s.x - hx, s.y - hz), ImVec2(s.x + hx, s.y + hz), IM_COL32(240, 170, 60, 255));
+    }
+
+
     // camera marker
     glm::vec3 cam = m_Camera->GetIsoTarget();
     ImVec2 cs = worldToScreen(cam.x, cam.z);
     dl->AddRect(ImVec2(cs.x - 5, cs.y - 5), ImVec2(cs.x + 5, cs.y + 5), IM_COL32(255, 255, 255, 255));
 
     // input
-    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) m_MinimapDragging = true;
+    if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
+        m_MinimapDragCenter = m_MinimapCenter; // lock before anything moves
+        m_MinimapDragging = true;
+    }
     if (!ImGui::IsMouseDown(ImGuiMouseButton_Left)) m_MinimapDragging = false;
 
     if (hovered && io.MouseWheel != 0.0f)
@@ -1754,12 +1774,14 @@ void Game::DrawMinimap() {
     float v = (io.MousePos.y - imgMin.y) / size;
     u = glm::clamp(u, 0.0f, 1.0f); // keep dragging inside the map edges
     v = glm::clamp(v, 0.0f, 1.0f);
-    glm::vec2 world = m_MinimapCenter + glm::vec2(u - 0.5f, v - 0.5f) * (m_MinimapRange * 2.0f);
+    glm::vec2 world = GetMinimapCenter() + glm::vec2(u - 0.5f, v - 0.5f) * (m_MinimapRange * 2.0f);
 
     if (m_MinimapDragging) {
         if (m_Camera->GetMode() != Camera3D::Mode::IsoRTS)
             m_Camera->SetMode(Camera3D::Mode::IsoRTS);
         m_Camera->SetIsoTarget(glm::vec3(world.x, 0.0f, world.y));
+        std::cout << "u=" << u << " v=" << v << " center=" << GetMinimapCenter().x << "," << GetMinimapCenter().y
+                  << " range=" << m_MinimapRange << " world=" << world.x << "," << world.y << std::endl;
     }
 
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Right) && !m_SelectedUnits.empty()) {

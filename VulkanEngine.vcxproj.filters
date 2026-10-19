@@ -56,6 +56,7 @@
     <None Include="Shaders\fog_layer.vert" />
     <None Include="Shaders\fog_layer.frag" />
     <None Include="Shaders\minimap.comp" />
+    <None Include="Shaders\minimap_trees.comp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\Main.cpp">

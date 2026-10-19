@@ -14,6 +14,7 @@ struct MinimapPush {
 };
 
 void Minimap::Init(VulkanEngine *engine, FogTexture *fogTex) {
+
     m_Engine = engine;
     m_FogTex = fogTex;
     VkDevice dev = engine->GetDevice();
@@ -141,6 +142,30 @@ void Minimap::Init(VulkanEngine *engine, FogTexture *fogTex) {
     if (vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &ci, nullptr, &m_Pipeline) != VK_SUCCESS)
         throw std::runtime_error("Failed to create minimap pipeline");
     vkDestroyShaderModule(dev, mod, nullptr);
+
+
+      VkPushConstantRange tpr{ VK_SHADER_STAGE_COMPUTE_BIT, 0, 40 };
+    VkPipelineLayoutCreateInfo tpli{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+    tpli.setLayoutCount = 1;
+    tpli.pSetLayouts = &m_SetLayout;
+    tpli.pushConstantRangeCount = 1;
+    tpli.pPushConstantRanges = &tpr;
+    vkCreatePipelineLayout(dev, &tpli, nullptr, &m_TreePipeLayout);
+
+    auto tcode = engine->ReadFile("Shaders/minimap_trees_comp.spv");
+    VkShaderModule tmod = engine->CreateShaderModule(tcode);
+    VkPipelineShaderStageCreateInfo tst{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+    tst.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+    tst.module = tmod;
+    tst.pName = "main";
+    VkComputePipelineCreateInfo tci{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+    tci.stage = tst;
+    tci.layout = m_TreePipeLayout;
+    if (vkCreateComputePipelines(dev, VK_NULL_HANDLE, 1, &tci, nullptr, &m_TreePipeline) != VK_SUCCESS)
+        throw std::runtime_error("Failed to create minimap tree pipeline");
+    vkDestroyShaderModule(dev, tmod, nullptr);
+
+
 } // end of Init
 
 void Minimap::Record(VkCommandBuffer cmd, glm::vec2 center, float halfRange, float seed) {
@@ -163,11 +188,38 @@ void Minimap::Record(VkCommandBuffer cmd, glm::vec2 center, float halfRange, flo
     vkCmdPushConstants(cmd, m_PipeLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(push), &push);
     vkCmdDispatch(cmd, SIZE / 8, SIZE / 8, 1);
 
-    // Make the writes visible to ImGui's fragment shader
-    mb.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-    mb.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-                         0, 1, &mb, 0, nullptr, 0, nullptr);
+     // terrain pass writes must finish before the tree pass writes on top
+    VkMemoryBarrier wb{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+    wb.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    wb.dstAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+    vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+                         0, 1, &wb, 0, nullptr, 0, nullptr);
+
+   struct TreePush {
+        glm::vec2 center;
+        float halfRange;
+        float seed;
+        glm::vec2 fogOrigin;
+        float fogInvSize;
+        int32_t cellsPerAxis;
+        int32_t startCellX;
+        int32_t startCellZ;
+    } tp{};
+
+    tp.center = center;
+    tp.halfRange = halfRange;
+    tp.seed = seed;
+    tp.fogOrigin = m_FogTex->GetOrigin();
+    tp.fogInvSize = m_FogTex->GetInvWorldSize();
+    tp.startCellX = (int32_t)std::floor((center.x - halfRange) / 8.0f);
+    tp.startCellZ = (int32_t)std::floor((center.y - halfRange) / 8.0f);
+    tp.cellsPerAxis = (int32_t)std::ceil(halfRange * 2.0f / 8.0f) + 2;
+
+    vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_TreePipeline);
+    vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_TreePipeLayout, 0, 1, &m_Set, 0, nullptr);
+    vkCmdPushConstants(cmd, m_TreePipeLayout, VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(tp), &tp);
+    uint32_t groups = (uint32_t)(tp.cellsPerAxis + 7) / 8;
+    vkCmdDispatch(cmd, groups, groups, 1);
 }
 
 void Minimap::Shutdown() {
@@ -180,4 +232,8 @@ void Minimap::Shutdown() {
     vkDestroyImageView(dev, m_View, nullptr);
     vkDestroyImage(dev, m_Image, nullptr);
     vkFreeMemory(dev, m_Mem, nullptr);
+    vkDestroyPipeline(dev, m_TreePipeline, nullptr);
+    vkDestroyPipelineLayout(dev, m_TreePipeLayout, nullptr);
+    vkDestroyDescriptorPool(dev, m_TreePool, nullptr);
+    vkDestroyDescriptorSetLayout(dev, m_TreeSetLayout, nullptr);
 }

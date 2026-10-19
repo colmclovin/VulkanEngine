@@ -507,7 +507,12 @@ bool InteractionSystem::TryPickupMachine(entt::registry &registry, entt::entity 
 			inventory.AddItem(inserter.heldItem, 1);
 		}
 		machineItem = ItemId::Inserter;
-	} else {
+    } else if (registry.any_of<PowerGeneratorComponent>(target)) {
+        machineItem = ItemId::CoalGenerator;
+    } else if (registry.any_of<PowerPoleComponent>(target)) {
+        machineItem = ItemId::PowerPole;
+    } 
+	else {
 		return false; // not a recognized machine type
 	}
 

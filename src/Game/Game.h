@@ -112,6 +112,8 @@ private:
     float m_FogTimer = 0.0f;
     float m_TotalTime = 0.0f;
     void DrawMinimap();
+    glm::vec2 m_MinimapDragCenter{}; // center locked at the moment the drag starts
+    glm::vec2 GetMinimapCenter() const { return m_MinimapDragging ? m_MinimapDragCenter : m_MinimapCenter; }
     Minimap m_Minimap;
     float m_MinimapRange = 150.0f; // half-width in world units
     glm::vec2 m_MinimapCenter{};

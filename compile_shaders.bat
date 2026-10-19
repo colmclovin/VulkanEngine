@@ -439,7 +439,19 @@ if exist "Shaders\minimap.comp" (
 ) else (
 	echo WARNING: minimap.comp not found
 )
-
+REM Compile minimap trees compute shader
+if exist "Shaders\minimap_trees.comp" (
+	echo Compiling minimap trees compute shader...
+	glslc -I Shaders Shaders\minimap_trees.comp -o Shaders\minimap_trees_comp.spv	
+	if %ERRORLEVEL% EQU 0 (
+		echo   minimap trees compute shader compiled successfully
+	) else (
+		echo   minimap trees compute shader compilation failed
+		exit /b 1
+	)
+) else (
+	echo WARNING: minimap_trees.comp not found
+)
 
 echo.
 echo Shader compilation complete!

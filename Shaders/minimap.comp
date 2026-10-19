@@ -29,8 +29,13 @@ void main() {
     float visible  = smoothstep(0.5, 1.0, f);
 
     vec3 c = getBiomeColor(determineBiome(world.x, world.y, pc.seed));
+    OreInfo ore = getOreDepositAt(world.x, world.y, pc.seed);
+    if (ore.oreType != ORE_NONE) {
+        c = mix(c, getOreColor(ore.oreType), 0.9);
+    }
+    
     c *= mix(0.5, 1.0, visible);   // explored but not visible is dimmer
-    c *= explored;                 // unexplored is black
+    c *= explored;                 // unexplored is black                // unexplored is black
 
     imageStore(outImage, p, vec4(c, 1.0));
 }

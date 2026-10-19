@@ -10,6 +10,7 @@ public:
     static constexpr int SIZE = 256;
 
     void Init(VulkanEngine *engine, FogTexture *fogTex);
+
     void Shutdown();
     void Record(VkCommandBuffer cmd, glm::vec2 center, float halfRange, float seed);
 
@@ -31,4 +32,12 @@ private:
     VkPipeline m_Pipeline = VK_NULL_HANDLE;
 
     VkDescriptorSet m_ImGuiTex = VK_NULL_HANDLE;
+
+
+    uint32_t m_MaxTreesPerChunk = 0, m_MaxChunks = 0;
+    VkDescriptorSetLayout m_TreeSetLayout = VK_NULL_HANDLE;
+    VkDescriptorPool m_TreePool = VK_NULL_HANDLE;
+    VkDescriptorSet m_TreeSet = VK_NULL_HANDLE;
+    VkPipelineLayout m_TreePipeLayout = VK_NULL_HANDLE;
+    VkPipeline m_TreePipeline = VK_NULL_HANDLE;
 };

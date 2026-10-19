@@ -1,0 +1,68 @@
+#version 450
+#extension GL_GOOGLE_include_directive : require
+#include "Include/terrain.glsl"
+
+layout(local_size_x = 8, local_size_y = 8) in;
+
+layout(rgba8, set = 0, binding = 0) uniform writeonly image2D outImage;
+layout(set = 0, binding = 1) uniform sampler2D fogMap;
+
+layout(push_constant) uniform PC {
+    vec2 center;
+    float halfRange;
+    float seed;
+    vec2 fogOrigin;
+    float fogInvSize;
+    int cellsPerAxis;
+    ivec2 startCell;
+} pc;
+
+// MUST match hashJitter in tree_generate.comp
+float hashJitter(vec2 pos, float salt) {
+    vec2 wrapped = mod(pos, 1000.0);
+    float h = dot(wrapped, vec2(12.9898, 78.233)) + salt;
+    return fract(sin(h) * 43758.5453);
+}
+
+void main() {
+    ivec2 c = ivec2(gl_GlobalInvocationID.xy);
+    if (c.x >= pc.cellsPerAxis || c.y >= pc.cellsPerAxis) return;
+
+    ivec2 cell = pc.startCell + c;
+    float worldX = float(cell.x) * 8.0;
+    float worldZ = float(cell.y) * 8.0;
+
+    // same rules as tree_generate.comp
+    int biomeId = determineBiome(worldX, worldZ, pc.seed);
+    if (biomeId == BIOME_LAKE) return;
+
+    float treeDensity = 0.0;
+    if (biomeId == BIOME_PLAINS) treeDensity = 0.2;
+    else if (biomeId == BIOME_HILLS) treeDensity = 0.25;
+    else if (biomeId == BIOME_TUNDRA) treeDensity = 0.05;
+    if (treeDensity <= 0.0) return;
+
+    if (getOreDepositAt(worldX, worldZ, pc.seed).oreType != ORE_NONE) return;
+
+    float wetness = 1.0 - getAridity(worldX, worldZ, pc.seed);
+    float threshold = 1.0 - (treeDensity * wetness * 2.0);
+    if (hashJitter(vec2(worldX, worldZ), 1.0) < threshold) return;
+
+    float x = worldX + (hashJitter(vec2(worldX, worldZ), 2.0) - 0.5) * 8.0;
+    float z = worldZ + (hashJitter(vec2(worldX, worldZ), 3.0) - 0.5) * 8.0;
+
+    vec2 uv = (vec2(x, z) - pc.center) / (pc.halfRange * 2.0) + 0.5;
+    if (uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) return;
+
+    float f = textureLod(fogMap, (vec2(x, z) - pc.fogOrigin) * pc.fogInvSize, 0.0).r;
+    if (f < 0.25) return;
+    vec3 col = vec3(0.08, 0.30, 0.10) * mix(0.6, 1.0, smoothstep(0.5, 1.0, f));
+
+    ivec2 size = imageSize(outImage);
+    ivec2 p = ivec2(uv * vec2(size));
+    for (int dy = 0; dy < 2; dy++)
+        for (int dx = 0; dx < 2; dx++) {
+            ivec2 q = p + ivec2(dx, dy);
+            if (q.x < size.x && q.y < size.y) imageStore(outImage, q, vec4(col, 1.0));
+        }
+}

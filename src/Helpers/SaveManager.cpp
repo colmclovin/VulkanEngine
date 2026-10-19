@@ -215,7 +215,7 @@ outPlayer = registry.create();
     registry.emplace<NameTag>(outPlayer, "Player");
     registry.emplace<SelectableComponent>(outPlayer);
     registry.emplace<BoundsComponent>(outPlayer, BoundsComponent{ glm::vec3(0.5f, 1.0f, 0.5f) });
-    registry.emplace<VisionComponent>(outPlayer, 24.0f);
+    registry.emplace<VisionComponent>(outPlayer, 256.0f);
     registry.emplace<TeamComponent>(outPlayer, 0);
     std::cout << "Game loaded from " << path << std::endl;
     return true;
