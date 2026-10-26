@@ -47,6 +47,8 @@
 #include "../Rendering/FogTexture.h"
 #include <chrono>
 #include "../Renderer/TreeRenderer.h" 
+#include "../Systems/DamageSystem.h"
+#include "ResistancePresets.h"
 
 Game::Game() {
 
@@ -248,6 +250,9 @@ void Game::CreateInitialEntities() {
         m_Registry->emplace<NameTag>(m_PlayerEntity, "Player");
         m_Registry->emplace<VisionComponent>(m_PlayerEntity, 256.0f);
         m_Registry->emplace<TeamComponent>(m_PlayerEntity,0);
+        m_Registry->emplace<PlayerTag>(m_PlayerEntity);
+        m_Registry->emplace<HealthComponent>(m_PlayerEntity);
+        m_Registry->emplace<ResistanceComponent>(m_PlayerEntity, ResistancePresets::Player());
 
         m_ResourceMap.Generate(m_Settings.terrain.gridWidth, m_Settings.terrain.gridDepth,
             m_Settings.terrain.cellSize, m_Settings.terrain.seed);
@@ -327,7 +332,7 @@ void Game::IssueMoveCommand(const glm::vec3& ground) {
 void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     static bool qWasDown = false, eWasDown = false, f11WasDown = false, interactWasDown = false, 
         placeWasDown = false, rotateWasDown = false, inspectWasDown = false, rotatePlacedWasDown = false, pickupWasDown = false, saveWasDown = false,
-        loadWasDown = false, tabWasDown = false;
+        loadWasDown = false, tabWasDown = false, kWasDown = false;
     
      double mx, my;
     glfwGetCursorPos(window, &mx, &my);
@@ -375,6 +380,18 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
         std::cout << "player Position.y=" << pt.Position.y << std::endl;
     }
     f10WasDown = f10Down;
+
+    static int typeIdx = 0;
+    bool kDown = glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS;
+    if (kDown && !kWasDown && m_Registry->valid(m_PlayerEntity)) {
+        DamageType t = static_cast<DamageType>(typeIdx % DAMAGE_TYPE_COUNT);
+        float before = m_Registry->get<HealthComponent>(m_PlayerEntity).current;
+        DamageSystem::ApplyDamage(*m_Registry, m_PlayerEntity, 20.0f, t);
+        std::cout << "type " << typeIdx % DAMAGE_TYPE_COUNT << " dealt "
+                  << before - m_Registry->get<HealthComponent>(m_PlayerEntity).current << std::endl;
+        typeIdx++;
+    }
+
     //Testing
 
 
@@ -774,7 +791,8 @@ void Game::Update(float deltaTime) {
     InserterSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
     PowerSystem::Update(*m_Registry, deltaTime);
     MoveOrderSystem::Update(*m_Registry, deltaTime, m_Settings.terrain);
-    
+    DamageSystem::ProcessDeaths(*m_Registry, glm::vec3(0.0f, 0.0f, 0.0f)); // temporary spawn point
+
     glm::vec3 mc = (m_Camera->GetMode() == Camera3D::Mode::IsoRTS) ? m_Camera->GetIsoTarget()
              : (m_Registry->valid(m_PlayerEntity) ? m_Registry->get<TransformComponent>(m_PlayerEntity).Position
                                                   : m_Camera->GetIsoTarget());

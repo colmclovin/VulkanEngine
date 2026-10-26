@@ -11,6 +11,7 @@
 #include "../Rendering/ModelLoader.h"
 #include "../Rendering/Mesh.h"
 #include "../World/TerrainGenerator.h"
+#include "../Game/ResistancePresets.h"
 
 using json = nlohmann::json;
 
@@ -217,6 +218,11 @@ outPlayer = registry.create();
     registry.emplace<BoundsComponent>(outPlayer, BoundsComponent{ glm::vec3(0.5f, 1.0f, 0.5f) });
     registry.emplace<VisionComponent>(outPlayer, 256.0f);
     registry.emplace<TeamComponent>(outPlayer, 0);
+    registry.emplace<PlayerTag>(outPlayer);
+    registry.emplace<HealthComponent>(outPlayer);
+    registry.emplace<ResistanceComponent>(outPlayer , ResistancePresets::Player());
+
+
     std::cout << "Game loaded from " << path << std::endl;
     return true;
 }
