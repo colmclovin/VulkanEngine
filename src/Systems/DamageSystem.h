@@ -2,6 +2,7 @@
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
 #include "../Components/DamageType.h"
+#include "../World/PlacementGrid.h"
 
 class DamageSystem {
 public:
@@ -9,5 +10,5 @@ public:
     static void ApplyDamage(entt::registry &registry, entt::entity target, float amount,
                             DamageType type = DamageType::Physical, entt::entity source = entt::null);
     // Handles anything at 0 health. Call once per frame, after combat.
-    static void ProcessDeaths(entt::registry &registry, const glm::vec3 &worldSpawn);
+    static void ProcessDeaths(entt::registry& registry, const glm::vec3& worldSpawn, PlacementGrid& grid, float cellSize);
 };

@@ -653,3 +653,21 @@ entt::entity InteractionSystem::FindSelectableAlongRay(entt::registry& registry,
 	}
 	return closest;
 }
+entt::entity InteractionSystem::FindDamageableAlongRay(entt::registry& registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance) {
+	entt::entity closest = entt::null;
+	float closestT = maxDistance;
+
+	auto view = registry.view<TransformComponent, BoundsComponent, HealthComponent>();
+	for (auto entity : view) {
+		auto& t = view.get<TransformComponent>(entity);
+		auto& b = view.get<BoundsComponent>(entity);
+		glm::vec3 center = t.Position + glm::vec3(0.0f, b.halfExtents.y, 0.0f);
+
+		float hit;
+		if (RayIntersectsAABB(rayOrigin, rayDir, center - b.halfExtents, center + b.halfExtents, hit) && hit < closestT) {
+			closestT = hit;
+			closest = entity;
+		}
+	}
+	return closest;
+}

@@ -10,6 +10,7 @@ struct PlaceableDef {
     std::string meshPath;      // model to load for the placed entity
     glm::vec3 scale = glm::vec3(1.0f);
     glm::vec3 footprintHalfExtents = glm::vec3(0.5f, 1.0f, 0.5f); // NEW — matches BoundsComponent sizing
+	float maxHealth = 200.0f; // NEW — starting health for the placed entity
     // extend later: machine behavior tag, footprint size for grid snapping, etc.
 };
 

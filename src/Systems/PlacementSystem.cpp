@@ -8,6 +8,7 @@
 #include "../World/PlacementGrid.h"
 #include <iostream>
 #include "../Game/OreDepositMap.h"
+#include "../Game/ResistancePresets.h"
 void PlacementSystem::Update(entt::registry& registry, entt::entity player, Camera3D& camera,
 	ItemId selectedItem, const TerrainSettings& terrainSettings,
 	float mouseX, float mouseY, float screenWidth, float screenHeight, float aspect, PlacementGrid& placementGrid, VulkanEngine *engine, MeshRenderer *meshRenderer) {
@@ -133,6 +134,12 @@ void PlacementSystem::TryConfirmPlacement(entt::registry &registry, entt::entity
 			} else if (m_PendingItem == ItemId::PowerPole) {
 				registry.emplace<PowerPoleComponent>(m_GhostEntity);
 			}
+
+			// Shared by every placeable
+			registry.emplace<HealthComponent>(m_GhostEntity, HealthComponent{ def->maxHealth, def->maxHealth });
+			registry.emplace<ResistanceComponent>(m_GhostEntity, ResistancePresets::Building());
+			registry.emplace<TeamComponent>(m_GhostEntity, TeamComponent{ 0 });
+
             registry.remove<GhostComponent>(m_GhostEntity); // ADD — this is now a real machine, not a preview
 
 			registry.emplace<BoundsComponent>(m_GhostEntity, BoundsComponent{ def->footprintHalfExtents });

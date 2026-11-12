@@ -166,7 +166,7 @@ void Game::Init() {
     m_RenderSystem->SetPreRenderCallback([this](VkCommandBuffer cmd) {
         m_Minimap.Record(cmd, GetMinimapCenter(), m_MinimapRange, (float)m_Settings.terrain.seed);
     });
-    m_RenderSystem->SetUICallback([this]() { DrawMinimap(); }); // ADD
+    m_RenderSystem->SetUICallback([this]() { DrawMinimap(); DrawHealthBars(); }); // ADD
 
     //glfwSetInputMode(m_VulkanEngine->GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
@@ -381,18 +381,21 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     }
     f10WasDown = f10Down;
 
+
     static int typeIdx = 0;
     bool kDown = glfwGetKey(window, GLFW_KEY_K) == GLFW_PRESS;
-    if (kDown && !kWasDown && m_Registry->valid(m_PlayerEntity)) {
-        DamageType t = static_cast<DamageType>(typeIdx % DAMAGE_TYPE_COUNT);
-        float before = m_Registry->get<HealthComponent>(m_PlayerEntity).current;
-        DamageSystem::ApplyDamage(*m_Registry, m_PlayerEntity, 20.0f, t);
-        std::cout << "type " << typeIdx % DAMAGE_TYPE_COUNT << " dealt "
-                  << before - m_Registry->get<HealthComponent>(m_PlayerEntity).current << std::endl;
-        typeIdx++;
+    if (kDown && !kWasDown && !ImGui::GetIO().WantCaptureMouse) {
+        entt::entity target = InteractionSystem::FindDamageableAlongRay(*m_Registry, rayOrigin, rayDir, 500.0f);
+        if (m_Registry->valid(target)) {
+            DamageType t = static_cast<DamageType>(typeIdx % DAMAGE_TYPE_COUNT);
+            float before = m_Registry->get<HealthComponent>(target).current;
+            DamageSystem::ApplyDamage(*m_Registry, target, 20.0f, t);
+            std::cout << "type " << typeIdx % DAMAGE_TYPE_COUNT << " dealt "
+                << before - m_Registry->get<HealthComponent>(target).current
+                << ", hp now " << m_Registry->get<HealthComponent>(target).current << std::endl;
+        }
     }
-
-    //Testing
+    kWasDown = kDown;
 
 
 
@@ -791,7 +794,7 @@ void Game::Update(float deltaTime) {
     InserterSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
     PowerSystem::Update(*m_Registry, deltaTime);
     MoveOrderSystem::Update(*m_Registry, deltaTime, m_Settings.terrain);
-    DamageSystem::ProcessDeaths(*m_Registry, glm::vec3(0.0f, 0.0f, 0.0f)); // temporary spawn point
+    DamageSystem::ProcessDeaths(*m_Registry, glm::vec3(0.0f, 0.0f, 0.0f),m_PlacementGrid , m_Settings.terrain.cellSize); // temporary spawn point
 
     glm::vec3 mc = (m_Camera->GetMode() == Camera3D::Mode::IsoRTS) ? m_Camera->GetIsoTarget()
              : (m_Registry->valid(m_PlayerEntity) ? m_Registry->get<TransformComponent>(m_PlayerEntity).Position
@@ -1720,6 +1723,32 @@ void Game::CompareTerrainHeightAt(float x, float z) {
     vkDestroyBuffer(device, buf, nullptr);
     vkFreeMemory(device, mem, nullptr);
 }
+
+void Game::DrawHealthBars()
+{
+    if (!m_Camera) return;
+    ImGuiIO& io = ImGui::GetIO();
+    VkExtent2D extent = m_VulkanEngine->GetSwapChainExtent();
+    float aspect = static_cast<float>(extent.width) / extent.height;
+    glm::mat4 viewProj = m_Camera->GetProjectionMatrix(aspect) * m_Camera->GetActiveViewMatrix();
+    auto* dl = ImGui::GetBackgroundDrawList();
+    auto hv = m_Registry->view<TransformComponent, HealthComponent>();
+    for (auto e : hv) {
+        auto& hp = hv.get<HealthComponent>(e);
+        if (hp.current >= hp.max) continue;   // only show damaged things
+        glm::vec3 p = hv.get<TransformComponent>(e).Position + glm::vec3(0, 3.0f, 0);
+        glm::vec4 clip = viewProj * glm::vec4(p, 1.0f);
+        if (clip.w <= 0.0f) continue;
+        glm::vec2 ndc = glm::vec2(clip.x, clip.y) / clip.w;
+        ImVec2 s((ndc.x * 0.5f + 0.5f) * io.DisplaySize.x, (ndc.y * 0.5f + 0.5f) * io.DisplaySize.y);
+        float frac = glm::clamp(hp.current / hp.max, 0.0f, 1.0f);
+        dl->AddRectFilled(ImVec2(s.x - 20, s.y), ImVec2(s.x + 20, s.y + 4), IM_COL32(40, 40, 40, 200));
+        dl->AddRectFilled(ImVec2(s.x - 20, s.y), ImVec2(s.x - 20 + 40 * frac, s.y + 4), IM_COL32(220, 60, 60, 255));
+    }
+
+}
+
+
 
 void Game::DrawMinimap() {
     ImGuiIO &io = ImGui::GetIO();

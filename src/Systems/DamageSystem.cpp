@@ -1,5 +1,6 @@
 #include "DamageSystem.h"
 #include "../Components/Components.h"
+#include "../World/PlacementGrid.h"
 #include <vector>
 
 void DamageSystem::ApplyDamage(entt::registry &registry, entt::entity target, float amount,
@@ -18,7 +19,7 @@ void DamageSystem::ApplyDamage(entt::registry &registry, entt::entity target, fl
     hp->current -= amount * mult;
 }
 
-void DamageSystem::ProcessDeaths(entt::registry &registry, const glm::vec3 &worldSpawn) {
+void DamageSystem::ProcessDeaths(entt::registry &registry, const glm::vec3 &worldSpawn, PlacementGrid &grid, float cellSize) {
     // Collect first, then act, so we never destroy while iterating
     std::vector<entt::entity> dead;
     auto view = registry.view<HealthComponent>();
@@ -42,6 +43,12 @@ void DamageSystem::ProcessDeaths(entt::registry &registry, const glm::vec3 &worl
             // step 3 raises the game-over event here
         }
 
+        if (auto* t = registry.try_get<TransformComponent>(e)) {
+            if (auto* b = registry.try_get<BoundsComponent>(e)) {
+                auto cells = PlacementGrid::GetCoveredCells(t->Position, b->halfExtents, cellSize);
+                for (auto& c : cells) grid.Unregister(c);
+            }
+        }
         // Placed buildings also need unregistering from the PlacementGrid; step 2 adds that
         registry.destroy(e);
     }
