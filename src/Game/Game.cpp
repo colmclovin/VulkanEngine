@@ -223,17 +223,21 @@ void Game::CreateInitialEntities() {
               << " seed=" << m_Settings.terrain.seed << std::endl;
 
 
-        auto entity = m_Registry->create();
-
-        auto &sprite = m_Registry->emplace<SpriteComponent>(entity);
-        sprite.transform.Position = glm::vec3(150.0f, 150.0f, 0.0f);
-        sprite.transform.Scale = glm::vec3(300.0f, 600.0f, 1.0f);
-        sprite.color = glm::vec4(0.3f, 0.2f, 0.1f, 0.9f);
-        sprite.layer = 0;
-        m_Registry->emplace<NameTag>(entity, "UI Background");
+        //auto entity = m_Registry->create();
+        //auto &sprite = m_Registry->emplace<SpriteComponent>(entity);
+        //sprite.transform.Position = glm::vec3(150.0f, 150.0f, 0.0f);
+        //sprite.transform.Scale = glm::vec3(300.0f, 600.0f, 1.0f);
+        //sprite.color = glm::vec4(0.3f, 0.2f, 0.1f, 0.9f);
+        //sprite.layer = 0;
+        //m_Registry->emplace<NameTag>(entity, "UI Background");
     
         std::mt19937 rng(m_Settings.terrain.seed);
         glm::vec3 spawnPos = WorldGenerator::FindSpawnPoint(m_Settings.terrain, m_Settings.terrain.seed, rng);
+
+
+        m_UnitMesh = std::make_shared<SkinnedMesh>(ModelLoader::LoadSkinnedModel(
+                "Assets/Models/Test1.glb", m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer()));
+
 
 
         m_PlayerEntity = m_Registry->create();

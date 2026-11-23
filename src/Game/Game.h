@@ -129,7 +129,7 @@ private:
     FogOfWar m_Fog;
     glm::vec2 m_MinimapTexCenter{}; // center the texture was last drawn with
     bool m_MinimapDragging = false;
-
+    std::shared_ptr<SkinnedMesh> m_UnitMesh;
 
     struct NoiseTestPush {
         float startX;
