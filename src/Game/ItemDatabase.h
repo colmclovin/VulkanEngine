@@ -47,6 +47,7 @@ enum class ItemId {
 	FlameThrower,
 	Oil,
 	Plastic,
+	Soldier,
 };
 struct ItemDef {
 	std::string name;

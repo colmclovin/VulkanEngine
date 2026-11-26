@@ -27,7 +27,7 @@ class AudioEngine;
 class MinerSystem;
 class PlaceableDatabase;
 class PlacementSystem;
-
+class SkinnedMesh;
 
 struct GLFWwindow;
 
@@ -58,6 +58,7 @@ private:
     void Render();
     void Shutdown();
     void HandleRTSInput(GLFWwindow* window, float deltaTime);
+    entt::entity SpawnUnit(ItemId unitItem, glm::vec3 position, uint8_t team);
     // Core systems
     std::unique_ptr<AudioEngine> m_AudioEngine;
     std::unique_ptr<AudioEventSystem> m_AudioEvents;

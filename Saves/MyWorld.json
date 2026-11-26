@@ -1,29 +1,189 @@
 {
-    "depletionMap": [],
-    "entities": [],
+    "depletionMap": [
+        {
+            "remaining": 0.995629608631134,
+            "x": -486,
+            "z": -309
+        },
+        {
+            "remaining": 0.9137465953826904,
+            "x": 227,
+            "z": 208
+        },
+        {
+            "remaining": 0.8820446133613586,
+            "x": -489,
+            "z": -309
+        },
+        {
+            "remaining": 0.9955459237098694,
+            "x": -186,
+            "z": 454
+        },
+        {
+            "remaining": 0.8713240027427673,
+            "x": -203,
+            "z": 465
+        },
+        {
+            "remaining": 0.995630145072937,
+            "x": -491,
+            "z": -303
+        },
+        {
+            "remaining": 0.9956299066543579,
+            "x": -487,
+            "z": -309
+        }
+    ],
+    "entities": [
+        {
+            "data": {
+                "radius": 8.0
+            },
+            "health": 200.0,
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -478.0,
+                    3.051910400390625,
+                    -300.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.7071067690849304,
+                    0.0,
+                    0.7071067690849304
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "PowerPole"
+        },
+        {
+            "data": {
+                "craftTimer": 0.0,
+                "deployUnits": true,
+                "isCrafting": false,
+                "powerUsage": 5.0,
+                "runningOnPower": false,
+                "selectedRecipeIndex": -1
+            },
+            "health": 200.0,
+            "inventory": {
+                "inputs": [
+                    {
+                        "capacity": 100,
+                        "count": 0,
+                        "item": "None"
+                    },
+                    {
+                        "capacity": 100,
+                        "count": 0,
+                        "item": "None"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "capacity": 100,
+                        "count": 0,
+                        "item": "None"
+                    }
+                ]
+            },
+            "powerConsumer": {
+                "isPowered": false,
+                "powerRequired": 5.0,
+                "wantsPower": false
+            },
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -482.0,
+                    3.4941329956054688,
+                    -302.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.7071067690849304,
+                    0.0,
+                    0.7071067690849304
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "Assembler"
+        },
+        {
+            "data": {
+                "fuelBuffer": 0,
+                "fuelRemaining": 0.0,
+                "loadedFuelType": "None",
+                "powerOutput": 100.0
+            },
+            "health": 200.0,
+            "inventory": {
+                "inputs": [
+                    {
+                        "capacity": 100,
+                        "count": 0,
+                        "item": "None"
+                    }
+                ],
+                "outputs": []
+            },
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -481.0,
+                    3.2664833068847656,
+                    -298.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.7071067690849304,
+                    0.0,
+                    0.7071067690849304
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "CoalGenerator"
+        }
+    ],
     "player": {
+        "health": 100.0,
         "inventory": {
             "capacity": 20,
             "slots": [
                 {
-                    "count": 0,
-                    "item": "None"
+                    "count": 14,
+                    "item": "Coal"
+                },
+                {
+                    "count": 11,
+                    "item": "Wood"
+                },
+                {
+                    "count": 28,
+                    "item": "IronPlate"
                 },
                 {
                     "count": 0,
                     "item": "None"
                 },
                 {
-                    "count": 0,
-                    "item": "None"
-                },
-                {
-                    "count": 0,
-                    "item": "None"
-                },
-                {
-                    "count": 0,
-                    "item": "None"
+                    "count": 23,
+                    "item": "CopperPlate"
                 },
                 {
                     "count": 0,
@@ -89,9 +249,9 @@
         },
         "transform": {
             "Position": [
-                17.4931697845459,
-                0.5735083818435669,
-                98.6056900024414
+                -493.2294921875,
+                0.7681246399879456,
+                -305.25311279296875
             ],
             "Rotation": [
                 0.0,
@@ -106,10 +266,26 @@
             ]
         }
     },
-    "removedTreesMap": [],
+    "removedTreesMap": [
+        {
+            "chunkX": 8,
+            "chunkZ": 8,
+            "indices": [
+                8
+            ]
+        },
+        {
+            "chunkX": 7,
+            "chunkZ": 8,
+            "indices": [
+                3
+            ]
+        }
+    ],
     "seed": 2143,
     "techState": {
         "techPoints": 0,
         "unlocked": []
-    }
+    },
+    "units": []
 }

@@ -22,7 +22,7 @@ void SaveManager::SaveGame(const std::string &path, entt::registry &registry, en
 
     j["player"]["transform"] = registry.get<TransformComponent>(player);
     j["player"]["inventory"] = registry.get<InventoryComponent>(player);
-
+    if (auto *hp = registry.try_get<HealthComponent>(player)) j["player"]["health"] = hp->current;
 
     j["techState"]["techPoints"] = techState.techPoints;
     j["techState"]["unlocked"] = techState.GetUnlockedList();
@@ -90,11 +90,22 @@ json depletionJson = json::array();
         if (registry.any_of<PowerConsumerComponent>(entity)) {
             entityJson["powerConsumer"] = registry.get<PowerConsumerComponent>(entity);
         }
+        if (auto *hp = registry.try_get<HealthComponent>(entity)) entityJson["health"] = hp->current;
+        if (auto *tc = registry.try_get<TeamComponent>(entity)) entityJson["team"] = static_cast<int>(tc->team);
 
         entitiesJson.push_back(entityJson);
     }
     j["entities"] = entitiesJson;
-
+    json unitsJson = json::array();
+    auto uv = registry.view<UnitTypeComponent, TransformComponent, HealthComponent, TeamComponent>();
+    for (auto e : uv) {
+        const glm::vec3 &p = uv.get<TransformComponent>(e).Position;
+        unitsJson.push_back({ { "item", static_cast<int>(uv.get<UnitTypeComponent>(e).item) },
+                              { "pos", { p.x, p.y, p.z } },
+                              { "health", uv.get<HealthComponent>(e).current },
+                              { "team", static_cast<int>(uv.get<TeamComponent>(e).team) } });
+    }
+    j["units"] = unitsJson;
 
 
 
@@ -108,7 +119,11 @@ json depletionJson = json::array();
 }
 
 bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, entt::entity &outPlayer,
-                           ResourceMap &resourceMap, PlacementGrid &placementGrid, TechState &techState, GameSettings &settings, VulkanEngine *engine, MeshRenderer *meshRenderer, DepletionMap &depletionMap, RemovedTreesMap &removedTreesMap) {
+                           ResourceMap &resourceMap, PlacementGrid &placementGrid, TechState &techState,
+                           GameSettings &settings, VulkanEngine *engine, MeshRenderer *meshRenderer,
+                           DepletionMap &depletionMap, RemovedTreesMap &removedTreesMap,
+                           std::shared_ptr<SkinnedMesh> unitMesh,
+                           std::vector<SavedUnit> *outUnits){
     std::ifstream file(path);
     if (!file.is_open()) {
         std::cerr << "Save file not found: " << path << std::endl;
@@ -197,6 +212,9 @@ bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, en
         const PlaceableDef *def = PlaceableDatabase::TryGet(ItemDatabase::FromString(type));
         if (def) {
             registry.emplace<BoundsComponent>(entity, BoundsComponent{ def->footprintHalfExtents });
+            registry.emplace<HealthComponent>(entity, HealthComponent{ def->maxHealth, entityJson.value("health", def->maxHealth) });
+            registry.emplace<ResistanceComponent>(entity, ResistancePresets::Building());
+            registry.emplace<TeamComponent>(entity, TeamComponent{ static_cast<uint8_t>(entityJson.value("team", 0)) });
             auto coveredCells = PlacementGrid::GetCoveredCells(pos, def->footprintHalfExtents, settings.terrain.cellSize);
             placementGrid.RegisterArea(coveredCells, entity);
         }
@@ -209,8 +227,7 @@ outPlayer = registry.create();
     registry.emplace<PlayerComponent>(outPlayer);
     registry.emplace<InventoryComponent>(outPlayer, j["player"]["inventory"].get<InventoryComponent>());
 
-    auto playerMesh = std::make_shared<SkinnedMesh>(
-            ModelLoader::LoadSkinnedModel("Assets/Models/Test1.glb", engine, meshRenderer));
+    auto playerMesh = unitMesh ? unitMesh : std::make_shared<SkinnedMesh>(ModelLoader::LoadSkinnedModel("Assets/Models/Test1.glb", engine, meshRenderer));
     registry.emplace<SkinnedMeshComponent>(outPlayer, playerMesh); // CHANGED — was MeshComponent/Mesh
     registry.emplace<AnimationComponent>(outPlayer);
     registry.emplace<NameTag>(outPlayer, "Player");
@@ -218,11 +235,23 @@ outPlayer = registry.create();
     registry.emplace<BoundsComponent>(outPlayer, BoundsComponent{ glm::vec3(0.5f, 1.0f, 0.5f) });
     registry.emplace<VisionComponent>(outPlayer, 256.0f);
     registry.emplace<TeamComponent>(outPlayer, 0);
+    CombatStatsComponent ps;
+    ps.fireWhileMoving = false;
+    registry.emplace<CombatStatsComponent>(outPlayer, ps);
+    registry.emplace<StanceComponent>(outPlayer);
     registry.emplace<PlayerTag>(outPlayer);
-    registry.emplace<HealthComponent>(outPlayer);
-    registry.emplace<ResistanceComponent>(outPlayer , ResistancePresets::Player());
+    registry.emplace<ResistanceComponent>(outPlayer, ResistancePresets::Player());
+    float savedHp = j["player"].value("health", 100.0f);
+    registry.emplace<HealthComponent>(outPlayer, HealthComponent{ savedHp, 100.0f });
 
-
+        if (outUnits && j.contains("units")) {
+        for (auto &u : j["units"]) {
+            outUnits->push_back({ static_cast<ItemId>(u["item"].get<int>()),
+                                  glm::vec3(u["pos"][0].get<float>(), u["pos"][1].get<float>(), u["pos"][2].get<float>()),
+                                  u["health"].get<float>(),
+                                  static_cast<uint8_t>(u["team"].get<int>()) });
+        }
+    }
     std::cout << "Game loaded from " << path << std::endl;
     return true;
 }

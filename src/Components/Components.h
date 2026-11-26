@@ -32,3 +32,6 @@
 #include "CombatStatsComponent.h"
 #include "DamageType.h"
 #include "ResistanceComponent.h"
+#include "UnitTypeComponent.h"
+#include "AttackOrderComponent.h"
+#include "StanceComponent.h"

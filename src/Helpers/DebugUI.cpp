@@ -233,6 +233,7 @@ void DebugUI::DrawMachineInspector(entt::registry &registry, entt::entity target
         ImGui::Text("Type: Assembler");
         ImGui::Text("Status: %s", assembler.isCrafting ? "Crafting" : "Idle");
         ImGui::Text("Powered: %s", assembler.runningOnPower ? "Yes" : "No");
+        ImGui::Checkbox("Deploy units", &assembler.deployUnits);
         if (assembler.runningOnPower) {
             ImGui::Text("Power usage: %.1f/s", assembler.powerUsage);
         } 

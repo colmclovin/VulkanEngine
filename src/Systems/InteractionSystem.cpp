@@ -671,3 +671,20 @@ entt::entity InteractionSystem::FindDamageableAlongRay(entt::registry& registry,
 	}
 	return closest;
 }
+entt::entity InteractionSystem::FindEnemyAlongRay(entt::registry &registry, glm::vec3 o, glm::vec3 d, float maxDist, uint8_t myTeam) {
+    entt::entity closest = entt::null;
+    float closestT = maxDist;
+    auto view = registry.view<TransformComponent, BoundsComponent, HealthComponent, TeamComponent>();
+    for (auto e : view) {
+        if (view.get<TeamComponent>(e).team == myTeam) continue;
+        auto &t = view.get<TransformComponent>(e);
+        auto &b = view.get<BoundsComponent>(e);
+        glm::vec3 c = t.Position + glm::vec3(0, b.halfExtents.y, 0);
+        float hit;
+        if (RayIntersectsAABB(o, d, c - b.halfExtents, c + b.halfExtents, hit) && hit < closestT) {
+            closestT = hit;
+            closest = e;
+        }
+    }
+    return closest;
+}

@@ -24,6 +24,7 @@
 #include "../World/TreePlacement.h"
 #include "../Rendering/FogTexture.h"
 #include "FogLayerRenderer.h"
+#include <algorithm>
 RenderSystem::RenderSystem(VulkanEngine *engine) : m_Engine(engine) {
 }
 
@@ -188,12 +189,33 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
     }
 
     m_DebugLineRenderer->BeginFrame();
+
+    float frameDt = 1.0f / 60.0f; // or pass the real deltaTime in
+    for (auto &t : m_Tracers) {
+        m_DebugLineRenderer->AddLine(t.a, t.b, glm::vec3(1.0f, 0.9f, 0.3f));
+        t.ttl -= frameDt;
+    }
+    m_Tracers.erase(std::remove_if(m_Tracers.begin(), m_Tracers.end(),
+                                   [](const Tracer &t) { return t.ttl <= 0.0f; }),
+                    m_Tracers.end());
+
+
     auto selView = registry.view<TransformComponent, SelectableComponent>();
     for (auto e : selView) {
         if (!selView.get<SelectableComponent>(e).isSelected) continue;
         glm::vec3 p = selView.get<TransformComponent>(e).Position;
-        m_DebugLineRenderer->AddBox(p + glm::vec3(-1.5f, 0.2f, -1.5f), p + glm::vec3(1.5f, 0.4f, 1.5f), glm::vec3(0.2f, 1.0f, 0.4f));
+        auto *st = registry.try_get<StanceComponent>(e);
+        glm::vec3 col = (st && st->stance == Stance::HoldFire) ? glm::vec3(1.0f, 0.85f, 0.2f) : glm::vec3(0.2f, 1.0f, 0.4f);
+        m_DebugLineRenderer->AddBox(p + glm::vec3(-1.5f, 0.2f, -1.5f), p + glm::vec3(1.5f, 0.4f, 1.5f), col);
     }
+    auto teamView = registry.view<TransformComponent, TeamComponent, HealthComponent>();
+    for (auto e : teamView) {
+        if (teamView.get<TeamComponent>(e).team == 0) continue;
+        glm::vec3 p = teamView.get<TransformComponent>(e).Position;
+        m_DebugLineRenderer->AddBox(p + glm::vec3(-1.5f, 0.2f, -1.5f), p + glm::vec3(1.5f, 0.4f, 1.5f), glm::vec3(1.0f, 0.0f, 0.0f));
+    }
+
+
     if (settings.showBoundsDebug) {
         auto view = registry.view<TransformComponent, BoundsComponent>();
         for (auto entity : view) {

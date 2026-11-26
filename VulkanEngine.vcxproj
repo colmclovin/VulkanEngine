@@ -214,6 +214,7 @@
     <ClCompile Include="src\Game\ChunkManager.cpp" />
     <ClCompile Include="src\Game\CraftingSystem.cpp" />
     <ClCompile Include="src\Game\FogOfWar.cpp" />
+    <ClCompile Include="src\Game\UnitDatabase.cpp" />
     <ClCompile Include="src\Rendering\FogTexture.cpp" />
     <ClCompile Include="src\Game\FuelDatabase.cpp" />
     <ClCompile Include="src\Game\FurnaceRecipeDatabase.cpp" />
@@ -254,6 +255,7 @@
     <ClCompile Include="src\Systems\AssemblerSystem.cpp" />
     <ClCompile Include="src\Systems\BeltRenderSystem.cpp" />
     <ClCompile Include="src\Systems\BeltSystem.cpp" />
+    <ClCompile Include="src\Systems\CombatSystem.cpp" />
     <ClCompile Include="src\Systems\DamageSystem.cpp" />
     <ClCompile Include="src\Systems\FurnaceSystem.cpp" />
     <ClCompile Include="src\Systems\InserterSystem.cpp" />
@@ -281,6 +283,7 @@
     <ClInclude Include="src\Audio\AudioEventSystem.h" />
     <ClInclude Include="src\Components\AnimationComponent.h" />
     <ClInclude Include="src\Components\AssemblerComponent.h" />
+    <ClInclude Include="src\Components\AttackOrderComponent.h" />
     <ClInclude Include="src\Components\BeltComponent.h" />
     <ClInclude Include="src\Components\BoundsComponent.h" />
     <ClInclude Include="src\Components\CatalystComponent.h" />
@@ -306,9 +309,11 @@
     <ClInclude Include="src\Components\ResistanceComponent.h" />
     <ClInclude Include="src\Components\SkinnedMeshComponent.h" />
     <ClInclude Include="src\Components\SpriteComponent.h" />
+    <ClInclude Include="src\Components\StanceComponent.h" />
     <ClInclude Include="src\Components\TeamComponent.h" />
     <ClInclude Include="src\Components\TransformComponent.h" />
     <ClInclude Include="src\Components\TreeOriginComponent.h" />
+    <ClInclude Include="src\Components\UnitTypeComponent.h" />
     <ClInclude Include="src\Components\VisionComponent.h" />
     <ClInclude Include="src\Engine\VulkanEngine.h" />
     <ClInclude Include="src\Game\BiomeDatabase.h" />
@@ -319,6 +324,7 @@
     <ClInclude Include="src\Game\CraftingSystem.h" />
     <ClInclude Include="src\Game\FogOfWar.h" />
     <ClInclude Include="src\Game\ResistancePresets.h" />
+    <ClInclude Include="src\Game\UnitDatabase.h" />
     <ClInclude Include="src\Rendering\FogTexture.h" />
     <ClInclude Include="src\Game\FuelDatabase.h" />
     <ClInclude Include="src\Game\FurnaceRecipeDatabase.h" />
@@ -372,6 +378,7 @@
     <ClInclude Include="src\Systems\AssemblerSystem.h" />
     <ClInclude Include="src\Systems\BeltRenderSystem.h" />
     <ClInclude Include="src\Systems\BeltSystem.h" />
+    <ClInclude Include="src\Systems\CombatSystem.h" />
     <ClInclude Include="src\Systems\DamageSystem.h" />
     <ClInclude Include="src\Systems\FurnaceSystem.h" />
     <ClInclude Include="src\Systems\InserterSystem.h" />

@@ -50,4 +50,5 @@ public:
 		glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance, float& outClosestT);
 	static entt::entity FindSelectableAlongRay(entt::registry& registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
 	static entt::entity FindDamageableAlongRay(entt::registry& registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
+    static entt::entity FindEnemyAlongRay(entt::registry &registry, glm::vec3 o, glm::vec3 d, float maxDist, uint8_t myTeam);
 };

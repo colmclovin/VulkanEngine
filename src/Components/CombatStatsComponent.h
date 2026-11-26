@@ -8,4 +8,5 @@ struct CombatStatsComponent {
     float attackInterval = 1.0f;
     float cooldown = 0.0f;
     float moveSpeed = 10.0f;
+    bool fireWhileMoving = false;
 };

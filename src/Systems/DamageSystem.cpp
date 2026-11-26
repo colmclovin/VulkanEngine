@@ -42,11 +42,13 @@ void DamageSystem::ProcessDeaths(entt::registry &registry, const glm::vec3 &worl
         if (registry.all_of<CatalystComponent>(e)) {
             // step 3 raises the game-over event here
         }
-
-        if (auto* t = registry.try_get<TransformComponent>(e)) {
-            if (auto* b = registry.try_get<BoundsComponent>(e)) {
-                auto cells = PlacementGrid::GetCoveredCells(t->Position, b->halfExtents, cellSize);
-                for (auto& c : cells) grid.Unregister(c);
+        if (!registry.all_of<CombatStatsComponent>(e)) {
+            if (auto *t = registry.try_get<TransformComponent>(e)) {
+                if (auto *b = registry.try_get<BoundsComponent>(e)) {
+                    auto cells = PlacementGrid::GetCoveredCells(t->Position, b->halfExtents, cellSize);
+                    for (auto &c : cells)
+                        grid.Unregister(c);
+                }
             }
         }
         // Placed buildings also need unregistering from the PlacementGrid; step 2 adds that

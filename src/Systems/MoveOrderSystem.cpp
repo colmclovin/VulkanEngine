@@ -20,8 +20,16 @@ void MoveOrderSystem::Update(entt::registry& registry, float deltaTime, const Te
         }
 
         glm::vec3 moveDir = glm::normalize(toTarget);
-        float moveSpeed = 10.0f;   // tune, or pull from a PlayerComponent/UnitComponent's own speed
-        transform.Position += moveDir * moveSpeed * deltaTime;
-        transform.Position.y = GpuNoiseMatch::SampleHeight(transform.Position.x, transform.Position.z, static_cast<float>(settings.seed));   // ground-snap
+        float speed = 10.0f;
+        if (auto *cs = registry.try_get<CombatStatsComponent>(entity)) speed = cs->moveSpeed;
+        float step = speed * deltaTime;
+        if (dist <= std::max(step, ARRIVE_THRESHOLD)) {
+            transform.Position.x = order.targetPosition.x;
+            transform.Position.z = order.targetPosition.z;
+            transform.Position.y = GpuNoiseMatch::SampleHeight(transform.Position.x, transform.Position.z, static_cast<float>(settings.seed));
+            registry.remove<MoveOrderComponent>(entity);
+            continue;
+        }
+        transform.Position += moveDir * step;
     }
 }

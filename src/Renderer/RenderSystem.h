@@ -57,7 +57,16 @@ public:
     //void SetUICallback(std::function<void()> cb) { m_UICallback = std::move(cb); }
     void SetPreRenderCallback(std::function<void(VkCommandBuffer)> cb) { m_PreRenderCallback = std::move(cb); }
     void SetUICallback(std::function<void()> cb) { m_UICallback = std::move(cb); }
+    void AddTracer(glm::vec3 a, glm::vec3 b) { m_Tracers.push_back({ a, b, 0.15f }); }
+
+
 private:
+    struct Tracer {
+        glm::vec3 a, b;
+        float ttl;
+    };
+    std::vector<Tracer> m_Tracers;
+
     VulkanEngine *m_Engine = nullptr;
     Mesh m_TreeMesh;
     //std::function<void()> m_UICallback;

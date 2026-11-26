@@ -49,6 +49,9 @@
 #include "../Renderer/TreeRenderer.h" 
 #include "../Systems/DamageSystem.h"
 #include "ResistancePresets.h"
+#include "UnitDatabase.h"
+#include "../Helpers/SaveManager.h"
+#include "../Systems/CombatSystem.h"
 
 Game::Game() {
 
@@ -115,6 +118,7 @@ void Game::Init() {
 
     std::cout << "=== Registering item Database ===" << std::endl;
     ItemDatabase::Init();
+    UnitDatabase::Init();
     RecipeDatabase::Init();
     FuelDatabase::Init();
 
@@ -197,7 +201,8 @@ void Game::Init() {
    // RunBiomeGridTest();
 
     m_Registry = std::make_unique<entt::registry>();
-
+    m_UnitMesh = std::make_shared<SkinnedMesh>(ModelLoader::LoadSkinnedModel(
+            "Assets/Models/Test1.glb", m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer()));
  
     //CreateInitialEntities();
     m_Initialized = true;
@@ -235,8 +240,7 @@ void Game::CreateInitialEntities() {
         glm::vec3 spawnPos = WorldGenerator::FindSpawnPoint(m_Settings.terrain, m_Settings.terrain.seed, rng);
 
 
-        m_UnitMesh = std::make_shared<SkinnedMesh>(ModelLoader::LoadSkinnedModel(
-                "Assets/Models/Test1.glb", m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer()));
+        
 
 
 
@@ -248,7 +252,7 @@ void Game::CreateInitialEntities() {
         m_Registry->emplace<SelectableComponent>(m_PlayerEntity);
 
         m_Registry->emplace<BoundsComponent>(m_PlayerEntity, BoundsComponent{ glm::vec3(0.5f, 1.0f, 0.5f) });
-        auto playerMesh = std::make_shared<SkinnedMesh>(ModelLoader::LoadSkinnedModel("Assets/Models/Test1.glb", m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer())); // swap for a real player model later
+        auto playerMesh = m_UnitMesh;
         m_Registry->emplace<AnimationComponent>(m_PlayerEntity);
         m_Registry->emplace<SkinnedMeshComponent>(m_PlayerEntity, playerMesh);
         m_Registry->emplace<NameTag>(m_PlayerEntity, "Player");
@@ -256,6 +260,10 @@ void Game::CreateInitialEntities() {
         m_Registry->emplace<TeamComponent>(m_PlayerEntity,0);
         m_Registry->emplace<PlayerTag>(m_PlayerEntity);
         m_Registry->emplace<HealthComponent>(m_PlayerEntity);
+        CombatStatsComponent ps;
+        ps.fireWhileMoving = false;
+        m_Registry->emplace<CombatStatsComponent>(m_PlayerEntity, ps);
+        m_Registry->emplace<StanceComponent>(m_PlayerEntity);
         m_Registry->emplace<ResistanceComponent>(m_PlayerEntity, ResistancePresets::Player());
 
         m_ResourceMap.Generate(m_Settings.terrain.gridWidth, m_Settings.terrain.gridDepth,
@@ -263,18 +271,6 @@ void Game::CreateInitialEntities() {
 
 
 
-        
-       /* auto terrainMesh = TerrainGenerator::GenerateHeightmapTerrain(
-            m_Settings.terrain, m_ResourceMap);
-        std::cout << "Terrain mesh vertex count: " << terrainMesh->Vertices.size()
-                  << " index count: " << terrainMesh->Indices.size() << std::endl;
-        m_TerrainEntity = m_Registry->create();
-        m_Registry->emplace<TransformComponent>(m_TerrainEntity);
-        m_Registry->emplace<MeshComponent>(m_TerrainEntity, terrainMesh);
-        m_Registry->emplace<NameTag>(m_TerrainEntity, "Terrain");
-
-        WorldGenerator::ScatterTrees(*m_Registry, m_Settings.terrain, m_ResourceMap, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer());
-        */
         }
 void Game::HandleInput(float deltaTime) {
     GLFWwindow* window = m_VulkanEngine->GetWindow();
@@ -321,6 +317,8 @@ void Game::HandleInput(float deltaTime) {
 
 }
 void Game::IssueMoveCommand(const glm::vec3& ground) {
+    for (auto unit : m_SelectedUnits)
+        if (m_Registry->valid(unit)) m_Registry->remove<AttackOrderComponent>(unit);
     int n = static_cast<int>(m_SelectedUnits.size());
     int side = static_cast<int>(std::ceil(std::sqrt((float)std::max(n, 1))));
     int i = 0;
@@ -401,7 +399,15 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     }
     kWasDown = kDown;
 
-
+    static bool f6Was = false, f7Was = false;
+    bool f6 = glfwGetKey(window, GLFW_KEY_F6) == GLFW_PRESS;
+    bool f7 = glfwGetKey(window, GLFW_KEY_F7) == GLFW_PRESS;
+    if ((f6 && !f6Was) || (f7 && !f7Was)) {
+        glm::vec3 ground = TerrainRaycast::RaycastToTerrain(rayOrigin, rayDir, m_Settings.terrain);
+        SpawnUnit(ItemId::Soldier, ground, f6 ? 1 : 0);
+    }
+    f6Was = f6;
+    f7Was = f7;
 
 
     if (placeIsDown && !placeWasDown) m_PlacementSystem->TryConfirmPlacement(*m_Registry, m_PlayerEntity, m_PlacementGrid, m_Settings.terrain);
@@ -500,10 +506,16 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
         m_PlacementGrid = PlacementGrid{};
         m_DepletionMap = DepletionMap{};
         m_RemovedTreesMap = RemovedTreesMap{};
-
-        entt::entity loadedPlayer;
-        if (SaveManager::LoadGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, loadedPlayer, m_ResourceMap, m_PlacementGrid, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_DepletionMap, m_RemovedTreesMap)) {
+        std::vector<SavedUnit> savedUnits;
+        entt::entity loadedPlayer = entt::null;
+        if (SaveManager::LoadGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, loadedPlayer, m_ResourceMap, m_PlacementGrid, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_DepletionMap, m_RemovedTreesMap, m_UnitMesh, &savedUnits)) {
             m_PlayerEntity = loadedPlayer;
+             // or the free struct, depending on where you defined it
+            // pass &savedUnits to LoadGame, then:
+            for (auto &su : savedUnits) {
+                entt::entity e = SpawnUnit(su.item, su.pos, su.team);
+                if (m_Registry->valid(e)) m_Registry->get<HealthComponent>(e).current = su.health;
+            }
         }
     }
     if (tabIsDown && !tabWasDown) {
@@ -691,13 +703,29 @@ void Game::HandleRTSInput(GLFWwindow* window, float deltaTime) {
     if (rightDown && !m_RightWasDown && !io.WantCaptureMouse) {
         glm::vec3 rayOrigin = m_Camera->GetEyePosition();
         glm::vec3 rayDir = m_Camera->ScreenPointToRay(mx, my, (float)extent.width, (float)extent.height, aspect);
-        glm::vec3 ground = TerrainRaycast::RaycastToTerrain(rayOrigin, rayDir, m_Settings.terrain);
 
-        // Fan multiple units out so they don't stack on one point
-
-        IssueMoveCommand(ground);
+        entt::entity enemy = InteractionSystem::FindEnemyAlongRay(*m_Registry, rayOrigin, rayDir, 500.0f, 0);
+        if (m_Registry->valid(enemy)) {
+            for (auto unit : m_SelectedUnits) {
+                if (!m_Registry->valid(unit) || !m_Registry->all_of<CombatStatsComponent>(unit)) continue;
+                m_Registry->remove<MoveOrderComponent>(unit);
+                m_Registry->emplace_or_replace<AttackOrderComponent>(unit, AttackOrderComponent{ enemy });
+            }
+        } else {
+            glm::vec3 ground = TerrainRaycast::RaycastToTerrain(rayOrigin, rayDir, m_Settings.terrain);
+            IssueMoveCommand(ground);
+        }
     }
-
+    static bool hWas = false;
+    bool hDown = glfwGetKey(window, GLFW_KEY_H) == GLFW_PRESS;
+    if (hDown && !hWas) {
+        for (auto u : m_SelectedUnits) {
+            if (!m_Registry->valid(u)) continue;
+            auto &s = m_Registry->get_or_emplace<StanceComponent>(u);
+            s.stance = (s.stance == Stance::FireAtWill) ? Stance::HoldFire : Stance::FireAtWill;
+        }
+    }
+    hWas = hDown;
     // ---- Drag rectangle overlay ----
 
         bool showRect = m_IsBoxSelecting && leftDown &&
@@ -792,13 +820,27 @@ void Game::Update(float deltaTime) {
 
     MinerSystem::Update(*m_Registry, m_DepletionMap, m_Settings.terrain, deltaTime, m_ChunkManager);
     FurnaceSystem::Update(*m_Registry, deltaTime);
-    AssemblerSystem::Update(*m_Registry, deltaTime);
+    int unitCount = 0;
+    for (auto e : m_Registry->view<CombatStatsComponent, TeamComponent>())
+        unitCount++;
+    const int UNIT_CAP = 200; // tune
+
+    std::vector<AssemblerSystem::SpawnRequest> spawns;
+    AssemblerSystem::Update(*m_Registry, deltaTime, spawns, UNIT_CAP - unitCount);
+    for (auto &s : spawns)
+        SpawnUnit(s.unit, s.position, s.team);
     BeltSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
     BeltRenderSystem::SyncItemEntities(*m_Registry, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.cellSize);
     InserterSystem::Update(*m_Registry, m_PlacementGrid, m_Settings.terrain.cellSize, deltaTime);
     PowerSystem::Update(*m_Registry, deltaTime);
     MoveOrderSystem::Update(*m_Registry, deltaTime, m_Settings.terrain);
     DamageSystem::ProcessDeaths(*m_Registry, glm::vec3(0.0f, 0.0f, 0.0f),m_PlacementGrid , m_Settings.terrain.cellSize); // temporary spawn point
+
+    std::vector<CombatSystem::Shot> shots;
+    CombatSystem::Update(*m_Registry, deltaTime, shots);
+    for (auto &s : shots)
+        m_RenderSystem->AddTracer(s.from, s.to);
+
 
     glm::vec3 mc = (m_Camera->GetMode() == Camera3D::Mode::IsoRTS) ? m_Camera->GetIsoTarget()
              : (m_Registry->valid(m_PlayerEntity) ? m_Registry->get<TransformComponent>(m_PlayerEntity).Position
@@ -1842,4 +1884,39 @@ void Game::DrawMinimap() {
 
     ImGui::End();
     ImGui::PopStyleVar();
+}
+
+entt::entity Game::SpawnUnit(ItemId unitItem, glm::vec3 position, uint8_t team) {
+    std::cout << "SpawnUnit called: item=" << (int)unitItem << " team=" << (int)team << std::endl;
+    if (!m_UnitMesh) {
+        std::cout << "SpawnUnit: m_UnitMesh is null" << std::endl;
+        return entt::null;
+    }
+    const UnitDef *def = UnitDatabase::TryGet(unitItem);
+    if (!def) {
+        std::cout << "SpawnUnit: no UnitDef for item " << (int)unitItem << std::endl;
+        return entt::null;
+    }
+
+    entt::entity e = m_Registry->create();
+    auto &tr = m_Registry->emplace<TransformComponent>(e);
+    tr.Position = position;
+    tr.Position.y = GpuNoiseMatch::SampleHeight(position.x, position.z, (float)m_Settings.terrain.seed);
+
+    m_Registry->emplace<AnimationComponent>(e);
+    m_Registry->emplace<SkinnedMeshComponent>(e, m_UnitMesh);
+    m_Registry->emplace<BoundsComponent>(e, BoundsComponent{ glm::vec3(0.5f, 1.0f, 0.5f) });
+    m_Registry->emplace<HealthComponent>(e, HealthComponent{ def->maxHealth, def->maxHealth });
+    m_Registry->emplace<ResistanceComponent>(e, def->resist);
+    m_Registry->emplace<TeamComponent>(e, TeamComponent{ team });
+    m_Registry->emplace<CombatStatsComponent>(e, def->stats);
+    m_Registry->emplace<UnitTypeComponent>(e, UnitTypeComponent{ unitItem }); // see note below
+    m_Registry->emplace<StanceComponent>(e, StanceComponent{ team == 0 ? Stance::FireAtWill : Stance::HoldFire });
+
+    if (team == 0) {
+        m_Registry->emplace<SelectableComponent>(e);
+        m_Registry->emplace<VisionComponent>(e, VisionComponent{ def->visionRadius });
+    }
+    std::cout << "unit at " << tr.Position.x << "," << tr.Position.y << "," << tr.Position.z << std::endl;
+    return e;
 }

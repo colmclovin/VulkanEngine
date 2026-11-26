@@ -44,6 +44,7 @@ void ItemDatabase::Init() {
     s_Items[ItemId::FlameThrower] = { "Flame Thrower", 999, "Assets/Models/FlameThrower.glb" };
     s_Items[ItemId::Oil] = { "Oil", 999, "Assets/Models/Oil.glb" };
     s_Items[ItemId::Plastic] = { "Plastic", 999, "Assets/Models/Plastic.glb" };
+    s_Items[ItemId::Soldier] = { "Soldier", 999, "Assets/Models/Wood.glb" };
 
 }
 

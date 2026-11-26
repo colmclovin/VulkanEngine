@@ -4,9 +4,14 @@
 #include "../Components/MachineInventoryComponent.h"
 #include "../Game/RecipeDatabase.h"
 #include "../Components/PowerComponent.h"
-
-void AssemblerSystem::Update(entt::registry &registry, float deltaTime) {
-	auto view = registry.view<AssemblerComponent, MachineInventoryComponent>();
+#include "../Components/TransformComponent.h"
+#include "../Components/TeamComponent.h"
+#include "../Game/UnitDatabase.h"
+#include <cmath>
+#include <glm/gtc/constants.hpp>
+#include <iostream>
+void AssemblerSystem::Update(entt::registry &registry, float deltaTime, std::vector<SpawnRequest> &spawns, int unitBudget) {
+    auto view = registry.view<AssemblerComponent, MachineInventoryComponent>();
 	for (auto entity : view) {
 		auto &assembler = view.get<AssemblerComponent>(entity);
 		auto &inv = view.get<MachineInventoryComponent>(entity);
@@ -50,36 +55,64 @@ void AssemblerSystem::Update(entt::registry &registry, float deltaTime) {
 			if (!hasAllInputs) continue;
 
 			bool hasRoom = true;
-			for (auto &out : recipe.outputs) {
-				bool found = false;
-				for (auto &slot : inv.outputs) {
-					if ((slot.item == out.item || slot.item == ItemId::None) && slot.count < slot.capacity) {
-						found = true;
-						break;
-					}
-				}
-				if (!found) {
-					hasRoom = false;
-					break;
-				}
-			}
-			if (!hasRoom) continue;
+            for (auto &out : recipe.outputs) {
+                if (assembler.deployUnits && UnitDatabase::TryGet(out.item)) continue; // deployed, so no slot needed
+                bool found = false;
+                for (auto &slot : inv.outputs) {
+                    if ((slot.item == out.item || slot.item == ItemId::None) && slot.count < slot.capacity) {
+                        found = true;
+                        break;
+                    }
+                }
+                if (!found) {
+                    hasRoom = false;
+                    break;
+                }
+            }
+            if (!hasRoom) continue;
 
 			for (auto &req : recipe.inputs) {
 				MachineInventoryComponent::RemoveFromSlots(inv.inputs, req.item, req.count);
 			}
 			assembler.isCrafting = true;
 			assembler.craftTimer = recipe.craftTime;
-		} else {
-			if (!hasPower) continue; // ADD — pause mid-craft if power is lost; progress isn't lost, just frozen
+        } else {
+            if (!hasPower) continue;
 
-			assembler.craftTimer -= deltaTime;
-			if (assembler.craftTimer <= 0.0f) {
-				for (auto &out : recipe.outputs) {
-					MachineInventoryComponent::AddToSlots(inv.outputs, out.item, out.count);
-				}
-				assembler.isCrafting = false;
-			}
-		}
+            assembler.craftTimer -= deltaTime;
+            if (assembler.craftTimer <= 0.0f) {
+                // If we'd deploy units but the cap is reached, wait here with the finished craft
+
+                bool wantsDeploy = false;
+                if (assembler.deployUnits)
+                    for (auto &out : recipe.outputs)
+                        if (UnitDatabase::TryGet(out.item)) wantsDeploy = true;
+                if (wantsDeploy && unitBudget <= 0) {
+                    assembler.craftTimer = 0.0f;
+                    continue;
+                }
+
+                glm::vec3 pos = registry.get<TransformComponent>(entity).Position;
+                uint8_t team = 0;
+                if (auto *tc = registry.try_get<TeamComponent>(entity)) team = tc->team;
+
+                for (auto &out : recipe.outputs) {
+                    if (assembler.deployUnits && UnitDatabase::TryGet(out.item)) {
+                        static int counter = 0;
+                        for (int n = 0; n < out.count && unitBudget > 0; n++, unitBudget--) {
+                            float angle = (counter++ % 8) * (glm::two_pi<float>() / 8.0f);
+                            spawns.push_back({ out.item,
+                                               pos + glm::vec3(std::cos(angle) * 4.0f, 0.0f, std::sin(angle) * 4.0f),
+                                               team });
+                        }
+                        std::cout << "craft done: deploy=" << assembler.deployUnits
+                                  << " wantsDeploy=" << wantsDeploy << " budget=" << unitBudget << std::endl;
+                    } else {
+                        MachineInventoryComponent::AddToSlots(inv.outputs, out.item, out.count);
+                    }
+                }
+                assembler.isCrafting = false;
+            }
+        }
 	}
 }
