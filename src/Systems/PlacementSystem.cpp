@@ -88,7 +88,11 @@ void PlacementSystem::TryConfirmPlacement(entt::registry &registry, entt::entity
 
 	auto coveredCells = PlacementGrid::GetCoveredCells(ghostPos, def->footprintHalfExtents, gridSize);
 
-	
+	if (m_PendingItem == ItemId::Catalyst) {
+        auto cv = registry.view<CatalystComponent, TeamComponent>();
+        for (auto c : cv)
+            if (cv.get<TeamComponent>(c).team == 0) return; // already placed; show a message later
+    }
 
 	if (placementGrid.IsAreaOccupied(coveredCells)) {
 		return; // blocked — refuse before touching inventory at all
@@ -133,11 +137,19 @@ void PlacementSystem::TryConfirmPlacement(entt::registry &registry, entt::entity
 																				   { MachineSlot{} } });
 			} else if (m_PendingItem == ItemId::PowerPole) {
 				registry.emplace<PowerPoleComponent>(m_GhostEntity);
+			} else if (m_PendingItem == ItemId::Catalyst) {
+			    registry.emplace<CatalystComponent>(m_GhostEntity);
+			    registry.emplace<VisionComponent>(m_GhostEntity, VisionComponent{ 160.0f });
 			}
 
 			// Shared by every placeable
 			registry.emplace<HealthComponent>(m_GhostEntity, HealthComponent{ def->maxHealth, def->maxHealth });
-			registry.emplace<ResistanceComponent>(m_GhostEntity, ResistancePresets::Building());
+			
+            if (m_PendingItem == ItemId::Catalyst) {
+                registry.emplace_or_replace<ResistanceComponent>(m_GhostEntity, ResistancePresets::Catalyst());
+            } else {
+                registry.emplace<ResistanceComponent>(m_GhostEntity, ResistancePresets::Building());
+            }
 			registry.emplace<TeamComponent>(m_GhostEntity, TeamComponent{ 0 });
 
             registry.remove<GhostComponent>(m_GhostEntity); // ADD — this is now a real machine, not a preview

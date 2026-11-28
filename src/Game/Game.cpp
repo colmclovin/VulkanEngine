@@ -52,6 +52,9 @@
 #include "UnitDatabase.h"
 #include "../Helpers/SaveManager.h"
 #include "../Systems/CombatSystem.h"
+#include "../Systems/VictorySystem.h"
+#include "NestPlacement.h"
+
 
 Game::Game() {
 
@@ -88,6 +91,21 @@ void Game::Run() {
         if (m_State == GameState::MainMenu) {
             RunMainMenu();
         } else if (m_State == GameState::Playing) {
+            if (m_PendingLoad) {
+                m_PendingLoad = false;
+                LoadCurrentSave(); // ResetWorldState clears m_GameOver
+                m_ChunkManager.Reset();
+                m_ChunkManager.BeginInitialLoad(m_Registry->get<TransformComponent>(m_PlayerEntity).Position,
+                                                m_Camera->GetForwardDirection(), m_Settings.terrain, m_Settings.terrain.seed);
+                m_State = GameState::Loading;
+                continue;
+            }
+            if (m_PendingMenu) {
+                m_PendingMenu = false;
+                ResetWorldState();
+                m_State = GameState::MainMenu;
+                continue;
+            }
             HandleInput(deltaTime);
             Update(deltaTime);
             Render();
@@ -170,8 +188,11 @@ void Game::Init() {
     m_RenderSystem->SetPreRenderCallback([this](VkCommandBuffer cmd) {
         m_Minimap.Record(cmd, GetMinimapCenter(), m_MinimapRange, (float)m_Settings.terrain.seed);
     });
-    m_RenderSystem->SetUICallback([this]() { DrawMinimap(); DrawHealthBars(); }); // ADD
-
+    m_RenderSystem->SetUICallback([this]() {
+        DrawHealthBars();
+        DrawMinimap();
+        DrawGameOver();
+    });
     //glfwSetInputMode(m_VulkanEngine->GetWindow(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
 
@@ -502,21 +523,7 @@ void Game::HandleIsoInput(GLFWwindow* window, float deltaTime) {
     }
     saveWasDown = saveIsDown;
     if (loadIsDown && !loadWasDown) {
-        m_Registry->clear();
-        m_PlacementGrid = PlacementGrid{};
-        m_DepletionMap = DepletionMap{};
-        m_RemovedTreesMap = RemovedTreesMap{};
-        std::vector<SavedUnit> savedUnits;
-        entt::entity loadedPlayer = entt::null;
-        if (SaveManager::LoadGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, loadedPlayer, m_ResourceMap, m_PlacementGrid, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_DepletionMap, m_RemovedTreesMap, m_UnitMesh, &savedUnits)) {
-            m_PlayerEntity = loadedPlayer;
-             // or the free struct, depending on where you defined it
-            // pass &savedUnits to LoadGame, then:
-            for (auto &su : savedUnits) {
-                entt::entity e = SpawnUnit(su.item, su.pos, su.team);
-                if (m_Registry->valid(e)) m_Registry->get<HealthComponent>(e).current = su.health;
-            }
-        }
+        LoadCurrentSave();
     }
     if (tabIsDown && !tabWasDown) {
         if (m_Camera->GetMode() == Camera3D::Mode::IsoRTS) {
@@ -768,6 +775,7 @@ void Game::HandleFreeFlyInput(GLFWwindow* window, float deltaTime) {
     }
 }
 void Game::Update(float deltaTime) {
+    if (m_GameOver) return;
     GLFWwindow* window = m_VulkanEngine->GetWindow();
 
     m_TotalTime += deltaTime;
@@ -835,6 +843,24 @@ void Game::Update(float deltaTime) {
     PowerSystem::Update(*m_Registry, deltaTime);
     MoveOrderSystem::Update(*m_Registry, deltaTime, m_Settings.terrain);
     DamageSystem::ProcessDeaths(*m_Registry, glm::vec3(0.0f, 0.0f, 0.0f),m_PlacementGrid , m_Settings.terrain.cellSize); // temporary spawn point
+    if (VictorySystem::Update(*m_Registry, m_HadCatalyst) == GameResult::Lost && !m_GameOver) {
+        m_GameOver = true;
+    }
+    if (!m_InvasionStarted) {
+        auto cv = m_Registry->view<CatalystComponent, TransformComponent, TeamComponent>();
+        for (auto c : cv) {
+            if (cv.get<TeamComponent>(c).team != 0) continue;
+            glm::vec3 p = cv.get<TransformComponent>(c).Position;
+            m_CatalystPos = glm::vec2(p.x, p.z);
+            m_InvasionStartTime = m_TotalTime;
+            m_InvasionStarted = true;
+            m_Nests.Activate(m_CatalystPos, m_Settings.terrain.seed, m_Fog, 4, m_TotalTime); // 4 = first-wave nest count
+            break;
+        }
+    }
+    if (m_InvasionStarted) m_Nests.Tick(deltaTime, m_TotalTime);
+
+
 
     std::vector<CombatSystem::Shot> shots;
     CombatSystem::Update(*m_Registry, deltaTime, shots);
@@ -938,11 +964,10 @@ void Game::Shutdown() {
 }
 
 void Game::StartNewGame(const std::string &saveName) {
-    m_Registry->clear();
-    m_PlacementGrid = PlacementGrid{};
+    ResetWorldState();
     m_TechState = TechState{};
     m_ChunkManager.Reset();
-    CreateInitialEntities(); // existing world-gen path: player, terrain, WorldGenerator::ScatterTrees, etc.
+    CreateInitialEntities();
 
     m_CurrentSaveName = saveName;
     SaveManager::SaveGame("Saves/" + saveName + ".json", *m_Registry, m_PlayerEntity, m_ResourceMap, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_DepletionMap, m_RemovedTreesMap); // save immediately so the file exists
@@ -953,10 +978,9 @@ void Game::StartNewGame(const std::string &saveName) {
 }
 
 void Game::LoadExistingGame(const std::string &saveName) {
-    m_Registry->clear();
-    m_PlacementGrid = PlacementGrid{};
+    ResetWorldState();
     m_ChunkManager.Reset();
-    entt::entity loadedPlayer;
+    entt::entity loadedPlayer = entt::null;
     bool success = SaveManager::LoadGame("Saves/" + saveName + ".json", *m_Registry, loadedPlayer,
                                          m_ResourceMap, m_PlacementGrid, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_DepletionMap, m_RemovedTreesMap);
     if (success) {
@@ -1051,10 +1075,7 @@ void Game::RunPauseMenu() {
         SaveManager::SaveGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, m_PlayerEntity, m_ResourceMap, m_TechState, m_Settings, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(), m_DepletionMap, m_RemovedTreesMap);
         break;
     case PauseMenuAction::QuitToMenu:
-        m_Registry->clear();
-        m_PlacementGrid = PlacementGrid{};
-        m_DepletionMap = DepletionMap{};
-        m_RemovedTreesMap = RemovedTreesMap{};
+        ResetWorldState();
         m_State = GameState::MainMenu;
         break;
     case PauseMenuAction::QuitGame:
@@ -1847,6 +1868,31 @@ void Game::DrawMinimap() {
         dl->AddRectFilled(ImVec2(s.x - hx, s.y - hz), ImVec2(s.x + hx, s.y + hz), IM_COL32(240, 170, 60, 255));
     }
 
+        {
+        float half = m_MinimapRange;
+        int minCX = (int)std::floor((GetMinimapCenter().x - half) / NestPlacement::CELL);
+        int maxCX = (int)std::floor((GetMinimapCenter().x + half) / NestPlacement::CELL);
+        int minCZ = (int)std::floor((GetMinimapCenter().y - half) / NestPlacement::CELL);
+        int maxCZ = (int)std::floor((GetMinimapCenter().y + half) / NestPlacement::CELL);
+
+        for (int cz = minCZ; cz <= maxCZ; cz++) {
+            for (int cx = minCX; cx <= maxCX; cx++) {
+                for (auto &n : m_Nests.Nests()) {
+                    if (m_Fog.GetState(n.pos.x, n.pos.y) != FogOfWar::Visible) continue;
+                    auto site = NestPlacement::GetNestInCell(cx, cz, m_Settings.terrain.seed, m_CatalystPos);
+                if (!site) continue;
+                ImVec2 s = worldToScreen(site->pos.x, site->pos.y);
+                if (s.x < imgMin.x || s.y < imgMin.y || s.x > imgMin.x + size || s.y > imgMin.y + size) continue;
+
+                // tier 0 = pale red, tier 4 = deep red; bigger dot for higher tier
+                int t = site->distanceTier;
+                dl->AddCircleFilled(s, 3.0f + t, IM_COL32(255, 200 - t * 45, 200 - t * 45, 255));
+                }
+            }
+        }
+    }
+
+
 
     // camera marker
     glm::vec3 cam = m_Camera->GetIsoTarget();
@@ -1919,4 +1965,47 @@ entt::entity Game::SpawnUnit(ItemId unitItem, glm::vec3 position, uint8_t team) 
     }
     std::cout << "unit at " << tr.Position.x << "," << tr.Position.y << "," << tr.Position.z << std::endl;
     return e;
+}
+void Game::DrawGameOver() {
+    if (!m_GameOver) return;
+    ImGuiIO &io = ImGui::GetIO();
+    ImGui::SetNextWindowPos(ImVec2(io.DisplaySize.x * 0.5f, io.DisplaySize.y * 0.5f), ImGuiCond_Always, ImVec2(0.5f, 0.5f));
+    ImGui::Begin("Game Over", nullptr, ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoMove);
+    ImGui::Text("Your Catalyst was destroyed.");
+    if (ImGui::Button("Load last save")) m_PendingLoad = true;
+    ImGui::SameLine();
+    if (ImGui::Button("Main menu")) m_PendingMenu = true;
+    ImGui::End();
+}
+void Game::ResetWorldState() {
+    m_ChunkManager.UnloadAll(*m_Registry, m_VulkanEngine.get(),
+                             m_RenderSystem->GetTerrainRenderer(), m_RenderSystem->GetTreeRenderer());
+
+    m_Registry->clear();
+    m_PlacementGrid = PlacementGrid{};
+    m_DepletionMap = DepletionMap{};
+    m_RemovedTreesMap = RemovedTreesMap{};
+    m_Fog = FogOfWar{};
+
+    m_SelectedUnits.clear();
+    m_IsBoxSelecting = false;
+    m_HadCatalyst = false;
+    m_InvasionStarted = false;
+    m_Nests.Clear();
+    m_GameOver = false;
+}
+void Game::LoadCurrentSave() {
+    ResetWorldState();
+    std::vector<SavedUnit> savedUnits;
+    entt::entity loadedPlayer = entt::null;
+    if (SaveManager::LoadGame("Saves/" + m_CurrentSaveName + ".json", *m_Registry, loadedPlayer, m_ResourceMap,
+                              m_PlacementGrid, m_TechState, m_Settings, m_VulkanEngine.get(),
+                              m_RenderSystem->GetMeshRenderer(), m_DepletionMap, m_RemovedTreesMap,
+                              m_UnitMesh, &savedUnits)) {
+        m_PlayerEntity = loadedPlayer;
+        for (auto &su : savedUnits) {
+            entt::entity e = SpawnUnit(su.item, su.pos, su.team);
+            if (m_Registry->valid(e)) m_Registry->get<HealthComponent>(e).current = su.health;
+        }
+    }
 }

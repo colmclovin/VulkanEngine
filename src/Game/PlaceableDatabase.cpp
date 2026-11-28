@@ -15,6 +15,7 @@ void PlaceableDatabase::Init() {
     s_Placeables[ItemId::Inserter] = { "Assets/Models/Inserter.glb", glm::vec3(1.0f), glm::vec3(1.0f, 1.0f, 1.0f), 200.0f };
     s_Placeables[ItemId::PowerPole] = { "Assets/Models/PowerPole.glb", glm::vec3(1.0f), glm::vec3(0.5f, 3.0f, 0.5f), 200.0f };
     s_Placeables[ItemId::CoalGenerator] = { "Assets/Models/CoalGenerator.glb", glm::vec3(1.0f), glm::vec3(2.0f, 2.0f, 2.0f), 200.0f    };
+    s_Placeables[ItemId::Catalyst] = { "Assets/Models/Catalyst.glb", glm::vec3(1.0f), glm::vec3(4.0f, 4.0f, 4.0f), 1000.0f };
 
     // add more as you get building item types, e.g. ItemId::Furnace, ItemId::Belt
 }

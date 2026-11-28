@@ -18,6 +18,7 @@
 #include "../World/TreeHealthMap.h"
 #include "FogOfWar.h"
 #include "../Rendering/Minimap.h"
+#include "NestManager.h"
 
 class TerrainGenerator;
 class VulkanEngine;
@@ -79,6 +80,13 @@ private:
     ItemId GetSelectedItem() const {
         return (m_SelectedHotbarSlot >= 0 && m_SelectedHotbarSlot < HOTBAR_SIZE) ? m_Hotbar[m_SelectedHotbarSlot] : ItemId::None;
     }
+    void ResetWorldState();
+    bool m_PendingLoad = false;
+    bool m_PendingMenu = false;
+    void LoadCurrentSave(); 
+    bool m_HadCatalyst = false;
+    bool m_GameOver = false;
+    void DrawGameOver();
     GameState m_State = GameState::MainMenu;
     std::string m_CurrentSaveName; // which save file is active, once in Playing state
     RemovedTreesMap m_RemovedTreesMap;
@@ -120,7 +128,10 @@ private:
     float m_MinimapRange = 150.0f; // half-width in world units
     glm::vec2 m_MinimapCenter{};
     float m_MinimapTimer = 0.0f;
-
+    NestManager m_Nests;
+    bool m_InvasionStarted = false;
+    double m_InvasionStartTime = 0.0;
+    glm::vec2 m_CatalystPos{};
     std::vector<entt::entity> m_SelectedUnits;
     bool m_IsBoxSelecting = false;
     glm::vec2 m_BoxSelectStart{};     // physical pixels, used for the selection math

@@ -83,6 +83,9 @@ json depletionJson = json::array();
         } else if (registry.any_of<PowerPoleComponent>(entity)) {
             entityJson["type"] = "PowerPole";
             entityJson["data"] = registry.get<PowerPoleComponent>(entity);
+        } else if (registry.any_of<CatalystComponent>(entity)) {
+            entityJson["type"] = "Catalyst";
+            entityJson["data"] = json::object();
         } else {
             continue; // terrain, trees, pickups — not saved yet
         }
@@ -199,7 +202,12 @@ bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, en
             registry.emplace<PowerPoleComponent>(entity, entityJson["data"].get<PowerPoleComponent>());
             auto mesh = ItemDatabase::GetWorldMesh(ItemId::PowerPole, engine, meshRenderer);
             if (mesh) registry.emplace<MeshComponent>(entity, mesh);
-        
+        } else if (type == "Catalyst") {
+            registry.emplace<CatalystComponent>(entity);
+            registry.emplace<VisionComponent>(entity, VisionComponent{ 80.0f });
+            registry.emplace<TeamComponent>(entity, TeamComponent{ static_cast<uint8_t>(entityJson.value("team", 0)) });
+            auto mesh = ItemDatabase::GetWorldMesh(ItemId::Catalyst, engine, meshRenderer);
+            if (mesh) registry.emplace<MeshComponent>(entity, mesh);
         } else {
             registry.destroy(entity); // unknown type — skip
             continue;
@@ -208,18 +216,21 @@ bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, en
           if (entityJson.contains("powerConsumer")) {
             registry.emplace<PowerConsumerComponent>(entity, entityJson["powerConsumer"].get<PowerConsumerComponent>());
         }
-
+          std::cout << "load type=" << type << " item=" << (int)ItemDatabase::FromString(type) << std::endl;
         const PlaceableDef *def = PlaceableDatabase::TryGet(ItemDatabase::FromString(type));
+       
+        std::cout << "  def=" << (def != nullptr) << std::endl;
         if (def) {
-            registry.emplace<BoundsComponent>(entity, BoundsComponent{ def->footprintHalfExtents });
-            registry.emplace<HealthComponent>(entity, HealthComponent{ def->maxHealth, entityJson.value("health", def->maxHealth) });
-            registry.emplace<ResistanceComponent>(entity, ResistancePresets::Building());
-            registry.emplace<TeamComponent>(entity, TeamComponent{ static_cast<uint8_t>(entityJson.value("team", 0)) });
+            registry.emplace_or_replace<BoundsComponent>(entity, BoundsComponent{ def->footprintHalfExtents });
+            registry.emplace_or_replace<HealthComponent>(entity, HealthComponent{ def->maxHealth, entityJson.value("health", def->maxHealth) });
+            registry.emplace_or_replace<ResistanceComponent>(entity,
+                                                             registry.all_of<CatalystComponent>(entity) ? ResistancePresets::Catalyst() : ResistancePresets::Building());
+            registry.emplace_or_replace<TeamComponent>(entity, TeamComponent{ static_cast<uint8_t>(entityJson.value("team", 0)) });
             auto coveredCells = PlacementGrid::GetCoveredCells(pos, def->footprintHalfExtents, settings.terrain.cellSize);
             placementGrid.RegisterArea(coveredCells, entity);
         }
     }
-
+    
 
 
 outPlayer = registry.create();

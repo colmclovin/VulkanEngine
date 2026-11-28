@@ -33,7 +33,15 @@ void DamageSystem::ProcessDeaths(entt::registry &registry, const glm::vec3 &worl
         if (registry.all_of<PlayerTag>(e)) { // use whatever marks your player; see note below
             auto &hp = registry.get<HealthComponent>(e);
             hp.current = hp.max;
-            registry.get<TransformComponent>(e).Position = worldSpawn; // step 3 replaces this with the Catalyst position
+            glm::vec3 spawn = worldSpawn;
+            auto cv = registry.view<CatalystComponent, TransformComponent, TeamComponent>();
+            for (auto c : cv) {
+                if (cv.get<TeamComponent>(c).team == 0) {
+                    spawn = cv.get<TransformComponent>(c).Position + glm::vec3(5.0f, 0.0f, 0.0f);
+                    break;
+                }
+            }
+            registry.get<TransformComponent>(e).Position = spawn;
             registry.remove<MoveOrderComponent>(e);
             continue;
         }

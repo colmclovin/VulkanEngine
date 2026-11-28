@@ -79,6 +79,10 @@ void RecipeDatabase::Init() {
                           { { ItemId::IronPlate, 5 }, { ItemId::CopperPlate, 2 } },
                           { { ItemId::Soldier, 1 } },
                           5.0f });
+    s_Recipes.push_back({ "Catalyst",
+                          { { ItemId::IronPlate, 1 }, { ItemId::CopperPlate, 11 } },
+                          { { ItemId::Catalyst, 1 } },
+                          5.0f });
 }
 
 const std::vector<Recipe>& RecipeDatabase::GetAll() {

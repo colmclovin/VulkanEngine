@@ -600,3 +600,18 @@ std::optional<uint32_t> ChunkManager::GetTreeSlotForChunk(ChunkCoord coord) cons
     if (it == m_LoadedChunks.end() || !it->second.isGenerated) return std::nullopt;
     return it->second.treeSlot;
 }
+
+// ChunkManager.cpp
+void ChunkManager::UnloadAll(entt::registry &registry, VulkanEngine *engine,
+                             TerrainRenderer *terrainRenderer, TreeRenderer *treeRenderer) {
+    std::vector<ChunkCoord> coords;
+    coords.reserve(m_LoadedChunks.size());
+    for (auto &[coord, chunk] : m_LoadedChunks)
+        coords.push_back(coord);
+
+    for (auto &coord : coords)
+        UnloadChunk(coord, registry, engine, terrainRenderer, treeRenderer);
+
+    m_LoadedChunks.clear();
+    m_PendingGpuGeneration.clear();
+}

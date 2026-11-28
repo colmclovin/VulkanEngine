@@ -45,7 +45,7 @@ void ItemDatabase::Init() {
     s_Items[ItemId::Oil] = { "Oil", 999, "Assets/Models/Oil.glb" };
     s_Items[ItemId::Plastic] = { "Plastic", 999, "Assets/Models/Plastic.glb" };
     s_Items[ItemId::Soldier] = { "Soldier", 999, "Assets/Models/Wood.glb" };
-
+    s_Items[ItemId::Catalyst] = { "Catalyst", 999, "Assets/Models/Catalyst.glb" };
 }
 
 
@@ -97,6 +97,7 @@ static const std::unordered_map<ItemId, std::string> s_IdToName = {
     { ItemId::TechPoint, "TechPoint" },
     { ItemId::PowerPole, "PowerPole" },
     { ItemId::CoalGenerator, "CoalGenerator" },
+    { ItemId::Catalyst, "Catalyst" },
 };
 
 std::string ItemDatabase::ToString(ItemId id) {

@@ -1,24 +1,24 @@
 {
     "depletionMap": [
         {
-            "remaining": 0.995629608631134,
-            "x": -486,
-            "z": -309
-        },
-        {
             "remaining": 0.9137465953826904,
             "x": 227,
             "z": 208
         },
         {
-            "remaining": 0.8820446133613586,
-            "x": -489,
+            "remaining": 0.995629608631134,
+            "x": -486,
             "z": -309
         },
         {
             "remaining": 0.9955459237098694,
             "x": -186,
             "z": 454
+        },
+        {
+            "remaining": 0.8820446133613586,
+            "x": -489,
+            "z": -309
         },
         {
             "remaining": 0.8713240027427673,
@@ -38,16 +38,12 @@
     ],
     "entities": [
         {
-            "data": {
-                "radius": 8.0
-            },
-            "health": 200.0,
-            "team": 0,
+            "data": {},
             "transform": {
                 "Position": [
-                    -478.0,
-                    3.051910400390625,
-                    -300.0
+                    -504.0,
+                    0.14316940307617188,
+                    -251.0
                 ],
                 "Rotation": [
                     0.0,
@@ -61,7 +57,46 @@
                     1.0
                 ]
             },
-            "type": "PowerPole"
+            "type": "Catalyst"
+        },
+        {
+            "data": {
+                "fuelBuffer": 0,
+                "fuelRemaining": 0.0,
+                "loadedFuelType": "None",
+                "powerOutput": 100.0
+            },
+            "health": 200.0,
+            "inventory": {
+                "inputs": [
+                    {
+                        "capacity": 100,
+                        "count": 0,
+                        "item": "None"
+                    }
+                ],
+                "outputs": []
+            },
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -481.0,
+                    3.2664833068847656,
+                    -298.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.7071067690849304,
+                    0.0,
+                    0.7071067690849304
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "CoalGenerator"
         },
         {
             "data": {
@@ -122,28 +157,15 @@
         },
         {
             "data": {
-                "fuelBuffer": 0,
-                "fuelRemaining": 0.0,
-                "loadedFuelType": "None",
-                "powerOutput": 100.0
+                "radius": 8.0
             },
             "health": 200.0,
-            "inventory": {
-                "inputs": [
-                    {
-                        "capacity": 100,
-                        "count": 0,
-                        "item": "None"
-                    }
-                ],
-                "outputs": []
-            },
             "team": 0,
             "transform": {
                 "Position": [
-                    -481.0,
-                    3.2664833068847656,
-                    -298.0
+                    -478.0,
+                    3.051910400390625,
+                    -300.0
                 ],
                 "Rotation": [
                     0.0,
@@ -157,7 +179,7 @@
                     1.0
                 ]
             },
-            "type": "CoalGenerator"
+            "type": "PowerPole"
         }
     ],
     "player": {
@@ -174,7 +196,7 @@
                     "item": "Wood"
                 },
                 {
-                    "count": 28,
+                    "count": 27,
                     "item": "IronPlate"
                 },
                 {
@@ -182,7 +204,7 @@
                     "item": "None"
                 },
                 {
-                    "count": 23,
+                    "count": 12,
                     "item": "CopperPlate"
                 },
                 {
@@ -249,9 +271,9 @@
         },
         "transform": {
             "Position": [
-                -493.2294921875,
-                0.7681246399879456,
-                -305.25311279296875
+                -499.0,
+                0.14316940307617188,
+                -251.0
             ],
             "Rotation": [
                 0.0,

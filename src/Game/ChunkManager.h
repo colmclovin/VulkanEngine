@@ -96,6 +96,8 @@ public:
         }
     }
     ChunkManager::GeneratedVertexData GenerateTerrainDataOnly(ChunkCoord coord, const TerrainSettings& settings); // pure CPU, no GPU/registry
+    void UnloadAll(entt::registry &registry, VulkanEngine *engine,
+                   TerrainRenderer *terrainRenderer, TreeRenderer *treeRenderer);
 
 private:
     size_t m_InitialLoadTarget = 0;

@@ -214,6 +214,8 @@
     <ClCompile Include="src\Game\ChunkManager.cpp" />
     <ClCompile Include="src\Game\CraftingSystem.cpp" />
     <ClCompile Include="src\Game\FogOfWar.cpp" />
+    <ClCompile Include="src\Game\NestManager.cpp" />
+    <ClCompile Include="src\Game\NestPlacement.cpp" />
     <ClCompile Include="src\Game\UnitDatabase.cpp" />
     <ClCompile Include="src\Rendering\FogTexture.cpp" />
     <ClCompile Include="src\Game\FuelDatabase.cpp" />
@@ -265,6 +267,7 @@
     <ClCompile Include="src\Systems\PlacementSystem.cpp" />
     <ClCompile Include="src\Systems\PlayerAnimationSystem.cpp" />
     <ClCompile Include="src\Systems\PowerSystem.cpp" />
+    <ClCompile Include="src\Systems\VictorySystem.cpp" />
     <ClCompile Include="src\Utils\GameSettings.cpp" />
     <ClCompile Include="src\Utils\GpuNoiseMatch.cpp" />
     <ClCompile Include="src\Utils\TextureLoader.cpp" />
@@ -323,6 +326,8 @@
     <ClInclude Include="src\Game\ChunkManager.h" />
     <ClInclude Include="src\Game\CraftingSystem.h" />
     <ClInclude Include="src\Game\FogOfWar.h" />
+    <ClInclude Include="src\Game\NestManager.h" />
+    <ClInclude Include="src\Game\NestPlacement.h" />
     <ClInclude Include="src\Game\ResistancePresets.h" />
     <ClInclude Include="src\Game\UnitDatabase.h" />
     <ClInclude Include="src\Rendering\FogTexture.h" />
@@ -388,6 +393,7 @@
     <ClInclude Include="src\Systems\PlacementSystem.h" />
     <ClInclude Include="src\Systems\PlayerAnimationSystem.h" />
     <ClInclude Include="src\Systems\PowerSystem.h" />
+    <ClInclude Include="src\Systems\VictorySystem.h" />
     <ClInclude Include="src\Utils\GameSettings.h" />
     <ClInclude Include="src\Utils\GpuNoiseMatch.h" />
     <ClInclude Include="src\Utils\TextureLoader.h" />
