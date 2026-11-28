@@ -112,12 +112,16 @@ void RenderSystem::Init(uint32_t terrainVertsPerChunk, uint32_t terrainIndicesPe
     std::cout << "RenderSystem initialized with all subsystems" << std::endl;
 }
 
-PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& camera, GameSettings& settings, AudioEngine& audioEngine,
-    entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId& selectedItem,
-    TechState& techState, bool isPaused, bool& showOptionsInPause, DayNightCycle& dayNightCycle, ChunkManager& chunkManager, DepletionMap& depletionMap, RemovedTreesMap& removedTreesMap) {
+PauseMenuAction RenderSystem::RenderFrame(const FrameContext &ctx, bool isPaused) {
+    entt::registry &registry = ctx.registry;
+    Camera3D &camera = ctx.camera;
+    GameSettings &settings = ctx.settings;
+    DayNightCycle &dayNightCycle = ctx.dayNight;
+    ChunkManager &chunkManager = ctx.chunks;
+    const entt::entity player = ctx.player;
     m_Engine->SetClearColor(settings.clearColor);
 
-    glm::vec3 focusPoint = registry.valid(m_PlayerEntity) ? registry.get<TransformComponent>(m_PlayerEntity).Position : glm::vec3(0.0f);
+    glm::vec3 focusPoint = registry.valid(player) ? registry.get<TransformComponent>(player).Position : glm::vec3(0.0f);
     float dynamicOrthoSize = glm::clamp(camera.GetIsoDistance() * 3.0f, 100.0f, 500.0f);
     glm::mat4 lightSpaceMatrix = dayNightCycle.GetLightSpaceMatrix(focusPoint, dynamicOrthoSize, 1.0f, 1000.0f);
 
@@ -143,9 +147,9 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
     }
 
     bool began = m_Engine->BeginFrame([&](VkCommandBuffer cmd) {
-       // std::cout << "about to call RecordPendingGeneration  rendersystem.cpp" << std::endl;
-        chunkManager.RecordPendingGeneration(cmd, m_ChunkGenerator.get(), m_TerrainRenderer.get(), m_TreeRenderer.get(), settings.terrain, depletionMap, removedTreesMap);   // ADD — generate new chunks first
-       // std::cout << "RecordPendingGeneration complete rendersystem.cpp" << std::endl;
+        // Generate newly requested chunks first
+        chunkManager.RecordPendingGeneration(cmd, m_ChunkGenerator.get(), m_TerrainRenderer.get(), m_TreeRenderer.get(),
+                                             settings.terrain, ctx.world.depletionMap, ctx.world.removedTrees);
         if (m_PreRenderCallback) m_PreRenderCallback(cmd);
         m_ShadowMapRenderer->BeginShadowPass(*m_ShadowMap);
         m_ShadowMapRenderer->RenderStatic(registry, lightSpaceMatrix);
@@ -162,7 +166,7 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
     }
 
     m_ImGuiVulkanUtil->NewFrame();
-    m_DebugUI->Draw(registry, this, &camera, settings, &audioEngine, m_PlayerEntity, m_InspectedEntity, selectedItem, techState);
+    m_DebugUI->Draw(registry, this, &camera, settings, &ctx.audio, ctx.player, ctx.inspected, ctx.selectedItem, ctx.world.techState);
     if (m_SelActive) {
         ImVec2 a(m_SelA.x, m_SelA.y), b(m_SelB.x, m_SelB.y);
         auto* dl = ImGui::GetForegroundDrawList();
@@ -185,7 +189,7 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
 
     PauseMenuAction pauseAction = PauseMenuAction::None;
     if (isPaused) {
-        pauseAction = m_DebugUI->DrawPauseMenu(settings, showOptionsInPause);
+        pauseAction = m_DebugUI->DrawPauseMenu(settings, ctx.showOptionsInPause);
     }
 
     m_DebugLineRenderer->BeginFrame();
@@ -226,15 +230,15 @@ PauseMenuAction RenderSystem::RenderFrame(entt::registry& registry, Camera3D& ca
         }
 
         // MOVED HERE — correct block
-        if (registry.valid(m_PlayerEntity)) {
-            auto& playerTransform = registry.get<TransformComponent>(m_PlayerEntity);
+        if (registry.valid(player)) {
+            auto& playerTransform = registry.get<TransformComponent>(player);
             ChunkCoord playerChunk = ChunkManager::WorldToChunkCoord(playerTransform.Position);
             auto treeSlotOpt = chunkManager.GetTreeSlotForChunk(playerChunk);
 
             if (treeSlotOpt.has_value()) {
                 auto treeInstances = m_TreeRenderer->ReadBackChunkInstances(*treeSlotOpt);
                 for (auto& instance : treeInstances) {
-                    if (removedTreesMap.IsRemoved(playerChunk, instance.gridIndex)) continue;
+                    if (ctx.world.removedTrees.IsRemoved(playerChunk, instance.gridIndex)) continue;
                     glm::vec3 boxMin = instance.position + glm::vec3(-0.6f, 0.0f, -0.6f);
                     glm::vec3 boxMax = instance.position + glm::vec3(0.6f, 3.0f, 0.6f);
                     m_DebugLineRenderer->AddBox(boxMin, boxMax, glm::vec3(1.0f, 0.0f, 1.0f));

@@ -1,15 +1,16 @@
 #pragma once
-#include "../World/PlacementGrid.h"
-#include "../World/ResourceMap.h"
-#include "../Game/TechState.h"
 #include <entt/entt.hpp>
+#include <glm/glm.hpp>
+#include <memory>
 #include <string>
-#include "../Engine/VulkanEngine.h"
-#include "../Renderer/MeshRenderer.h"
-#include "../World/RemovedTreesMap.h"
-#include "../World/DepletionMap.h"
+#include <vector>
+#include "../Game/ItemDatabase.h"
+#include "../Game/WorldState.h"
+
 struct GameSettings;
 class SkinnedMesh;
+class VulkanEngine;
+class MeshRenderer;
 
 struct SavedUnit {
     ItemId item;
@@ -20,15 +21,12 @@ struct SavedUnit {
 
 class SaveManager {
 public:
-    static void SaveGame(const std::string &path, entt::registry &registry, entt::entity player,
-                         ResourceMap &resourceMap, TechState &techState, const GameSettings &settings, VulkanEngine *engine, MeshRenderer *meshRenderer, DepletionMap &depletionMap, RemovedTreesMap &removedTreesMap);
-    static bool LoadGame(const std::string &path, entt::registry &registry, entt::entity &outPlayer,
-                         ResourceMap &resourceMap, PlacementGrid &placementGrid, TechState &techState,
-                         GameSettings &settings, VulkanEngine *engine, MeshRenderer *meshRenderer,
-                         DepletionMap &depletionMap, RemovedTreesMap &removedTreesMap,
-                         std::shared_ptr<SkinnedMesh> unitMesh = nullptr, // optional
-                         std::vector<SavedUnit> *outUnits = nullptr);
+    static void SaveGame(const std::string &path, entt::registry &registry, entt::entity player, const WorldState &world,
+                         const GameSettings &settings);
 
-private:
-    std::vector<SavedUnit> *outUnits = nullptr;
+    // Expects an empty registry and a fresh WorldState. Units aren't created here; they're returned in outUnits
+    // so the caller can spawn them.
+    static bool LoadGame(const std::string &path, entt::registry &registry, entt::entity &outPlayer, WorldState &world,
+                         GameSettings &settings, VulkanEngine *engine, MeshRenderer *meshRenderer,
+                         std::shared_ptr<SkinnedMesh> unitMesh, std::vector<SavedUnit> &outUnits);
 };

@@ -2,21 +2,18 @@
 #include "../Components/Components.h"
 #include "../Utils/GameSettings.h"
 #include "../Components/InventoryComponent.h"
-#include "../World/ResourceMap.h"
-#include "../World/PlacementGrid.h"
 #include <fstream>
 #include <iostream>
 #include <JSON/json.hpp>
 #include "../Game/PlaceableDatabase.h"
-#include "../Rendering/ModelLoader.h"
-#include "../Rendering/Mesh.h"
-#include "../World/TerrainGenerator.h"
+#include "../Game/EntityFactory.h"
 #include "../Game/ResistancePresets.h"
 
 using json = nlohmann::json;
 
-void SaveManager::SaveGame(const std::string &path, entt::registry &registry, entt::entity player,
-                           ResourceMap &resourceMap, TechState &techState, const GameSettings &settings, VulkanEngine *engine, MeshRenderer *meshRenderer, DepletionMap &depletionMap, RemovedTreesMap &removedTreesMap) {
+void SaveManager::SaveGame(const std::string &path, entt::registry &registry, entt::entity player, const WorldState &world,
+                           const GameSettings &settings) {
+    const TechState &techState = world.techState;
     json j;
     j["seed"] = settings.terrain.seed;
 
@@ -27,23 +24,20 @@ void SaveManager::SaveGame(const std::string &path, entt::registry &registry, en
     j["techState"]["techPoints"] = techState.techPoints;
     j["techState"]["unlocked"] = techState.GetUnlockedList();
 
-json depletionJson = json::array();
-    for (auto &[coord, remainingFraction] : depletionMap.GetAll()) {
+    json depletionJson = json::array();
+    for (auto &[coord, remainingFraction] : world.depletionMap.GetAll()) {
         depletionJson.push_back({ { "x", coord.x }, { "z", coord.z }, { "remaining", remainingFraction } });
     }
     j["depletionMap"] = depletionJson;
 
-
-
     json removedTreesJson = json::array();
-    for (auto &[coord, indices] : removedTreesMap.GetAll()) {
+    for (auto &[coord, indices] : world.removedTrees.GetAll()) {
         json indicesJson = json::array();
         for (int idx : indices)
             indicesJson.push_back(idx);
         removedTreesJson.push_back({ { "chunkX", coord.x }, { "chunkZ", coord.z }, { "indices", indicesJson } });
     }
     j["removedTreesMap"] = removedTreesJson;
-
 
     json entitiesJson = json::array();
     auto view = registry.view<TransformComponent>();
@@ -61,7 +55,7 @@ json depletionJson = json::array();
             entityJson["data"] = registry.get<FurnaceComponent>(entity);
             if (registry.any_of<MachineInventoryComponent>(entity))
                 entityJson["inventory"] = registry.get<MachineInventoryComponent>(entity);
-            if (registry.any_of<PointLightComponent>(entity)) // NEW
+            if (registry.any_of<PointLightComponent>(entity))
                 entityJson["pointLight"] = registry.get<PointLightComponent>(entity);
         } else if (registry.any_of<AssemblerComponent>(entity)) {
             entityJson["type"] = "Assembler";
@@ -79,7 +73,6 @@ json depletionJson = json::array();
             entityJson["data"] = registry.get<PowerGeneratorComponent>(entity);
             if (registry.any_of<MachineInventoryComponent>(entity))
                 entityJson["inventory"] = registry.get<MachineInventoryComponent>(entity);
-        
         } else if (registry.any_of<PowerPoleComponent>(entity)) {
             entityJson["type"] = "PowerPole";
             entityJson["data"] = registry.get<PowerPoleComponent>(entity);
@@ -99,6 +92,7 @@ json depletionJson = json::array();
         entitiesJson.push_back(entityJson);
     }
     j["entities"] = entitiesJson;
+
     json unitsJson = json::array();
     auto uv = registry.view<UnitTypeComponent, TransformComponent, HealthComponent, TeamComponent>();
     for (auto e : uv) {
@@ -110,8 +104,6 @@ json depletionJson = json::array();
     }
     j["units"] = unitsJson;
 
-
-
     std::ofstream file(path);
     if (!file.is_open()) {
         std::cerr << "Failed to open save file for writing: " << path << std::endl;
@@ -121,12 +113,9 @@ json depletionJson = json::array();
     std::cout << "Game saved to " << path << std::endl;
 }
 
-bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, entt::entity &outPlayer,
-                           ResourceMap &resourceMap, PlacementGrid &placementGrid, TechState &techState,
+bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, entt::entity &outPlayer, WorldState &world,
                            GameSettings &settings, VulkanEngine *engine, MeshRenderer *meshRenderer,
-                           DepletionMap &depletionMap, RemovedTreesMap &removedTreesMap,
-                           std::shared_ptr<SkinnedMesh> unitMesh,
-                           std::vector<SavedUnit> *outUnits){
+                           std::shared_ptr<SkinnedMesh> unitMesh, std::vector<SavedUnit> &outUnits) {
     std::ifstream file(path);
     if (!file.is_open()) {
         std::cerr << "Save file not found: " << path << std::endl;
@@ -138,25 +127,21 @@ bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, en
 
     settings.terrain.seed = j["seed"];
 
-    techState.techPoints = j["techState"]["techPoints"];
+    world.techState.techPoints = j["techState"]["techPoints"];
     for (auto &techJson : j["techState"]["unlocked"]) {
-        techState.ForceUnlock(techJson.get<TechId>());
+        world.techState.ForceUnlock(techJson.get<TechId>());
     }
 
-       for (auto &entry : j["depletionMap"]) {
-        int x = entry["x"];
-        int z = entry["z"];
-        float remaining = entry["remaining"];
-        depletionMap.SetRemainingFraction(x, z, remaining); // small helper, see note below
+    for (auto &entry : j["depletionMap"]) {
+        world.depletionMap.SetRemainingFraction(entry["x"].get<int>(), entry["z"].get<int>(), entry["remaining"].get<float>());
     }
 
     for (auto &entry : j["removedTreesMap"]) {
         ChunkCoord coord{ entry["chunkX"], entry["chunkZ"] };
         for (auto &idx : entry["indices"]) {
-            removedTreesMap.MarkRemoved(coord, idx.get<int>());
+            world.removedTrees.MarkRemoved(coord, idx.get<int>());
         }
     }
-
 
     for (auto &entityJson : j["entities"]) {
         std::string type = entityJson["type"];
@@ -174,7 +159,7 @@ bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, en
             registry.emplace<FurnaceComponent>(entity, entityJson["data"].get<FurnaceComponent>());
             if (entityJson.contains("inventory"))
                 registry.emplace<MachineInventoryComponent>(entity, entityJson["inventory"].get<MachineInventoryComponent>());
-            if (entityJson.contains("pointLight")) // NEW
+            if (entityJson.contains("pointLight"))
                 registry.emplace<PointLightComponent>(entity, entityJson["pointLight"].get<PointLightComponent>());
             auto mesh = ItemDatabase::GetWorldMesh(ItemId::Furnace, engine, meshRenderer);
             if (mesh) registry.emplace<MeshComponent>(entity, mesh);
@@ -213,13 +198,12 @@ bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, en
             continue;
         }
 
-          if (entityJson.contains("powerConsumer")) {
+        if (entityJson.contains("powerConsumer")) {
             registry.emplace<PowerConsumerComponent>(entity, entityJson["powerConsumer"].get<PowerConsumerComponent>());
         }
-          std::cout << "load type=" << type << " item=" << (int)ItemDatabase::FromString(type) << std::endl;
+
+        // Bounds, health, resistance and grid occupancy come from the placeable definition
         const PlaceableDef *def = PlaceableDatabase::TryGet(ItemDatabase::FromString(type));
-       
-        std::cout << "  def=" << (def != nullptr) << std::endl;
         if (def) {
             registry.emplace_or_replace<BoundsComponent>(entity, BoundsComponent{ def->footprintHalfExtents });
             registry.emplace_or_replace<HealthComponent>(entity, HealthComponent{ def->maxHealth, entityJson.value("health", def->maxHealth) });
@@ -227,40 +211,22 @@ bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, en
                                                              registry.all_of<CatalystComponent>(entity) ? ResistancePresets::Catalyst() : ResistancePresets::Building());
             registry.emplace_or_replace<TeamComponent>(entity, TeamComponent{ static_cast<uint8_t>(entityJson.value("team", 0)) });
             auto coveredCells = PlacementGrid::GetCoveredCells(pos, def->footprintHalfExtents, settings.terrain.cellSize);
-            placementGrid.RegisterArea(coveredCells, entity);
+            world.placementGrid.RegisterArea(coveredCells, entity);
         }
     }
-    
 
 
-outPlayer = registry.create();
-    registry.emplace<TransformComponent>(outPlayer, j["player"]["transform"].get<TransformComponent>());
-    registry.emplace<PlayerComponent>(outPlayer);
-    registry.emplace<InventoryComponent>(outPlayer, j["player"]["inventory"].get<InventoryComponent>());
 
-    auto playerMesh = unitMesh ? unitMesh : std::make_shared<SkinnedMesh>(ModelLoader::LoadSkinnedModel("Assets/Models/Test1.glb", engine, meshRenderer));
-    registry.emplace<SkinnedMeshComponent>(outPlayer, playerMesh); // CHANGED — was MeshComponent/Mesh
-    registry.emplace<AnimationComponent>(outPlayer);
-    registry.emplace<NameTag>(outPlayer, "Player");
-    registry.emplace<SelectableComponent>(outPlayer);
-    registry.emplace<BoundsComponent>(outPlayer, BoundsComponent{ glm::vec3(0.5f, 1.0f, 0.5f) });
-    registry.emplace<VisionComponent>(outPlayer, 256.0f);
-    registry.emplace<TeamComponent>(outPlayer, 0);
-    CombatStatsComponent ps;
-    ps.fireWhileMoving = false;
-    registry.emplace<CombatStatsComponent>(outPlayer, ps);
-    registry.emplace<StanceComponent>(outPlayer);
-    registry.emplace<PlayerTag>(outPlayer);
-    registry.emplace<ResistanceComponent>(outPlayer, ResistancePresets::Player());
-    float savedHp = j["player"].value("health", 100.0f);
-    registry.emplace<HealthComponent>(outPlayer, HealthComponent{ savedHp, 100.0f });
+    outPlayer = EntityFactory::CreatePlayer(registry, j["player"]["transform"].get<TransformComponent>(), unitMesh);
+    registry.replace<InventoryComponent>(outPlayer, j["player"]["inventory"].get<InventoryComponent>());
+    registry.get<HealthComponent>(outPlayer).current = j["player"].value("health", 100.0f);
 
-        if (outUnits && j.contains("units")) {
+    if (j.contains("units")) {
         for (auto &u : j["units"]) {
-            outUnits->push_back({ static_cast<ItemId>(u["item"].get<int>()),
-                                  glm::vec3(u["pos"][0].get<float>(), u["pos"][1].get<float>(), u["pos"][2].get<float>()),
-                                  u["health"].get<float>(),
-                                  static_cast<uint8_t>(u["team"].get<int>()) });
+            outUnits.push_back({ static_cast<ItemId>(u["item"].get<int>()),
+                                 glm::vec3(u["pos"][0].get<float>(), u["pos"][1].get<float>(), u["pos"][2].get<float>()),
+                                 u["health"].get<float>(),
+                                 static_cast<uint8_t>(u["team"].get<int>()) });
         }
     }
     std::cout << "Game loaded from " << path << std::endl;

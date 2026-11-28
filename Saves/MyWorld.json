@@ -1,13 +1,18 @@
 {
     "depletionMap": [
         {
+            "remaining": 0.995629608631134,
+            "x": -486,
+            "z": -309
+        },
+        {
             "remaining": 0.9137465953826904,
             "x": 227,
             "z": 208
         },
         {
-            "remaining": 0.995629608631134,
-            "x": -486,
+            "remaining": 0.8820446133613586,
+            "x": -489,
             "z": -309
         },
         {
@@ -16,9 +21,9 @@
             "z": 454
         },
         {
-            "remaining": 0.8820446133613586,
-            "x": -489,
-            "z": -309
+            "remaining": 0.9067966938018799,
+            "x": -208,
+            "z": 462
         },
         {
             "remaining": 0.8713240027427673,
@@ -34,16 +39,323 @@
             "remaining": 0.9956299066543579,
             "x": -487,
             "z": -309
+        },
+        {
+            "remaining": 0.5803156495094299,
+            "x": -494,
+            "z": -294
+        },
+        {
+            "remaining": 0.9825398325920105,
+            "x": -499,
+            "z": -299
         }
     ],
     "entities": [
         {
-            "data": {},
+            "data": {
+                "direction": [
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "leftLane": {
+                    "capacity": 2,
+                    "queue": []
+                },
+                "rightLane": {
+                    "capacity": 2,
+                    "queue": []
+                },
+                "speed": 1.0
+            },
+            "health": 200.0,
+            "team": 0,
             "transform": {
                 "Position": [
-                    -504.0,
-                    0.14316940307617188,
-                    -251.0
+                    -494.0,
+                    2.74029541015625,
+                    -305.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "Belt"
+        },
+        {
+            "data": {
+                "facing": [
+                    0.0,
+                    0.0,
+                    -1.0
+                ],
+                "heldItem": "None",
+                "holdingItem": false,
+                "powerUsage": 1.0,
+                "runningOnPower": false,
+                "swingTime": 0.5,
+                "timer": 0.0
+            },
+            "health": 200.0,
+            "powerConsumer": {
+                "isPowered": false,
+                "powerRequired": 5.0,
+                "wantsPower": false
+            },
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -494.0,
+                    2.423236846923828,
+                    -303.0
+                ],
+                "Rotation": [
+                    0.0,
+                    1.0,
+                    0.0,
+                    -4.371138828673793e-08
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "Inserter"
+        },
+        {
+            "data": {
+                "radius": 8.0
+            },
+            "health": 200.0,
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -478.0,
+                    4.062843322753906,
+                    -296.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "PowerPole"
+        },
+        {
+            "data": {
+                "radius": 8.0
+            },
+            "health": 200.0,
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -481.0,
+                    4.747173309326172,
+                    -295.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "PowerPole"
+        },
+        {
+            "data": {
+                "radius": 8.0
+            },
+            "health": 200.0,
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -489.0,
+                    3.044902801513672,
+                    -296.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "PowerPole"
+        },
+        {
+            "data": {
+                "radius": 8.0
+            },
+            "health": 200.0,
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -486.0,
+                    4.382575988769531,
+                    -297.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "PowerPole"
+        },
+        {
+            "data": {
+                "radius": 8.0
+            },
+            "health": 200.0,
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -492.0,
+                    4.044563293457031,
+                    -297.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "PowerPole"
+        },
+        {
+            "data": {
+                "collectionRadius": 3.0,
+                "extractionRate": 1.0,
+                "fuelBuffer": 0,
+                "fuelRemaining": 0.0,
+                "loadedFuelType": "None",
+                "outputBuffer": 0,
+                "outputBufferCapacity": 50,
+                "outputInterval": 1.0,
+                "outputItem": "IronOre",
+                "outputTimer": 0.0270538330078125,
+                "powerUsage": 5.0,
+                "runningOnPower": false
+            },
+            "health": 200.0,
+            "powerConsumer": {
+                "isPowered": false,
+                "powerRequired": 5.0,
+                "wantsPower": true
+            },
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -494.0,
+                    3.2812442779541016,
+                    -294.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "Miner"
+        },
+        {
+            "data": {
+                "facing": [
+                    -0.0,
+                    0.0,
+                    -1.0
+                ],
+                "heldItem": "IronOre",
+                "holdingItem": true,
+                "powerUsage": 1.0,
+                "runningOnPower": false,
+                "swingTime": 0.5,
+                "timer": 0.4752197265625
+            },
+            "health": 200.0,
+            "powerConsumer": {
+                "isPowered": false,
+                "powerRequired": 5.0,
+                "wantsPower": true
+            },
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -495.0,
+                    3.0768260955810547,
+                    -297.0
+                ],
+                "Rotation": [
+                    -0.0,
+                    -1.0,
+                    -0.0,
+                    -4.371138828673793e-08
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "Inserter"
+        },
+        {
+            "data": {
+                "radius": 8.0
+            },
+            "health": 200.0,
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -478.0,
+                    3.051910400390625,
+                    -300.0
                 ],
                 "Rotation": [
                     0.0,
@@ -57,12 +369,69 @@
                     1.0
                 ]
             },
-            "type": "Catalyst"
+            "type": "PowerPole"
+        },
+        {
+            "data": {
+                "craftTimer": -0.005168914794921875,
+                "deployUnits": true,
+                "isCrafting": false,
+                "powerUsage": 5.0,
+                "runningOnPower": false,
+                "selectedRecipeIndex": 14
+            },
+            "health": 200.0,
+            "inventory": {
+                "inputs": [
+                    {
+                        "capacity": 100,
+                        "count": 1,
+                        "item": "CopperPlate"
+                    },
+                    {
+                        "capacity": 100,
+                        "count": 0,
+                        "item": "None"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "capacity": 100,
+                        "count": 0,
+                        "item": "None"
+                    }
+                ]
+            },
+            "powerConsumer": {
+                "isPowered": false,
+                "powerRequired": 5.0,
+                "wantsPower": true
+            },
+            "team": 0,
+            "transform": {
+                "Position": [
+                    -482.0,
+                    3.4941329956054688,
+                    -302.0
+                ],
+                "Rotation": [
+                    0.0,
+                    0.7071067690849304,
+                    0.0,
+                    0.7071067690849304
+                ],
+                "Scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "type": "Assembler"
         },
         {
             "data": {
                 "fuelBuffer": 0,
-                "fuelRemaining": 0.0,
+                "fuelRemaining": -0.0041046142578125,
                 "loadedFuelType": "None",
                 "powerOutput": 100.0
             },
@@ -99,47 +468,14 @@
             "type": "CoalGenerator"
         },
         {
-            "data": {
-                "craftTimer": 0.0,
-                "deployUnits": true,
-                "isCrafting": false,
-                "powerUsage": 5.0,
-                "runningOnPower": false,
-                "selectedRecipeIndex": -1
-            },
-            "health": 200.0,
-            "inventory": {
-                "inputs": [
-                    {
-                        "capacity": 100,
-                        "count": 0,
-                        "item": "None"
-                    },
-                    {
-                        "capacity": 100,
-                        "count": 0,
-                        "item": "None"
-                    }
-                ],
-                "outputs": [
-                    {
-                        "capacity": 100,
-                        "count": 0,
-                        "item": "None"
-                    }
-                ]
-            },
-            "powerConsumer": {
-                "isPowered": false,
-                "powerRequired": 5.0,
-                "wantsPower": false
-            },
+            "data": {},
+            "health": 1000.0,
             "team": 0,
             "transform": {
                 "Position": [
-                    -482.0,
-                    3.4941329956054688,
-                    -302.0
+                    -504.0,
+                    0.14316940307617188,
+                    -251.0
                 ],
                 "Rotation": [
                     0.0,
@@ -153,18 +489,56 @@
                     1.0
                 ]
             },
-            "type": "Assembler"
+            "type": "Catalyst"
         },
         {
             "data": {
-                "radius": 8.0
+                "cookTimer": 0.4143524169921875,
+                "currentOutput": "IronPlate",
+                "fuelBuffer": 0,
+                "fuelRemaining": 0.0,
+                "isCooking": true,
+                "loadedFuelType": "None",
+                "powerUsage": 5.0,
+                "runningOnPower": true
             },
             "health": 200.0,
+            "inventory": {
+                "inputs": [
+                    {
+                        "capacity": 100,
+                        "count": 12,
+                        "item": "IronOre"
+                    }
+                ],
+                "outputs": [
+                    {
+                        "capacity": 100,
+                        "count": 82,
+                        "item": "IronPlate"
+                    }
+                ]
+            },
+            "pointLight": {
+                "active": true,
+                "color": [
+                    1.0,
+                    0.5,
+                    0.0
+                ],
+                "intensity": 5.0,
+                "range": 8.0
+            },
+            "powerConsumer": {
+                "isPowered": false,
+                "powerRequired": 5.0,
+                "wantsPower": true
+            },
             "team": 0,
             "transform": {
                 "Position": [
-                    -478.0,
-                    3.051910400390625,
+                    -494.0,
+                    3.3698501586914063,
                     -300.0
                 ],
                 "Rotation": [
@@ -179,7 +553,7 @@
                     1.0
                 ]
             },
-            "type": "PowerPole"
+            "type": "Furnace"
         }
     ],
     "player": {
@@ -188,15 +562,15 @@
             "capacity": 20,
             "slots": [
                 {
-                    "count": 14,
-                    "item": "Coal"
+                    "count": 4,
+                    "item": "IronOre"
                 },
                 {
-                    "count": 11,
+                    "count": 10,
                     "item": "Wood"
                 },
                 {
-                    "count": 27,
+                    "count": 17,
                     "item": "IronPlate"
                 },
                 {
@@ -204,8 +578,8 @@
                     "item": "None"
                 },
                 {
-                    "count": 12,
-                    "item": "CopperPlate"
+                    "count": 0,
+                    "item": "None"
                 },
                 {
                     "count": 0,
@@ -271,9 +645,9 @@
         },
         "transform": {
             "Position": [
-                -499.0,
-                0.14316940307617188,
-                -251.0
+                -491.8223571777344,
+                0.2005363255739212,
+                -289.5290222167969
             ],
             "Rotation": [
                 0.0,
@@ -290,10 +664,31 @@
     },
     "removedTreesMap": [
         {
+            "chunkX": -17,
+            "chunkZ": -9,
+            "indices": [
+                9
+            ]
+        },
+        {
             "chunkX": 8,
             "chunkZ": 8,
             "indices": [
                 8
+            ]
+        },
+        {
+            "chunkX": -14,
+            "chunkZ": -11,
+            "indices": [
+                4
+            ]
+        },
+        {
+            "chunkX": -15,
+            "chunkZ": -8,
+            "indices": [
+                5
             ]
         },
         {
@@ -309,5 +704,16 @@
         "techPoints": 0,
         "unlocked": []
     },
-    "units": []
+    "units": [
+        {
+            "health": 100.0,
+            "item": 37,
+            "pos": [
+                -496.34893798828125,
+                1.770913004875183,
+                -303.9722595214844
+            ],
+            "team": 0
+        }
+    ]
 }

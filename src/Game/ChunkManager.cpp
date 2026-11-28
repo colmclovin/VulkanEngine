@@ -18,13 +18,11 @@ ChunkCoord ChunkManager::WorldToChunkCoord(glm::vec3 worldPos) {
     };
 }
 
-// ChunkManager.cpp
 void ChunkManager::Update(entt::registry& registry, glm::vec3 playerPosition, const TerrainSettings& settings,
     VulkanEngine* engine, MeshRenderer* meshRenderer, int seed, DepletionMap& depletionMap,
                           PlacementGrid &placementGrid, TerrainRenderer *terrainRenderer, RemovedTreesMap &removedTreesMap, glm::vec3 cameraForward, float isoDistance, TreeRenderer *treeRenderer) {
     ChunkCoord playerChunk = WorldToChunkCoord(playerPosition);
     glm::vec2 forward2D = glm::normalize(glm::vec2(cameraForward.x, cameraForward.z));
-   // std::cout << "ChunkManager::Update starting, treeRenderer=" << (treeRenderer ? "valid" : "NULL") << std::endl;
     // Normalize isoDistance against a baseline "typical" zoom, so zoomFactor is ~1.0 at normal play distance
     // and grows toward ~1.5-2.0 at max zoom-out. Tune baselineDistance/maxZoomFactor to your camera's real range.
     const float baselineDistance = 20.0f; // adjust to whatever your "normal" isoDistance typically is
@@ -62,7 +60,7 @@ void ChunkManager::Update(entt::registry& registry, glm::vec3 playerPosition, co
         auto terrainSlot = terrainRenderer->AllocateChunkSlot();
         if (!terrainSlot) continue;
 
-        auto treeSlot = treeRenderer->AllocateChunkSlot();   // NEW — TreeInstanceBufferPool needs the same AllocateSlot/FreeSlot pattern as TerrainBufferPool
+        auto treeSlot = treeRenderer->AllocateChunkSlot();   // TreeInstanceBufferPool needs the same AllocateSlot/FreeSlot pattern as TerrainBufferPool
         if (!treeSlot) {
             terrainRenderer->FreeChunkSlot(*terrainSlot);   // roll back the terrain slot if tree allocation fails, keep them paired
             continue;
@@ -76,31 +74,10 @@ void ChunkManager::Update(entt::registry& registry, glm::vec3 playerPosition, co
         m_LoadedChunks[coord] = chunk;
         m_PendingGpuGeneration.push_back({ coord });
     }
-    //std::cout << "Update: loaded=" << m_LoadedChunks.size() << " pending=" << m_PendingGpuGeneration.size() << std::endl;
-    //std::cout << "Slot allocation loop complete, m_PendingGpuGeneration=" << m_PendingGpuGeneration.size() << std::endl;
-    /*
-    // --- Trees: unchanged, still async CPU worker thread ---
-    for (auto& coord : desiredChunks) {
-        auto it = m_LoadedChunks.find(coord);
-        if (it == m_LoadedChunks.end()) continue;   // terrain slot allocation failed this frame, skip trees too until it succeeds
-        if (it->second.treesRequested) continue;    // NEW flag — see Chunk.h note below
-
-        std::lock_guard<std::mutex> lock(m_RequestMutex);
-        if (m_InFlightRequests.find(coord) != m_InFlightRequests.end()) continue;
-        if (m_AwaitingProcessing.find(coord) != m_AwaitingProcessing.end()) continue;
-
-        m_InFlightRequests.insert(coord);
-        m_PendingRequests.push(coord);
-        m_RequestCV.notify_one();
-        it->second.treesRequested = true;
-    }
-    */
     // Drain completed TREE generation results (terrain no longer comes through this path)
     ProcessCompletedChunks(registry, engine, meshRenderer, placementGrid, removedTreesMap);
     // --- Unload chunks no longer desired ---
     std::vector<ChunkCoord> toUnload;
-    //std::cout << "Update: m_LoadedChunks=" << m_LoadedChunks.size() << " desiredChunks=" << desiredChunks.size()
-     //   << " toUnload=" << toUnload.size() << std::endl;
     for (auto& [coord, chunk] : m_LoadedChunks) {
         bool stillDesired = false;
         for (auto& d : desiredChunks) {
@@ -113,26 +90,8 @@ void ChunkManager::Update(entt::registry& registry, glm::vec3 playerPosition, co
     }
 }
 
-//void ChunkManager::GenerateChunk(ChunkCoord coord, entt::registry &registry, const TerrainSettings &settings,
-//                                 VulkanEngine *engine, MeshRenderer *meshRenderer, int seed, DepletionMap &depletionMap, PlacementGrid &placementGrid) {
-//    Chunk chunk;
-//    chunk.coord = coord;
-//
-//    RegenerateChunkMesh(chunk, settings, depletionMap);
-//
-//    chunk.terrainEntity = registry.create();
-//    registry.emplace<TransformComponent>(chunk.terrainEntity);
-//    registry.emplace<MeshComponent>(chunk.terrainEntity, chunk.terrainMesh);
-//    registry.emplace<NameTag>(chunk.terrainEntity, "Chunk_" + std::to_string(coord.x) + "_" + std::to_string(coord.z));
-//
-//    WorldGenerator::ScatterTreesInChunk(registry, coord, CHUNK_WORLD_SIZE, settings, engine, meshRenderer, chunk.treeEntities, placementGrid);
-//
-//    chunk.isGenerated = true;
-//    m_LoadedChunks[coord] = chunk;
-//}
-
 void ChunkManager::UnloadChunk(ChunkCoord coord, entt::registry& registry, VulkanEngine* engine,
-    TerrainRenderer* terrainRenderer, TreeRenderer* treeRenderer) {   // ADD treeRenderer param
+    TerrainRenderer* terrainRenderer, TreeRenderer* treeRenderer) {
     auto it = m_LoadedChunks.find(coord);
     if (it == m_LoadedChunks.end()) return;
 
@@ -142,7 +101,7 @@ void ChunkManager::UnloadChunk(ChunkCoord coord, entt::registry& registry, Vulka
         terrainRenderer->FreeChunkSlot(chunk.terrainSlot);
     }
     if (chunk.treeSlot != UINT32_MAX) {
-        treeRenderer->FreeChunkSlot(chunk.treeSlot);   // NEW
+        treeRenderer->FreeChunkSlot(chunk.treeSlot);
     }
 
     // No more tree entity destruction — trees aren't entities anymore
@@ -150,17 +109,16 @@ void ChunkManager::UnloadChunk(ChunkCoord coord, entt::registry& registry, Vulka
 }
 void ChunkManager::OnResourceDepleted(entt::registry& registry, glm::vec3 worldPos, const TerrainSettings& settings,
     VulkanEngine* engine, MeshRenderer* meshRenderer, DepletionMap& depletionMap,
-    TerrainRenderer* terrainRenderer) {   // ADD
+    TerrainRenderer* terrainRenderer) {
     ChunkCoord coord = WorldToChunkCoord(worldPos);
     auto it = m_LoadedChunks.find(coord);
     if (it == m_LoadedChunks.end()) return;
 
     Chunk& chunk = it->second;
-    RegenerateChunkMesh(chunk, settings, depletionMap, terrainRenderer);   // ADD terrainRenderer
+    RegenerateChunkMesh(chunk, settings, depletionMap, terrainRenderer);
     // no more registry.replace<MeshComponent>(...) — terrain has no entity anymore
 }
 
-// ChunkManager.cpp
 void ChunkManager::RegenerateChunkMesh(Chunk& chunk, const TerrainSettings& settings, const DepletionMap& depletionMap, TerrainRenderer* terrainRenderer) {
     float chunkOriginX = chunk.coord.x * CHUNK_WORLD_SIZE;
     float chunkOriginZ = chunk.coord.z * CHUNK_WORLD_SIZE;
@@ -280,7 +238,7 @@ void ChunkManager::WorkerLoop(TerrainSettings settings, int seed) {
         {
             std::lock_guard<std::mutex> lock(m_RequestMutex);
             m_InFlightRequests.erase(coord);
-            m_AwaitingProcessing.insert(coord); // NEW — closes the gap between "done generating" and "actually in m_LoadedChunks"
+            m_AwaitingProcessing.insert(coord); // closes the gap between "done generating" and "actually in m_LoadedChunks"
         }
     }
 }
@@ -307,38 +265,6 @@ void ChunkManager::ProcessCompletedChunks(entt::registry& registry, VulkanEngine
             continue;
         }
         Chunk& chunk = it->second;
-        /*
-        auto treeMesh = WorldGenerator::GetTreeMeshCache(engine, meshRenderer);
-        int index = 0;
-        for (auto& candidate : result.treeCandidates) {
-            if (removedTreesMap.IsRemoved(result.coord, index)) {
-                index++;
-                continue;
-            }
-
-            auto entity = registry.create();
-            auto& transform = registry.emplace<TransformComponent>(entity);
-            transform.Position = candidate.position;
-            registry.emplace<MeshComponent>(entity, treeMesh);
-            registry.emplace<BoundsComponent>(entity, BoundsComponent{ glm::vec3(0.5f, 2.0f, 0.5f) });
-            registry.emplace<TreeOriginComponent>(entity, TreeOriginComponent{ result.coord, index });
-
-            HarvestableComponent harvest;
-            harvest.yieldItem = ItemId::Wood;
-            harvest.health = 100.0f;
-            harvest.maxHealth = 100.0f;
-            harvest.yieldPerHit = 1;
-            harvest.yieldOnDestroy = 5;
-            registry.emplace<HarvestableComponent>(entity, harvest);
-            registry.emplace<NameTag>(entity, "Tree");
-
-            GridCoord gridCoord = PlacementGrid::WorldToGrid(candidate.position, 1.0f);
-            placementGrid.Register(gridCoord, entity);
-
-            chunk.treeEntities.push_back(entity);
-            index++;
-        }
-        */
         {
             std::lock_guard<std::mutex> lock(m_RequestMutex);
             m_AwaitingProcessing.erase(result.coord);
@@ -346,7 +272,6 @@ void ChunkManager::ProcessCompletedChunks(entt::registry& registry, VulkanEngine
     }
 }
 
-// ChunkManager.cpp
 ChunkManager::GeneratedVertexData ChunkManager::GenerateTerrainDataOnly(ChunkCoord coord, const TerrainSettings& settings) {
     float chunkOriginX = coord.x * CHUNK_WORLD_SIZE;
     float chunkOriginZ = coord.z * CHUNK_WORLD_SIZE;
@@ -356,7 +281,7 @@ ChunkManager::GeneratedVertexData ChunkManager::GenerateTerrainDataOnly(ChunkCoo
 
     int paddedRes = CHUNK_VERTEX_RESOLUTION + 2;
     std::vector<glm::vec3> paddedPositions(paddedRes * paddedRes);
-    std::vector<glm::vec3> paddedColors(paddedRes * paddedRes);   // NEW — store color alongside position
+    std::vector<glm::vec3> paddedColors(paddedRes * paddedRes);   // store color alongside position
 
     DepletionMap emptyDepletionMap;
 
@@ -367,7 +292,7 @@ ChunkManager::GeneratedVertexData ChunkManager::GenerateTerrainDataOnly(ChunkCoo
             auto sample = TerrainGenerator::SampleTerrain(worldX, worldZ, settings, emptyDepletionMap);   // ONLY call, per position
             int idx = z * paddedRes + x;
             paddedPositions[idx] = glm::vec3(worldX, sample.height, worldZ);
-            paddedColors[idx] = sample.color;   // NEW — stored for reuse below
+            paddedColors[idx] = sample.color;   // stored for reuse below
         }
     }
 
@@ -547,7 +472,7 @@ float ChunkManager::GetInitialLoadProgress() const {
 void ChunkManager::RecordPendingGeneration(VkCommandBuffer commandBuffer, ChunkGenerator* generator,
     TerrainRenderer* terrainRenderer, TreeRenderer* treeRenderer,
     const TerrainSettings& settings, DepletionMap& depletionMap,
-    RemovedTreesMap& removedTreesMap) {   // ADD these two
+    RemovedTreesMap& removedTreesMap) {
     for (auto& req : m_PendingGpuGeneration) {
         auto it = m_LoadedChunks.find(req.coord);
         if (it == m_LoadedChunks.end()) continue;
@@ -601,7 +526,6 @@ std::optional<uint32_t> ChunkManager::GetTreeSlotForChunk(ChunkCoord coord) cons
     return it->second.treeSlot;
 }
 
-// ChunkManager.cpp
 void ChunkManager::UnloadAll(entt::registry &registry, VulkanEngine *engine,
                              TerrainRenderer *terrainRenderer, TreeRenderer *treeRenderer) {
     std::vector<ChunkCoord> coords;

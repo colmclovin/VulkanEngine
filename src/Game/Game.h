@@ -1,42 +1,31 @@
 #pragma once
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
+#include <memory>
+#include <string>
+#include <vector>
 #include "../Utils/GameSettings.h"
 #include "../Audio/AudioEngine.h"
 #include "../Audio/AudioEventSystem.h"
-#include "ItemDatabase.h"
-#include "../World/ResourceMap.h"
-#include "../World/WorldGenerator.h"
-#include "../Systems/MinerSystem.h"
-#include "../World/PlacementGrid.h"
-#include "TechState.h"
+#include "../Helpers/InputState.h"
 #include "../World/DayNightCycle.h"
+#include "ItemDatabase.h"
 #include "ChunkManager.h"
-#include "../World/DepletionMap.h"
-#include "../World/RemovedTreesMap.h"
-#include "../Renderer/TerrainRenderer.h"
-#include "../World/TreeHealthMap.h"
-#include "FogOfWar.h"
-#include "../Rendering/Minimap.h"
+#include "WorldState.h"
 #include "NestManager.h"
+#include "GameHUD.h"
 
-class TerrainGenerator;
 class VulkanEngine;
 class RenderSystem;
 class Camera3D;
-class AudioEngine;
-class MinerSystem;
-class PlaceableDatabase;
 class PlacementSystem;
 class SkinnedMesh;
-
-struct GLFWwindow;
+struct FrameContext;
 
 enum class GameState {
     MainMenu,
     Playing,
     Paused,
-    GameOver,
     Loading,
 };
 
@@ -47,19 +36,54 @@ public:
     void Run();
 
 private:
+    // Cursor ray in physical (framebuffer) pixels, recomputed once per frame where needed
+    struct MouseRay {
+        glm::vec3 origin;
+        glm::vec3 dir;
+        glm::vec2 cursor;   // physical pixels
+        glm::vec2 screen;   // swapchain extent
+        float aspect;
+    };
+
+    // --- Lifecycle ---
     void Init();
-    void LoadResources();
-    void CreateInitialEntities();
-    void HandleInput(float deltaTime);
-    void HandleIsoInput(GLFWwindow* window, float deltaTime);
-    void HandleIsoRTSInput(GLFWwindow* window, float deltaTime);
-    void HandleFreeFlyInput(GLFWwindow* window, float deltaTime);
-    void MovePlayer(glm::vec3 direction, float deltaTime);
+    void Shutdown();
     void Update(float deltaTime);
     void Render();
-    void Shutdown();
-    void HandleRTSInput(GLFWwindow* window, float deltaTime);
+    void DrawHUD();
+    FrameContext MakeFrameContext();
+    float GetAspect() const;
+
+    // --- Input ---
+    void HandleInput(float deltaTime);
+    void HandleIsoInput(float deltaTime);
+    void HandleRTSInput(const MouseRay &ray);
+    void HandleFreeFlyInput(float deltaTime);
+    void HandleInteract(entt::entity machineTarget, const MouseRay &ray);
+    void HandleHotbarInput();
+    void HandleDebugInput(const MouseRay &ray);
+    MouseRay GetMouseRay() const;
+    void MovePlayer(glm::vec3 direction, float deltaTime);
+    void IssueMoveCommand(const glm::vec3 &groundTarget);
+    void ClearUnitSelection();
+
+    // --- World / saves ---
+    void CreateInitialEntities();
     entt::entity SpawnUnit(ItemId unitItem, glm::vec3 position, uint8_t team);
+    void ResetWorldState();
+    void StartNewGame(const std::string &saveName);
+    void LoadExistingGame(const std::string &saveName);
+    bool LoadSave(const std::string &saveName);
+    void SaveCurrentGame();
+    void BeginChunkLoad();
+    void UpdateChunkStreaming(const glm::vec3 &center);
+    void RefreshSaveList();
+
+    // --- Screens ---
+    void RunMainMenu();
+    void RunPauseMenu();
+    void RunLoadingScreen();
+
     // Core systems
     std::unique_ptr<AudioEngine> m_AudioEngine;
     std::unique_ptr<AudioEventSystem> m_AudioEvents;
@@ -68,100 +92,53 @@ private:
     std::unique_ptr<Camera3D> m_Camera;
     std::unique_ptr<entt::registry> m_Registry;
     std::unique_ptr<PlacementSystem> m_PlacementSystem;
-    ItemId m_SelectedItem = ItemId::None;   // whatever "hotbar slot" logic you build later selects this
-    static constexpr int HOTBAR_SIZE = 9;
-    ItemId m_Hotbar[HOTBAR_SIZE] = { ItemId::Wood, ItemId::CopperOre, ItemId::IronOre, ItemId::Miner, ItemId::Furnace, ItemId::Assembler, ItemId::Belt, ItemId::Inserter, ItemId::None };
-    int m_SelectedHotbarSlot = -1;   // -1 = nothing selected
-    ResourceMap m_ResourceMap;
-    PlacementGrid m_PlacementGrid;
-    TechState m_TechState;
-    void IssueMoveCommand(const glm::vec3& groundTarget);
-
-    ItemId GetSelectedItem() const {
-        return (m_SelectedHotbarSlot >= 0 && m_SelectedHotbarSlot < HOTBAR_SIZE) ? m_Hotbar[m_SelectedHotbarSlot] : ItemId::None;
-    }
-    void ResetWorldState();
-    bool m_PendingLoad = false;
-    bool m_PendingMenu = false;
-    void LoadCurrentSave(); 
-    bool m_HadCatalyst = false;
-    bool m_GameOver = false;
-    void DrawGameOver();
-    GameState m_State = GameState::MainMenu;
-    std::string m_CurrentSaveName; // which save file is active, once in Playing state
-    RemovedTreesMap m_RemovedTreesMap;
-    void RunMainMenu();
-    void StartNewGame(const std::string &saveName);
-    void LoadExistingGame(const std::string &saveName);
-    void RunPauseMenu();
-    void RunLoadingScreen();
-    void QuitToMenu(); // for later, if you add a "return to menu" option mid-game
-    bool m_ShowOptionsInPause = false;
-    bool m_ShowOptionsInMenu = false;
-    std::vector<std::string> m_AvailableSaves;
-    char m_NewGameNameBuffer[64] = "MyWorld";
-    glm::vec3 m_LastPlayerPosition = glm::vec3(0.0f);
-    void RefreshSaveList();
-    ChunkManager m_ChunkManager;
-    entt::entity m_PlayerEntity = entt::null;
-    entt::entity m_TerrainEntity = entt::null;
-    entt::entity m_CurrentTarget = entt::null;
+    std::shared_ptr<SkinnedMesh> m_UnitMesh;
     GameSettings m_Settings;
-    bool m_FirstMouse = true;
-    double m_LastMouseX = 0.0, m_LastMouseY = 0.0;
-    DayNightCycle m_DayNightCycle;
-    DepletionMap m_DepletionMap;
+    InputState m_Input;
+    GameHUD m_HUD;
+
+    // State machine
+    GameState m_State = GameState::MainMenu;
     bool m_IsRunning = false;
     bool m_Initialized = false;
-    entt::entity m_InspectedEntity = entt::null;
-    float m_LoadingProgress = 0.0f; // 0.0 to 1.0
-    TreeHealthMap m_TreeHealthMap;
-    std::unique_ptr<TerrainRenderer> m_TerrainRenderer;
-    bool m_TerrainTestActive = false;
+    bool m_PendingLoad = false;   // reload the current save at the start of the next Playing frame
+    bool m_PendingMenu = false;   // return to the main menu at the start of the next Playing frame
+    bool m_GameOver = false;
+
+    // Saves / menus
+    std::string m_CurrentSaveName;
+    std::vector<std::string> m_AvailableSaves;
+    char m_NewGameNameBuffer[64] = "MyWorld";
+    bool m_ShowOptionsInPause = false;
+    bool m_ShowOptionsInMenu = false;
+
+    // World
+    WorldState m_World;
+    ChunkManager m_ChunkManager;
+    DayNightCycle m_DayNightCycle;
+    NestManager m_Nests;
+    bool m_HadCatalyst = false;   // set by VictorySystem once a Catalyst has existed; losing it = game over
     float m_FogTimer = 0.0f;
     float m_TotalTime = 0.0f;
-    void DrawHealthBars();
-    void DrawMinimap();
-    glm::vec2 m_MinimapDragCenter{}; // center locked at the moment the drag starts
-    glm::vec2 GetMinimapCenter() const { return m_MinimapDragging ? m_MinimapDragCenter : m_MinimapCenter; }
-    Minimap m_Minimap;
-    float m_MinimapRange = 150.0f; // half-width in world units
-    glm::vec2 m_MinimapCenter{};
-    float m_MinimapTimer = 0.0f;
-    NestManager m_Nests;
-    bool m_InvasionStarted = false;
-    double m_InvasionStartTime = 0.0;
-    glm::vec2 m_CatalystPos{};
+
+    // Player / hotbar
+    entt::entity m_PlayerEntity = entt::null;
+    entt::entity m_InspectedEntity = entt::null;
+    static constexpr int HOTBAR_SIZE = 9;
+    ItemId m_Hotbar[HOTBAR_SIZE] = { ItemId::Wood, ItemId::CopperOre, ItemId::IronOre, ItemId::Miner, ItemId::Furnace,
+                                     ItemId::Assembler, ItemId::Belt, ItemId::Inserter, ItemId::None };
+    ItemId m_SelectedItem = ItemId::None;
+
+    // Free-fly mouse look
+    bool m_FirstMouse = true;
+    double m_LastMouseX = 0.0, m_LastMouseY = 0.0;
+
+    // RTS selection
     std::vector<entt::entity> m_SelectedUnits;
     bool m_IsBoxSelecting = false;
-    glm::vec2 m_BoxSelectStart{};     // physical pixels, used for the selection math
-    glm::vec2 m_BoxSelectStartUI{};      // ImGui space, used only for drawing the rectangle
-    bool m_LeftWasDown = false;
-    bool m_RightWasDown = false;
-    FogOfWar m_Fog;
-    glm::vec2 m_MinimapTexCenter{}; // center the texture was last drawn with
-    bool m_MinimapDragging = false;
-    std::shared_ptr<SkinnedMesh> m_UnitMesh;
+    glm::vec2 m_BoxSelectStart{};   // physical pixels, used for the selection math
+    glm::vec2 m_BoxSelectStartUI{}; // ImGui space, used only for drawing the rectangle
 
-    struct NoiseTestPush {
-        float startX;
-        float startZ;
-        float spacing;
-        uint32_t sampleType;   // 0 = raw simplex, 1 = fbm, 2 = ridged
-    };
-    void RunNoiseLibraryTest();
-    struct BiomeTestPush {
-        float startX;
-        float startZ;
-        float spacing;
-        float seed;
-        uint32_t sampleType;
-        float worldExtentZ;
-    };
-    void CompareTerrainHeightAt(float x, float z);
-
-    void RunBiomeLibraryTest();
-    void RunSimplexDebugTest(glm::vec2 testPoint);
-    void RunRidgedDebugTest(glm::vec2 pos, int octaves, float frequency, float lacunarity, float gain);
-    void RunBiomeGridTest();
+    // Debug
+    int m_DebugDamageType = 0;
 };

@@ -6,6 +6,7 @@
 #include "../Helpers/PauseMenuAction.h"
 #include "../World/DayNightCycle.h"
 #include "../Game/ChunkManager.h"
+#include "../Game/WorldState.h"
 #include "../Rendering/Mesh.h"
 #include <functional>
 
@@ -29,15 +30,30 @@ class DebugUI;
 struct GameSettings;
 class FogTexture;
 
+// Everything the game hands the renderer each frame (scene, camera, and the state the debug UI edits)
+struct FrameContext {
+    entt::registry &registry;
+    Camera3D &camera;
+    GameSettings &settings;
+    AudioEngine &audio;
+    WorldState &world;
+    DayNightCycle &dayNight;
+    ChunkManager &chunks;
+    entt::entity player;
+    entt::entity inspected;
+    ItemId &selectedItem;
+    bool &showOptionsInPause;
+};
+
 class RenderSystem {
 
 public:
     RenderSystem(VulkanEngine *engine);
     ~RenderSystem();
-    
-    
+
     void Init(uint32_t terrainVertsPerChunk, uint32_t terrainIndicesPerChunk, uint32_t terrainMaxChunks);
-    PauseMenuAction RenderFrame(entt::registry &registry, Camera3D &camera, GameSettings &settings, AudioEngine &audioEngine, entt::entity m_PlayerEntity, entt::entity m_InspectedEntity, ItemId &selectedItem, TechState &techState, bool isPaused, bool &showOptionsInPause, DayNightCycle& dayNightCycle, ChunkManager& chunkManager, DepletionMap& depletionMap, RemovedTreesMap& removedTreesMap);
+    // isPaused draws the pause menu on top and returns the button the player picked
+    PauseMenuAction RenderFrame(const FrameContext &ctx, bool isPaused);
     void Shutdown();
 
     //ResourceManager *GetResourceManager() const { return m_ResourceManager.get(); }

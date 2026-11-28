@@ -101,8 +101,6 @@ public:
 
 private:
     size_t m_InitialLoadTarget = 0;
-    void GenerateChunk(ChunkCoord coord, entt::registry &registry, const TerrainSettings &settings,
-                       VulkanEngine *engine, MeshRenderer *meshRenderer, int seed, DepletionMap &depletionMap, PlacementGrid &placementGrid);
     void UnloadChunk(ChunkCoord coord, entt::registry& registry, VulkanEngine* engine, TerrainRenderer* terrainRenderer, TreeRenderer* treeRenderer);
 
     std::unordered_map<ChunkCoord, Chunk, ChunkCoordHash> m_LoadedChunks;

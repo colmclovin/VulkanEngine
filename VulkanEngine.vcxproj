@@ -221,6 +221,9 @@
     <ClCompile Include="src\Game\FuelDatabase.cpp" />
     <ClCompile Include="src\Game\FurnaceRecipeDatabase.cpp" />
     <ClCompile Include="src\Game\Game.cpp" />
+    <ClCompile Include="src\World\TreeRaycast.cpp" />
+    <ClCompile Include="src\Game\GameHUD.cpp" />
+    <ClCompile Include="src\Game\EntityFactory.cpp" />
     <ClCompile Include="src\Game\ItemDatabase.cpp" />
     <ClCompile Include="src\Game\OreDatabase.cpp" />
     <ClCompile Include="src\Game\OreDepositMap.cpp" />
@@ -334,6 +337,11 @@
     <ClInclude Include="src\Game\FuelDatabase.h" />
     <ClInclude Include="src\Game\FurnaceRecipeDatabase.h" />
     <ClInclude Include="src\Game\Game.h" />
+    <ClInclude Include="src\Utils\RayMath.h" />
+    <ClInclude Include="src\World\TreeRaycast.h" />
+    <ClInclude Include="src\Game\GameHUD.h" />
+    <ClInclude Include="src\Game\EntityFactory.h" />
+    <ClInclude Include="src\Game\WorldState.h" />
     <ClInclude Include="src\Game\ItemDatabase.h" />
     <ClInclude Include="src\Game\OreDatabase.h" />
     <ClInclude Include="src\Game\OreDepositMap.h" />
@@ -343,6 +351,7 @@
     <ClInclude Include="src\Game\TechState.h" />
     <ClInclude Include="src\Helpers\ComputeTest.h" />
     <ClInclude Include="src\Helpers\DebugUI.h" />
+    <ClInclude Include="src\Helpers\InputState.h" />
     <ClInclude Include="src\Helpers\GlmSerialization.h" />
     <ClInclude Include="src\Game\PlaceableDatabase.h" />
     <ClInclude Include="src\Helpers\PauseMenuAction.h" />

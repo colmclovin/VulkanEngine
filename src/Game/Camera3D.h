@@ -1,6 +1,7 @@
 // Camera3D.h
 #pragma once
 #include <glm/glm.hpp>
+#include <optional>
 
 enum class CameraMovement {
     Forward,
@@ -48,6 +49,17 @@ public:
     void SetIsoTarget(glm::vec3 pos) { isoTarget = pos; }
     glm::mat4 GetActiveViewMatrix() const;   // picks the right one internally
     glm::vec3 ScreenPointToRay(float mouseX, float mouseY, float screenWidth, float screenHeight, float aspect) const;
+    glm::mat4 GetViewProjection(float aspect) const { return GetProjectionMatrix(aspect) * GetActiveViewMatrix(); }
+
+    // Projects a world point to screen pixels (origin top-left). Empty if the point is behind the camera.
+    // Takes a precomputed viewProj so callers projecting many points only build it once.
+    static std::optional<glm::vec2> ProjectToScreen(const glm::mat4 &viewProj, glm::vec3 worldPos, glm::vec2 screenSize) {
+        glm::vec4 clip = viewProj * glm::vec4(worldPos, 1.0f);
+        if (clip.w <= 0.0f) return std::nullopt;
+        // GetProjectionMatrix already flips Y for Vulkan, so ndc.y = -1 is the top of the screen
+        glm::vec2 ndc = glm::vec2(clip.x, clip.y) / clip.w;
+        return (ndc * 0.5f + 0.5f) * screenSize;
+    }
     glm::vec3 GetForwardDirection() const;
 
     float GetIsoPanSpeed() const { return isoPanSpeed; }

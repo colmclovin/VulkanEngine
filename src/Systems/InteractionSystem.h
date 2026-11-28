@@ -2,53 +2,43 @@
 #pragma once
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
-#include "../World/ResourceMap.h"
+#include "../Game/ItemDatabase.h"
+#include "../Game/WorldState.h"
 #include "../Utils/GameSettings.h"
-#include "../World/PlacementGrid.h"
-#include "../World/RemovedTreesMap.h"
-#include "../Engine/VulkanEngine.h"
-#include "../Renderer/MeshRenderer.h"
-#include "../World/DepletionMap.h"
-#include "../Game/ChunkManager.h"
-#include "../World/TreeHealthMap.h"
-#include "../Components/Components.h"
-class AudioEventSystem;
 
+class AudioEventSystem;
+class VulkanEngine;
+class MeshRenderer;
+class ChunkManager;
+class TreeRenderer;
+
+// Player <-> world interactions: picking things under the cursor, mining, and moving items
+// between the player's inventory and machines.
 class InteractionSystem {
 public:
-	static entt::entity FindNearestInteractable(entt::registry &registry, glm::vec3 playerPos, float range);
-	static entt::entity FindNearestPickup(entt::registry &registry, glm::vec3 playerPos, float range);
-	static void CollectPickup(entt::registry &registry, entt::entity pickup, entt::entity player, AudioEventSystem *audio);
-	static void Mine(entt::registry &registry, entt::entity target, entt::entity player, AudioEventSystem *audio,
-					 VulkanEngine *engine, MeshRenderer *meshRenderer, PlacementGrid &placementGrid, RemovedTreesMap &removedTreesMap, float cellSize);
-	static bool TryMineGround(ResourceMap &resourceMap, entt::registry &registry, entt::entity player,
-							  glm::vec3 playerPos, glm::vec3 targetPos, float maxRange,
-							  float extractAmount, AudioEventSystem *audio);
-	static bool TryMineAtCursor(entt::registry& registry, DepletionMap& depletionMap, entt::entity player,
-		glm::vec3 rayOrigin, glm::vec3 rayDir, const TerrainSettings& terrainSettings,
-		float maxRange, AudioEventSystem* audio, VulkanEngine* engine, MeshRenderer* meshRenderer,
-		PlacementGrid& placementGrid, RemovedTreesMap& removedTreesMap, ChunkManager& chunkManager,
-		TreeHealthMap& treeHealthMap, TreeRenderer& treeRenderer);
-	static entt::entity FindEntityAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
-	static bool TryFuelMiner(entt::registry &registry, entt::entity minerEntity, entt::entity player, ItemId selectedItem, int amount);
-	static bool TryCollectMinerOutput(entt::registry &registry, entt::entity minerEntity, entt::entity player);
-	static entt::entity FindMinerAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
-	static entt::entity FindMachineAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
-	static bool TryInsertIntoMachine(entt::registry &registry, entt::entity machine, entt::entity player, ItemId item, int amount);
-	static bool TryCollectFromMachine(entt::registry &registry, entt::entity machine, entt::entity player);
-	static bool TryFuelFurnace(entt::registry &registry, entt::entity furnaceEntity, entt::entity player, ItemId selectedItem, int amount);
-	static bool TryRotateMachine(entt::registry &registry, entt::entity target);
-	static bool TryPickupMachine(entt::registry &registry, entt::entity target, entt::entity player, PlacementGrid &placementGrid, float gridSize);
-	static bool TryFuelGenerator(entt::registry &registry, entt::entity generatorEntity, entt::entity player, ItemId selectedItem, int amount);
-	bool TryChopTreeAtCursor(glm::vec3 cursorWorldPos, RemovedTreesMap& removedTreesMap, ChunkManager& chunkManager,
-		const TerrainSettings& settings, InventoryComponent& inventory);
-	static int FindTreeAlongRay(const std::vector<TreeInstanceReadback>& treeInstances,
-		const RemovedTreesMap& removedTreesMap, ChunkCoord coord,
-		glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
-	static int FindTreeAlongRayWithT(const std::vector<TreeInstanceReadback>& treeInstances,
-		const RemovedTreesMap& removedTreesMap, ChunkCoord coord,
-		glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance, float& outClosestT);
-	static entt::entity FindSelectableAlongRay(entt::registry& registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
-	static entt::entity FindDamageableAlongRay(entt::registry& registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
-    static entt::entity FindEnemyAlongRay(entt::registry &registry, glm::vec3 o, glm::vec3 d, float maxDist, uint8_t myTeam);
+    // --- Picking (ray vs. entity bounding boxes) ---
+    static entt::entity FindMachineAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
+    static entt::entity FindSelectableAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
+    static entt::entity FindDamageableAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance);
+    static entt::entity FindEnemyAlongRay(entt::registry &registry, glm::vec3 rayOrigin, glm::vec3 rayDir, float maxDistance, uint8_t myTeam);
+
+    // --- Pickups ---
+    static entt::entity FindNearestPickup(entt::registry &registry, glm::vec3 playerPos, float range);
+    static void CollectPickup(entt::registry &registry, entt::entity pickup, entt::entity player, AudioEventSystem *audio);
+
+    // Mines ore at the cursor's ground point, or else chops the tree under the cursor. Returns true if anything happened.
+    static bool TryMineAtCursor(entt::registry &registry, WorldState &world, entt::entity player, glm::vec3 rayOrigin,
+                                glm::vec3 rayDir, const TerrainSettings &terrainSettings, float maxRange,
+                                VulkanEngine *engine, MeshRenderer *meshRenderer, ChunkManager &chunkManager,
+                                const TreeRenderer &treeRenderer);
+
+    // --- Machines ---
+    // Loads fuel into a furnace, generator or miner. Fails if the item isn't fuel or a different fuel is loaded.
+    static bool TryFuelMachine(entt::registry &registry, entt::entity machine, entt::entity player, ItemId item, int amount);
+    static bool TryInsertIntoMachine(entt::registry &registry, entt::entity machine, entt::entity player, ItemId item, int amount);
+    static bool TryCollectFromMachine(entt::registry &registry, entt::entity machine, entt::entity player);
+    static bool TryCollectMinerOutput(entt::registry &registry, entt::entity minerEntity, entt::entity player);
+    static bool TryRotateMachine(entt::registry &registry, entt::entity target);
+    static bool TryPickupMachine(entt::registry &registry, entt::entity target, entt::entity player,
+                                 PlacementGrid &placementGrid, float gridSize);
 };

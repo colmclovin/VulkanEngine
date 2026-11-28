@@ -2,8 +2,26 @@
 #include "NestManager.h"
 #include "FogOfWar.h"
 #include "NestPlacement.h"
+#include "EntityFactory.h"
+#include "../Components/Components.h"
 #include <algorithm>
 #include <cmath>
+
+void NestManager::Update(entt::registry &registry, int seed, const FogOfWar &fog, float dt, double now) {
+    if (!m_InvasionStarted) {
+        auto catalysts = registry.view<CatalystComponent, TransformComponent, TeamComponent>();
+        for (auto c : catalysts) {
+            if (catalysts.get<TeamComponent>(c).team != EntityFactory::PLAYER_TEAM) continue;
+            glm::vec3 p = catalysts.get<TransformComponent>(c).Position;
+            m_CatalystPos = glm::vec2(p.x, p.z);
+            m_InvasionStartTime = now;
+            m_InvasionStarted = true;
+            Activate(m_CatalystPos, seed, fog, FIRST_WAVE_NEST_COUNT, now);
+            break;
+        }
+    }
+    if (m_InvasionStarted) Tick(dt, now);
+}
 
 void NestManager::Activate(glm::vec2 c, int seed, const FogOfWar &fog, int count, double now) {
     m_Nests.clear();
