@@ -89,35 +89,41 @@ namespace GpuNoiseMatch {
             sum += n * amplitude;
             freq *= lacunarity;
             amplitude *= gain;
-           // std::cout << "CPU octave " << i << ": sum=" << sum << " n=" << n << " amplitude=" << amplitude << " freq=" << freq << std::endl;
         }
         return sum;
     }
 
+    // ---- Biome tuning. MUST match the same constants in Shaders/Include/biome.glsl ----
+    constexpr float BIOME_SCALE = 3.0f;                        // multiplies the size of every biome
+    constexpr float ELEVATION_FREQUENCY = 0.0008f / BIOME_SCALE; // hills/mountains noise
+    constexpr float ARIDITY_FREQUENCY = 0.0015f / BIOME_SCALE;   // lake/plains/desert noise
+    constexpr float LATITUDE_BAND_SIZE = 2000.0f * BIOME_SCALE;  // world units from the equator to full tundra
+    constexpr float LAKE_MAX_ARIDITY = 0.2f;
+    constexpr float DESERT_MIN_ARIDITY = 0.6f;
+
     // Exact port of biome.glsl's getAridity
     float GetAridity(float worldX, float worldZ, float seed) {
         float seedOffset = HashSeed(seed + 7000.0f);
-        float raw = SimplexNoise2D(glm::vec2(worldX, worldZ) * 0.0015f + glm::vec2(seedOffset));
+        float raw = SimplexNoise2D(glm::vec2(worldX, worldZ) * ARIDITY_FREQUENCY + glm::vec2(seedOffset));
         return (raw + 1.0f) * 0.5f;
     }
 
     // Exact port of biome.glsl's getElevationTrigger
     float GetElevationTrigger(float worldX, float worldZ, float seed) {
         float seedOffset = HashSeed(seed);
-        float raw = RidgedNoise(glm::vec2(worldX, worldZ) * 0.0008f + glm::vec2(seedOffset), 3, 1.0f, 2.0f, 0.5f);
+        float raw = RidgedNoise(glm::vec2(worldX, worldZ) * ELEVATION_FREQUENCY + glm::vec2(seedOffset), 3, 1.0f, 2.0f, 0.5f);
         return glm::clamp((raw - 0.05f) / 0.9f, 0.0f, 1.0f);
     }
 
     // Exact port of biome.glsl's getLatitude
     float GetLatitude(float worldZ) {
-        const float LATITUDE_BAND_SIZE = 2000.0f;
         return glm::clamp(std::abs(worldZ) / LATITUDE_BAND_SIZE, 0.0f, 1.0f);
     }
 
     int DetermineClimateBiome(float latitude, float aridity) {
         if (latitude >= 0.6f && latitude <= 1.0f) return BIOME_TUNDRA;
-        if (latitude >= 0.0f && latitude <= 0.5f && aridity >= 0.6f && aridity <= 1.0f) return BIOME_DESERT;
-        if (aridity >= 0.0f && aridity <= 0.5f) return BIOME_LAKE;
+        if (latitude >= 0.0f && latitude <= 0.5f && aridity >= DESERT_MIN_ARIDITY && aridity <= 1.0f) return BIOME_DESERT;
+        if (aridity >= 0.0f && aridity <= LAKE_MAX_ARIDITY) return BIOME_LAKE;
         return BIOME_PLAINS;
     }
 

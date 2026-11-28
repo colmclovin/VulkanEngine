@@ -23,13 +23,16 @@ void MoveOrderSystem::Update(entt::registry& registry, float deltaTime, const Te
         float speed = 10.0f;
         if (auto *cs = registry.try_get<CombatStatsComponent>(entity)) speed = cs->moveSpeed;
         float step = speed * deltaTime;
-        if (dist <= std::max(step, ARRIVE_THRESHOLD)) {
+        bool arrived = dist <= std::max(step, ARRIVE_THRESHOLD);
+        if (arrived) {
             transform.Position.x = order.targetPosition.x;
             transform.Position.z = order.targetPosition.z;
-            transform.Position.y = GpuNoiseMatch::SampleHeight(transform.Position.x, transform.Position.z, static_cast<float>(settings.seed));
             registry.remove<MoveOrderComponent>(entity);
-            continue;
+        } else {
+            transform.Position += moveDir * step;
         }
-        transform.Position += moveDir * step;
+        // Follow the ground every step (moveDir is flat, so without this units glide at their start height)
+        transform.Position.y = GpuNoiseMatch::SampleSurfaceHeight(transform.Position.x, transform.Position.z,
+                                                                  static_cast<float>(settings.seed));
     }
 }

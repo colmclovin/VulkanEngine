@@ -14,6 +14,7 @@ layout(push_constant) uniform PC {
     vec2 fogOrigin;
     float fogInvSize;
     float pad;
+    vec2 forward;   // world XZ direction that points "up" on the map (the camera's facing)
 } pc;
 
 void main() {
@@ -21,8 +22,11 @@ void main() {
     ivec2 size = imageSize(outImage);
     if (p.x >= size.x || p.y >= size.y) return;
 
+    // Map is rotated so camera-forward is up: x across the map is camera-right, y down the map is -forward
     vec2 uv = (vec2(p) + 0.5) / vec2(size);
-    vec2 world = pc.center + (uv - 0.5) * pc.halfRange * 2.0;
+    vec2 local = (uv - 0.5) * pc.halfRange * 2.0;
+    vec2 right = vec2(-pc.forward.y, pc.forward.x);
+    vec2 world = pc.center + right * local.x - pc.forward * local.y;
 
     float f = textureLod(fogMap, (world - pc.fogOrigin) * pc.fogInvSize, 0.0).r;
     float explored = smoothstep(0.0, 0.5, f);
@@ -35,7 +39,7 @@ void main() {
     }
     
     c *= mix(0.5, 1.0, visible);   // explored but not visible is dimmer
-    c *= explored;                 // unexplored is black                // unexplored is black
+    c *= explored;                 // unexplored is black
 
     imageStore(outImage, p, vec4(c, 1.0));
 }

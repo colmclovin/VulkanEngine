@@ -12,7 +12,8 @@ public:
     void Init(VulkanEngine *engine, FogTexture *fogTex);
 
     void Shutdown();
-    void Record(VkCommandBuffer cmd, glm::vec2 center, float halfRange, float seed);
+    // forward = world XZ direction (unit length) to show as "up" on the map
+    void Record(VkCommandBuffer cmd, glm::vec2 center, float halfRange, float seed, glm::vec2 forward);
 
     VkDescriptorSet GetImGuiTexture() const { return m_ImGuiTex; }
 

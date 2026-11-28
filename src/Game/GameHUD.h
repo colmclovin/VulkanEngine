@@ -18,10 +18,14 @@ public:
 
     void Init(VulkanEngine *engine, FogTexture *fogTexture) { m_Minimap.Init(engine, fogTexture); }
     // Renders the minimap texture; call from the pre-render callback (before the main pass)
-    void RecordMinimap(VkCommandBuffer cmd, int seed) { m_Minimap.Record(cmd, GetMinimapCenter(), m_MinimapRange, (float)seed); }
+    void RecordMinimap(VkCommandBuffer cmd, int seed) {
+        m_Minimap.Record(cmd, GetMinimapCenter(), m_MinimapRange, (float)seed, m_MapForward);
+    }
 
     // Where the minimap is centered when the player isn't dragging it (the player, or the RTS camera)
     void SetMinimapFocus(glm::vec2 worldXZ) { m_MinimapCenter = worldXZ; }
+    // World XZ direction shown as "up" on the minimap — pass the camera's facing so the map turns with it
+    void SetMinimapForward(glm::vec2 forwardXZ) { m_MapForward = glm::normalize(forwardXZ); }
 
     void DrawHealthBars(entt::registry &registry, const Camera3D &camera, float aspect);
 
@@ -38,6 +42,14 @@ private:
     static constexpr float MINIMAP_MAX_RANGE = 2000.0f;
 
     glm::vec2 GetMinimapCenter() const { return m_MinimapDragging ? m_MinimapDragCenter : m_MinimapCenter; }
+    glm::vec2 MapRight() const { return glm::vec2(-m_MapForward.y, m_MapForward.x); }
+    // Offset from the map center in world units <-> (right, down) offset on the map. Must match minimap.comp.
+    glm::vec2 WorldToMapOffset(glm::vec2 worldOffset) const {
+        return glm::vec2(glm::dot(worldOffset, MapRight()), -glm::dot(worldOffset, m_MapForward));
+    }
+    glm::vec2 MapToWorldOffset(glm::vec2 mapOffset) const { return MapRight() * mapOffset.x - m_MapForward * mapOffset.y; }
+
+    glm::vec2 m_MapForward{ 0.0f, -1.0f }; // north (-Z) up until the camera tells us otherwise
 
     Minimap m_Minimap;
     float m_MinimapRange = 150.0f;   // half-width in world units

@@ -4,7 +4,7 @@
 
 
 struct MinerComponent {
-    float collectionRadius = 3.0f; // how far around the miner it reaches into the ResourceMap
+    float collectionRadius = 3.0f; // how far around the miner it reaches for ore
     float extractionRate = 1.0f; // resource units extracted per second, while fueled
     float outputInterval = 1.0f; // seconds between producing one item into its output buffer
     float outputTimer = 0.0f; // internal countdown

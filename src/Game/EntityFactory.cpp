@@ -45,7 +45,7 @@ entt::entity CreateUnit(entt::registry &registry, ItemId unitItem, glm::vec3 pos
     entt::entity e = registry.create();
     auto &tr = registry.emplace<TransformComponent>(e);
     tr.Position = position;
-    tr.Position.y = GpuNoiseMatch::SampleHeight(position.x, position.z, (float)seed);
+    tr.Position.y = GpuNoiseMatch::SampleSurfaceHeight(position.x, position.z, (float)seed);
 
     registry.emplace<AnimationComponent>(e);
     registry.emplace<SkinnedMeshComponent>(e, std::move(mesh));

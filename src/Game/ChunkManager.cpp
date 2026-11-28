@@ -1,15 +1,48 @@
 // ChunkManager.cpp
 #include "ChunkManager.h"
-#include "../Engine/VulkanEngine.h"
-#include "../Components/Components.h"
-#include "../World/TerrainGenerator.h"
-#include "../World/WorldGenerator.h"
-#include "../Components/ChunkBoundsComponent.h"
-#include <iostream>
-#include <FastNoise/FastNoiseLite.h>
-#include "OreDepositMap.h"
+#include <unordered_set>
+#include "ChunkGenerator.h"
 #include "../Renderer/TerrainRenderer.h"
 #include "../Renderer/TreeRenderer.h"
+#include "../Utils/GpuNoiseMatch.h"
+
+// CPU height sampling assumes this vertex spacing; change both together
+static_assert(ChunkManager::MESH_CELL_SIZE == GpuNoiseMatch::TERRAIN_MESH_CELL_SIZE,
+              "GpuNoiseMatch::TERRAIN_MESH_CELL_SIZE must match the chunk mesh spacing");
+
+namespace {
+    constexpr float BASELINE_ISO_DISTANCE = 20.0f; // camera distance at which the load radius is 1x
+    constexpr float BEHIND_RADIUS_FRACTION = 0.35f; // chunks behind the camera load out to 35% of the radius
+    constexpr size_t MAX_DEPLETION_ENTRIES = 4;    // must match depletionEntries[] in chunk_generate_pass1.comp
+    constexpr float CHUNK_BOUNDS_RADIUS = ChunkManager::CHUNK_WORLD_SIZE * 0.75f;
+
+    // Chunks within a radius of center that's full-size in front of the camera and shrinks behind it,
+    // all scaled up by zoomFactor.
+    std::vector<ChunkCoord> ComputeDesiredChunks(ChunkCoord centerChunk, glm::vec3 cameraForward, float zoomFactor) {
+        glm::vec2 forward2D = glm::normalize(glm::vec2(cameraForward.x, cameraForward.z));
+        const float radius = static_cast<float>(ChunkManager::LOAD_RADIUS_CHUNKS);
+        const int loopRadius = static_cast<int>(radius * zoomFactor);
+
+        std::vector<ChunkCoord> desired;
+        for (int dz = -loopRadius; dz <= loopRadius; dz++) {
+            for (int dx = -loopRadius; dx <= loopRadius; dx++) {
+                float distance = glm::length(glm::vec2(dx, dz));
+                bool include = distance < 0.001f;
+                if (!include) {
+                    float facing = glm::dot(glm::vec2(dx, dz) / distance, forward2D); // -1 behind .. +1 ahead
+                    float effectiveRadius = glm::mix(radius * BEHIND_RADIUS_FRACTION, radius, (facing + 1.0f) * 0.5f);
+                    include = distance <= effectiveRadius * zoomFactor;
+                }
+                if (include) desired.push_back({ centerChunk.x + dx, centerChunk.z + dz });
+            }
+        }
+        return desired;
+    }
+
+    glm::vec3 ChunkBoundsCenter(ChunkCoord coord) {
+        return glm::vec3((coord.x + 0.5f) * ChunkManager::CHUNK_WORLD_SIZE, 0.0f, (coord.z + 0.5f) * ChunkManager::CHUNK_WORLD_SIZE);
+    }
+}
 
 ChunkCoord ChunkManager::WorldToChunkCoord(glm::vec3 worldPos) {
     return {
@@ -18,51 +51,21 @@ ChunkCoord ChunkManager::WorldToChunkCoord(glm::vec3 worldPos) {
     };
 }
 
-void ChunkManager::Update(entt::registry& registry, glm::vec3 playerPosition, const TerrainSettings& settings,
-    VulkanEngine* engine, MeshRenderer* meshRenderer, int seed, DepletionMap& depletionMap,
-                          PlacementGrid &placementGrid, TerrainRenderer *terrainRenderer, RemovedTreesMap &removedTreesMap, glm::vec3 cameraForward, float isoDistance, TreeRenderer *treeRenderer) {
-    ChunkCoord playerChunk = WorldToChunkCoord(playerPosition);
-    glm::vec2 forward2D = glm::normalize(glm::vec2(cameraForward.x, cameraForward.z));
-    // Normalize isoDistance against a baseline "typical" zoom, so zoomFactor is ~1.0 at normal play distance
-    // and grows toward ~1.5-2.0 at max zoom-out. Tune baselineDistance/maxZoomFactor to your camera's real range.
-    const float baselineDistance = 20.0f; // adjust to whatever your "normal" isoDistance typically is
-    const float maxZoomFactor = 1.8f; // how much wider at max zoom-out, tune to taste
-    float zoomFactor = glm::clamp(isoDistance / baselineDistance, 1.0f, maxZoomFactor);
+void ChunkManager::Update(glm::vec3 center, glm::vec3 cameraForward, float isoDistance, TerrainRenderer *terrainRenderer,
+                          TreeRenderer *treeRenderer) {
+    float zoomFactor = glm::clamp(isoDistance / BASELINE_ISO_DISTANCE, 1.0f, MAX_ZOOM_FACTOR);
+    std::vector<ChunkCoord> desired = ComputeDesiredChunks(WorldToChunkCoord(center), cameraForward, zoomFactor);
 
-    int scaledLoopRadius = static_cast<int>(LOAD_RADIUS_CHUNKS * maxZoomFactor); // e.g., 20 * 1.8 = 36
-
-    std::vector<ChunkCoord> desiredChunks;
-    for (int dz = -scaledLoopRadius; dz <= scaledLoopRadius; dz++) { // CHANGED — loop now goes to ±36, not ±20
-        for (int dx = -scaledLoopRadius; dx <= scaledLoopRadius; dx++) { // CHANGED
-            float distance = glm::length(glm::vec2(dx, dz));
-            if (distance < 0.001f) {
-                desiredChunks.push_back({ playerChunk.x + dx, playerChunk.z + dz });
-                continue;
-            }
-
-            glm::vec2 toChunk = glm::vec2(dx, dz) / distance;
-            float dot = glm::dot(toChunk, forward2D);
-
-            float baseEffectiveRadius = glm::mix(static_cast<float>(LOAD_RADIUS_CHUNKS) * 0.35f,
-                                                 static_cast<float>(LOAD_RADIUS_CHUNKS), (dot + 1.0f) * 0.5f);
-            float effectiveRadius = baseEffectiveRadius * zoomFactor;
-
-            if (distance <= effectiveRadius) {
-                desiredChunks.push_back({ playerChunk.x + dx, playerChunk.z + dz });
-            }
-        }
-    }
-
-    // --- Terrain: GPU-driven, synchronous-per-frame allocation ---
-    for (auto& coord : desiredChunks) {
-        if (m_LoadedChunks.find(coord) != m_LoadedChunks.end()) continue;
+    // Allocate GPU slots for newly desired chunks and queue them for generation
+    for (auto &coord : desired) {
+        if (m_LoadedChunks.count(coord)) continue;
 
         auto terrainSlot = terrainRenderer->AllocateChunkSlot();
-        if (!terrainSlot) continue;
+        if (!terrainSlot) continue; // pool full this frame, try again next frame
 
-        auto treeSlot = treeRenderer->AllocateChunkSlot();   // TreeInstanceBufferPool needs the same AllocateSlot/FreeSlot pattern as TerrainBufferPool
+        auto treeSlot = treeRenderer->AllocateChunkSlot();
         if (!treeSlot) {
-            terrainRenderer->FreeChunkSlot(*terrainSlot);   // roll back the terrain slot if tree allocation fails, keep them paired
+            terrainRenderer->FreeChunkSlot(*terrainSlot); // keep terrain and tree slots paired
             continue;
         }
 
@@ -70,394 +73,40 @@ void ChunkManager::Update(entt::registry& registry, glm::vec3 playerPosition, co
         chunk.coord = coord;
         chunk.terrainSlot = *terrainSlot;
         chunk.treeSlot = *treeSlot;
-        chunk.isGenerated = false;
         m_LoadedChunks[coord] = chunk;
-        m_PendingGpuGeneration.push_back({ coord });
+        m_PendingGpuGeneration.push_back(coord);
     }
-    // Drain completed TREE generation results (terrain no longer comes through this path)
-    ProcessCompletedChunks(registry, engine, meshRenderer, placementGrid, removedTreesMap);
-    // --- Unload chunks no longer desired ---
+
+    // Unload chunks that are no longer desired
+    std::unordered_set<ChunkCoord, ChunkCoordHash> desiredSet(desired.begin(), desired.end());
     std::vector<ChunkCoord> toUnload;
-    for (auto& [coord, chunk] : m_LoadedChunks) {
-        bool stillDesired = false;
-        for (auto& d : desiredChunks) {
-            if (d == coord) { stillDesired = true; break; }
-        }
-        if (!stillDesired) toUnload.push_back(coord);
-    }
-    for (auto& coord : toUnload) {
-        UnloadChunk(coord, registry, engine, terrainRenderer, treeRenderer);
-    }
+    for (auto &[coord, chunk] : m_LoadedChunks)
+        if (!desiredSet.count(coord)) toUnload.push_back(coord);
+    for (auto &coord : toUnload) UnloadChunk(coord, terrainRenderer, treeRenderer);
 }
 
-void ChunkManager::UnloadChunk(ChunkCoord coord, entt::registry& registry, VulkanEngine* engine,
-    TerrainRenderer* terrainRenderer, TreeRenderer* treeRenderer) {
+void ChunkManager::UnloadChunk(ChunkCoord coord, TerrainRenderer *terrainRenderer, TreeRenderer *treeRenderer) {
     auto it = m_LoadedChunks.find(coord);
     if (it == m_LoadedChunks.end()) return;
 
-    Chunk& chunk = it->second;
-
-    if (chunk.terrainSlot != UINT32_MAX) {
-        terrainRenderer->FreeChunkSlot(chunk.terrainSlot);
-    }
-    if (chunk.treeSlot != UINT32_MAX) {
-        treeRenderer->FreeChunkSlot(chunk.treeSlot);
-    }
-
-    // No more tree entity destruction — trees aren't entities anymore
+    if (it->second.terrainSlot != UINT32_MAX) terrainRenderer->FreeChunkSlot(it->second.terrainSlot);
+    if (it->second.treeSlot != UINT32_MAX) treeRenderer->FreeChunkSlot(it->second.treeSlot);
     m_LoadedChunks.erase(it);
 }
-void ChunkManager::OnResourceDepleted(entt::registry& registry, glm::vec3 worldPos, const TerrainSettings& settings,
-    VulkanEngine* engine, MeshRenderer* meshRenderer, DepletionMap& depletionMap,
-    TerrainRenderer* terrainRenderer) {
-    ChunkCoord coord = WorldToChunkCoord(worldPos);
-    auto it = m_LoadedChunks.find(coord);
-    if (it == m_LoadedChunks.end()) return;
 
-    Chunk& chunk = it->second;
-    RegenerateChunkMesh(chunk, settings, depletionMap, terrainRenderer);
-    // no more registry.replace<MeshComponent>(...) — terrain has no entity anymore
+void ChunkManager::UnloadAll(TerrainRenderer *terrainRenderer, TreeRenderer *treeRenderer) {
+    std::vector<ChunkCoord> coords;
+    coords.reserve(m_LoadedChunks.size());
+    for (auto &[coord, chunk] : m_LoadedChunks) coords.push_back(coord);
+    for (auto &coord : coords) UnloadChunk(coord, terrainRenderer, treeRenderer);
+
+    m_LoadedChunks.clear();
+    m_PendingGpuGeneration.clear();
 }
 
-void ChunkManager::RegenerateChunkMesh(Chunk& chunk, const TerrainSettings& settings, const DepletionMap& depletionMap, TerrainRenderer* terrainRenderer) {
-    float chunkOriginX = chunk.coord.x * CHUNK_WORLD_SIZE;
-    float chunkOriginZ = chunk.coord.z * CHUNK_WORLD_SIZE;
-    float cellSize = CHUNK_WORLD_SIZE / (CHUNK_VERTEX_RESOLUTION - 1);
-
-    int paddedRes = CHUNK_VERTEX_RESOLUTION + 2;
-    std::vector<glm::vec3> paddedPositions(paddedRes * paddedRes);
-    std::vector<glm::vec3> paddedColors(paddedRes * paddedRes);
-
-    for (int z = 0; z < paddedRes; z++) {
-        for (int x = 0; x < paddedRes; x++) {
-            float worldX = chunkOriginX + (x - 1) * cellSize;
-            float worldZ = chunkOriginZ + (z - 1) * cellSize;
-            auto sample = TerrainGenerator::SampleTerrain(worldX, worldZ, settings, depletionMap);
-            int idx = z * paddedRes + x;
-            paddedPositions[idx] = glm::vec3(worldX, sample.height, worldZ);
-            paddedColors[idx] = sample.color;
-        }
-    }
-
-    std::vector<glm::vec3> paddedNormals(paddedRes * paddedRes, glm::vec3(0.0f));
-    for (int z = 0; z < paddedRes - 1; z++) {
-        for (int x = 0; x < paddedRes - 1; x++) {
-            int tl = z * paddedRes + x;
-            int tr = tl + 1;
-            int bl = (z + 1) * paddedRes + x;
-            int br = bl + 1;
-
-            glm::vec3 faceNormal = glm::normalize(glm::cross(
-                paddedPositions[bl] - paddedPositions[tl],
-                paddedPositions[tr] - paddedPositions[tl]));
-
-            paddedNormals[tl] += faceNormal;
-            paddedNormals[tr] += faceNormal;
-            paddedNormals[bl] += faceNormal;
-            paddedNormals[br] += faceNormal;
-        }
-    }
-
-    std::vector<Vertex> vertices(CHUNK_VERTEX_RESOLUTION * CHUNK_VERTEX_RESOLUTION);
-    for (int z = 0; z < CHUNK_VERTEX_RESOLUTION; z++) {
-        for (int x = 0; x < CHUNK_VERTEX_RESOLUTION; x++) {
-            int paddedIdx = (z + 1) * paddedRes + (x + 1);
-            int realIdx = z * CHUNK_VERTEX_RESOLUTION + x;
-
-            Vertex& v = vertices[realIdx];
-            v.position = paddedPositions[paddedIdx];
-            v.normal = glm::normalize(paddedNormals[paddedIdx]);
-            v.texCoord = glm::vec2((float)x / (CHUNK_VERTEX_RESOLUTION - 1), (float)z / (CHUNK_VERTEX_RESOLUTION - 1));
-            v.color = paddedColors[paddedIdx];
-        }
-    }
-
-    std::vector<uint32_t> indices;
-    for (int z = 0; z < CHUNK_VERTEX_RESOLUTION - 1; z++) {
-        for (int x = 0; x < CHUNK_VERTEX_RESOLUTION - 1; x++) {
-            int topLeft = z * CHUNK_VERTEX_RESOLUTION + x;
-            int topRight = topLeft + 1;
-            int bottomLeft = (z + 1) * CHUNK_VERTEX_RESOLUTION + x;
-            int bottomRight = bottomLeft + 1;
-
-            indices.push_back(topLeft);
-            indices.push_back(bottomLeft);
-            indices.push_back(topRight);
-            indices.push_back(topRight);
-            indices.push_back(bottomLeft);
-            indices.push_back(bottomRight);
-        }
-    }
-
-    // Re-upload into the SAME slot this chunk already owns — no allocation, just overwrite
-    glm::vec3 boundsCenter(
-        chunk.coord.x * CHUNK_WORLD_SIZE + CHUNK_WORLD_SIZE * 0.5f,
-        0.0f,
-        chunk.coord.z * CHUNK_WORLD_SIZE + CHUNK_WORLD_SIZE * 0.5f);
-    float boundsRadius = CHUNK_WORLD_SIZE * 0.75f;
-
-    terrainRenderer->UploadChunk(chunk.terrainSlot, vertices, indices, boundsCenter, boundsRadius);
-}
-
-void ChunkManager::StartWorkerThread(const TerrainSettings& settings, int seed) {
-    m_ShouldStop = false;
-    for (int i = 0; i < WORKER_THREAD_COUNT; i++) {
-        m_WorkerThreads.emplace_back(&ChunkManager::WorkerLoop, this, settings, seed);
-    }
-}
-void ChunkManager::StopWorkerThread() {
-    m_ShouldStop = true;
-    m_RequestCV.notify_all();   // wake ALL waiting threads, not just one
-    for (auto& t : m_WorkerThreads) {
-        if (t.joinable()) t.join();
-    }
-    m_WorkerThreads.clear();
-}
-
-void ChunkManager::WorkerLoop(TerrainSettings settings, int seed) {
-    while (!m_ShouldStop) {
-        ChunkCoord coord;
-        {
-            std::unique_lock<std::mutex> lock(m_RequestMutex);
-            m_RequestCV.wait(lock, [this] { return !m_PendingRequests.empty() || m_ShouldStop; });
-            if (m_ShouldStop) return;
-
-            coord = m_PendingRequests.front();
-            m_PendingRequests.pop();
-        }
-
-        ChunkGenerationResult result;
-        result.coord = coord;
-        result.terrainData = GenerateTerrainDataOnly(coord, settings);
-        result.treeCandidates = GenerateTreeCandidatesOnly(coord, settings);
-
-        {
-            std::lock_guard<std::mutex> lock(m_ResultMutex);
-            m_CompletedResults.push(std::move(result));
-        }
-        {
-            std::lock_guard<std::mutex> lock(m_RequestMutex);
-            m_InFlightRequests.erase(coord);
-            m_AwaitingProcessing.insert(coord); // closes the gap between "done generating" and "actually in m_LoadedChunks"
-        }
-    }
-}
-
-
-void ChunkManager::ProcessCompletedChunks(entt::registry& registry, VulkanEngine* engine, MeshRenderer* meshRenderer,
-    PlacementGrid& placementGrid, RemovedTreesMap& removedTreesMap) {
-    const int MAX_PER_FRAME = 2;
-
-    for (int i = 0; i < MAX_PER_FRAME; i++) {
-        ChunkGenerationResult result;
-        {
-            std::lock_guard<std::mutex> lock(m_ResultMutex);
-            if (m_CompletedResults.empty()) return;
-            result = std::move(m_CompletedResults.front());
-            m_CompletedResults.pop();
-        }
-
-        auto it = m_LoadedChunks.find(result.coord);
-        if (it == m_LoadedChunks.end()) {
-            // Chunk was unloaded before its tree job finished — discard the result, nothing to attach trees to
-            std::lock_guard<std::mutex> lock(m_RequestMutex);
-            m_AwaitingProcessing.erase(result.coord);
-            continue;
-        }
-        Chunk& chunk = it->second;
-        {
-            std::lock_guard<std::mutex> lock(m_RequestMutex);
-            m_AwaitingProcessing.erase(result.coord);
-        }
-    }
-}
-
-ChunkManager::GeneratedVertexData ChunkManager::GenerateTerrainDataOnly(ChunkCoord coord, const TerrainSettings& settings) {
-    float chunkOriginX = coord.x * CHUNK_WORLD_SIZE;
-    float chunkOriginZ = coord.z * CHUNK_WORLD_SIZE;
-    float cellSize = CHUNK_WORLD_SIZE / (CHUNK_VERTEX_RESOLUTION - 1);
-
-    GeneratedVertexData data;
-
-    int paddedRes = CHUNK_VERTEX_RESOLUTION + 2;
-    std::vector<glm::vec3> paddedPositions(paddedRes * paddedRes);
-    std::vector<glm::vec3> paddedColors(paddedRes * paddedRes);   // store color alongside position
-
-    DepletionMap emptyDepletionMap;
-
-    for (int z = 0; z < paddedRes; z++) {
-        for (int x = 0; x < paddedRes; x++) {
-            float worldX = chunkOriginX + (x - 1) * cellSize;
-            float worldZ = chunkOriginZ + (z - 1) * cellSize;
-            auto sample = TerrainGenerator::SampleTerrain(worldX, worldZ, settings, emptyDepletionMap);   // ONLY call, per position
-            int idx = z * paddedRes + x;
-            paddedPositions[idx] = glm::vec3(worldX, sample.height, worldZ);
-            paddedColors[idx] = sample.color;   // stored for reuse below
-        }
-    }
-
-    std::vector<glm::vec3> paddedNormals(paddedRes * paddedRes, glm::vec3(0.0f));
-    for (int z = 0; z < paddedRes - 1; z++) {
-        for (int x = 0; x < paddedRes - 1; x++) {
-            int tl = z * paddedRes + x;
-            int tr = tl + 1;
-            int bl = (z + 1) * paddedRes + x;
-            int br = bl + 1;
-
-            glm::vec3 faceNormal = glm::normalize(glm::cross(
-                paddedPositions[bl] - paddedPositions[tl],
-                paddedPositions[tr] - paddedPositions[tl]));
-
-            paddedNormals[tl] += faceNormal;
-            paddedNormals[tr] += faceNormal;
-            paddedNormals[bl] += faceNormal;
-            paddedNormals[br] += faceNormal;
-        }
-    }
-
-    data.vertices.resize(CHUNK_VERTEX_RESOLUTION * CHUNK_VERTEX_RESOLUTION);
-    for (int z = 0; z < CHUNK_VERTEX_RESOLUTION; z++) {
-        for (int x = 0; x < CHUNK_VERTEX_RESOLUTION; x++) {
-            int paddedIdx = (z + 1) * paddedRes + (x + 1);
-            int realIdx = z * CHUNK_VERTEX_RESOLUTION + x;
-
-            Vertex& v = data.vertices[realIdx];
-            v.position = paddedPositions[paddedIdx];
-            v.normal = glm::normalize(paddedNormals[paddedIdx]);
-            v.texCoord = glm::vec2((float)x / (CHUNK_VERTEX_RESOLUTION - 1), (float)z / (CHUNK_VERTEX_RESOLUTION - 1));
-            v.color = paddedColors[paddedIdx];   // CHANGED — reused from padded grid, no second SampleTerrain call
-        }
-    }
-
-    for (int z = 0; z < CHUNK_VERTEX_RESOLUTION - 1; z++) {
-        for (int x = 0; x < CHUNK_VERTEX_RESOLUTION - 1; x++) {
-            int topLeft = z * CHUNK_VERTEX_RESOLUTION + x;
-            int topRight = topLeft + 1;
-            int bottomLeft = (z + 1) * CHUNK_VERTEX_RESOLUTION + x;
-            int bottomRight = bottomLeft + 1;
-
-            data.indices.push_back(topLeft);
-            data.indices.push_back(bottomLeft);
-            data.indices.push_back(topRight);
-            data.indices.push_back(topRight);
-            data.indices.push_back(bottomLeft);
-            data.indices.push_back(bottomRight);
-        }
-    }
-
-    return data;
-}
-
-std::vector<ChunkManager::TreeCandidate> ChunkManager::GenerateTreeCandidatesOnly(ChunkCoord coord, const TerrainSettings& settings) {
-    std::vector<TreeCandidate> candidates;
-
-    float chunkOriginX = coord.x * CHUNK_WORLD_SIZE;
-    float chunkOriginZ = coord.z * CHUNK_WORLD_SIZE;
-    float worldExtentZ = settings.gridDepth * settings.cellSize;
-
-    // Cached per-thread — configured once, reused across every chunk this thread ever processes
-    static thread_local FastNoiseLite treeJitterNoise;
-    static thread_local int lastSeed = -1;
-    if (lastSeed != settings.seed) {
-        treeJitterNoise.SetSeed(settings.seed + 4000);
-        treeJitterNoise.SetNoiseType(FastNoiseLite::NoiseType_OpenSimplex2);
-        treeJitterNoise.SetFrequency(0.4f);
-        lastSeed = settings.seed;
-    }
-
-    // Thread-safe RNG for jitter, replacing rand()/RAND_MAX — each thread gets its own independent generator
-    static thread_local std::mt19937 treeRng(std::hash<std::thread::id>{}(std::this_thread::get_id()));
-    std::uniform_real_distribution<float> jitterRange(-0.5f, 0.5f);
-
-    float sampleSpacing = 8.0f;
-
-    for (float x = 0.0f; x < CHUNK_WORLD_SIZE; x += sampleSpacing) {
-        for (float z = 0.0f; z < CHUNK_WORLD_SIZE; z += sampleSpacing) {
-            float worldX = chunkOriginX + x;
-            float worldZ = chunkOriginZ + z;
-
-            BiomeId biome = BiomeMap::GetBiomeAt(worldX, worldZ, settings.seed);
-            if (biome == BiomeId::Lake) continue;
-
-            const BiomeDef& def = BiomeDatabase::Get(biome);
-            if (def.treeDensity <= 0.0f) continue;
-
-            auto deposit = OreDepositMap::GetDepositAt(worldX, worldZ, settings.seed);
-            if (deposit) continue;
-
-            float aridity = BiomeMap::GetAridity(worldX, worldZ, settings.seed);
-            float wetness = 1.0f - aridity;
-            float effectiveDensity = def.treeDensity * wetness;
-
-            float roll = treeJitterNoise.GetNoise(worldX, worldZ);
-            float threshold = 1.0f - (effectiveDensity * 2.0f);
-            if (roll < threshold) continue;
-
-            float jitterX = jitterRange(treeRng) * sampleSpacing;   // CHANGED — thread-safe, no more rand()
-            float jitterZ = jitterRange(treeRng) * sampleSpacing;   // CHANGED
-            float finalX = worldX + jitterX;
-            float finalZ = worldZ + jitterZ;
-
-            auto sample = TerrainGenerator::SampleHeight(finalX, finalZ, settings);
-
-            candidates.push_back({ glm::vec3(finalX, sample, finalZ) });
-        }
-    }
-
-    return candidates;
-}
-
-void ChunkManager::RequestInitialChunksBlocking(glm::vec3 playerPos, const TerrainSettings &settings,
-                                                VulkanEngine *engine, MeshRenderer *meshRenderer, int seed,
-                                                DepletionMap &depletionMap, RemovedTreesMap &removedTreesMap,
-                                                entt::registry &registry, PlacementGrid &placementGrid, TerrainRenderer *terrainRenderer) {
-    ChunkCoord playerChunk = WorldToChunkCoord(playerPos);
-    std::vector<ChunkCoord> desired;
-    for (int dz = -LOAD_RADIUS_CHUNKS; dz <= LOAD_RADIUS_CHUNKS; dz++)
-        for (int dx = -LOAD_RADIUS_CHUNKS; dx <= LOAD_RADIUS_CHUNKS; dx++)
-            desired.push_back({ playerChunk.x + dx, playerChunk.z + dz });
-
-    for (auto &coord : desired) {
-        std::lock_guard<std::mutex> lock(m_RequestMutex);
-        m_InFlightRequests.insert(coord);
-        m_PendingRequests.push(coord);
-        m_RequestCV.notify_one();
-    }
-
-    while (m_LoadedChunks.size() < desired.size()) {
-        ProcessCompletedChunks(registry, engine, meshRenderer, placementGrid, removedTreesMap);
-        std::this_thread::sleep_for(std::chrono::milliseconds(10)); // avoid busy-spinning
-    }
-}
-void ChunkManager::BeginInitialLoad(glm::vec3 playerPos, glm::vec3 cameraForward, const TerrainSettings &settings, int seed) {
-    ChunkCoord playerChunk = WorldToChunkCoord(playerPos);
-    glm::vec2 forward2D = glm::normalize(glm::vec2(cameraForward.x, cameraForward.z));
-
-    std::vector<ChunkCoord> desired;
-    for (int dz = -LOAD_RADIUS_CHUNKS; dz <= LOAD_RADIUS_CHUNKS; dz++) {
-        for (int dx = -LOAD_RADIUS_CHUNKS; dx <= LOAD_RADIUS_CHUNKS; dx++) {
-            float distance = glm::length(glm::vec2(dx, dz));
-            if (distance < 0.001f) {
-                desired.push_back({ playerChunk.x + dx, playerChunk.z + dz });
-                continue;
-            }
-
-            glm::vec2 toChunk = glm::vec2(dx, dz) / distance;
-            float dot = glm::dot(toChunk, forward2D);
-            float effectiveRadius = glm::mix(static_cast<float>(LOAD_RADIUS_CHUNKS) * 0.35f,
-                                             static_cast<float>(LOAD_RADIUS_CHUNKS), (dot + 1.0f) * 0.5f);
-            if (distance <= effectiveRadius) desired.push_back({ playerChunk.x + dx, playerChunk.z + dz });
-        }
-    }
-
-    m_InitialLoadTarget = desired.size(); // now matches the REAL, forward-biased chunk count
-
-    for (auto &coord : desired) {
-        std::lock_guard<std::mutex> lock(m_RequestMutex);
-        m_InFlightRequests.insert(coord);
-        m_PendingRequests.push(coord);
-        m_RequestCV.notify_one();
-    }
+void ChunkManager::BeginInitialLoad(glm::vec3 playerPos, glm::vec3 cameraForward) {
+    // Same shape Update() loads at normal zoom, so the loading screen finishes once those chunks exist
+    m_InitialLoadTarget = ComputeDesiredChunks(WorldToChunkCoord(playerPos), cameraForward, 1.0f).size();
 }
 
 bool ChunkManager::IsInitialLoadComplete() const {
@@ -469,43 +118,37 @@ float ChunkManager::GetInitialLoadProgress() const {
     return glm::clamp((float)m_LoadedChunks.size() / (float)m_InitialLoadTarget, 0.0f, 1.0f);
 }
 
-void ChunkManager::RecordPendingGeneration(VkCommandBuffer commandBuffer, ChunkGenerator* generator,
-    TerrainRenderer* terrainRenderer, TreeRenderer* treeRenderer,
-    const TerrainSettings& settings, DepletionMap& depletionMap,
-    RemovedTreesMap& removedTreesMap) {
-    for (auto& req : m_PendingGpuGeneration) {
-        auto it = m_LoadedChunks.find(req.coord);
-        if (it == m_LoadedChunks.end()) continue;
-        if (it->second.isGenerated) continue;
+void ChunkManager::RecordPendingGeneration(VkCommandBuffer commandBuffer, ChunkGenerator *generator,
+                                           TerrainRenderer *terrainRenderer, TreeRenderer *treeRenderer,
+                                           const TerrainSettings &settings, const DepletionMap &depletionMap,
+                                           const RemovedTreesMap &removedTreesMap) {
+    for (auto &coord : m_PendingGpuGeneration) {
+        auto it = m_LoadedChunks.find(coord);
+        if (it == m_LoadedChunks.end() || it->second.isGenerated) continue;
 
-        float chunkOriginX = req.coord.x * CHUNK_WORLD_SIZE;
-        float chunkOriginZ = req.coord.z * CHUNK_WORLD_SIZE;
-        float cellSize = CHUNK_WORLD_SIZE / (CHUNK_VERTEX_RESOLUTION - 1);
+        float chunkOriginX = coord.x * CHUNK_WORLD_SIZE;
+        float chunkOriginZ = coord.z * CHUNK_WORLD_SIZE;
 
-        // Gather this chunk's relevant depletion entries (within its world-space bounds)
+        // Depleted ore cells inside this chunk, so the shader can fade their color
         std::vector<glm::vec4> depletionEntries;
-        for (auto& [gridCoord, fraction] : depletionMap.GetAll()) {
+        for (auto &[gridCoord, fraction] : depletionMap.GetAll()) {
             float wx = static_cast<float>(gridCoord.x);
             float wz = static_cast<float>(gridCoord.z);
-            if (wx >= chunkOriginX && wx < chunkOriginX + CHUNK_WORLD_SIZE &&
-                wz >= chunkOriginZ && wz < chunkOriginZ + CHUNK_WORLD_SIZE) {
+            if (wx >= chunkOriginX && wx < chunkOriginX + CHUNK_WORLD_SIZE && wz >= chunkOriginZ && wz < chunkOriginZ + CHUNK_WORLD_SIZE) {
                 depletionEntries.push_back(glm::vec4(wx, wz, fraction, 0.0f));
-                if (depletionEntries.size() >= 8) break;   // matches shader's fixed array size
+                if (depletionEntries.size() >= MAX_DEPLETION_ENTRIES) break;
             }
         }
 
-        // Gather this chunk's removed tree indices
-        auto removedIndices = removedTreesMap.GetAll().count(req.coord) ? removedTreesMap.GetAll().at(req.coord) : std::unordered_set<int>{};
+        // Trees chopped down in this chunk, so the shader skips them
+        auto removedIt = removedTreesMap.GetAll().find(coord);
+        auto removedIndices = removedIt != removedTreesMap.GetAll().end() ? removedIt->second : std::unordered_set<int>{};
 
-        generator->RecordGenerateChunk(commandBuffer, it->second.terrainSlot, it->second.treeSlot,
-            chunkOriginX, chunkOriginZ, cellSize, (float)settings.seed,
-            depletionEntries, removedIndices);
+        generator->RecordGenerateChunk(commandBuffer, it->second.terrainSlot, it->second.treeSlot, chunkOriginX, chunkOriginZ,
+                                       MESH_CELL_SIZE, (float)settings.seed, depletionEntries, removedIndices);
 
-        glm::vec3 boundsCenter(chunkOriginX + CHUNK_WORLD_SIZE * 0.5f, 0.0f, chunkOriginZ + CHUNK_WORLD_SIZE * 0.5f);
-        float boundsRadius = CHUNK_WORLD_SIZE * 0.75f;
-        terrainRenderer->UploadChunkBounds(it->second.terrainSlot, boundsCenter, boundsRadius);
-        treeRenderer->UploadChunkBounds(it->second.treeSlot, boundsCenter, boundsRadius);
-
+        terrainRenderer->UploadChunkBounds(it->second.terrainSlot, ChunkBoundsCenter(coord), CHUNK_BOUNDS_RADIUS);
+        treeRenderer->UploadChunkBounds(it->second.treeSlot, ChunkBoundsCenter(coord), CHUNK_BOUNDS_RADIUS);
         it->second.isGenerated = true;
     }
     m_PendingGpuGeneration.clear();
@@ -513,29 +156,14 @@ void ChunkManager::RecordPendingGeneration(VkCommandBuffer commandBuffer, ChunkG
 
 void ChunkManager::RequestChunkRegeneration(ChunkCoord coord) {
     auto it = m_LoadedChunks.find(coord);
-    if (it == m_LoadedChunks.end()) return;   // chunk isn't loaded, nothing to regenerate
+    if (it == m_LoadedChunks.end()) return; // not loaded; it'll generate with current data when it loads
 
-    // Re-queue it for generation, reusing the EXACT same slots it already owns
-    m_PendingGpuGeneration.push_back({ coord });
-    it->second.isGenerated = false;   // allows RecordPendingGeneration to pick it up again
+    it->second.isGenerated = false;
+    m_PendingGpuGeneration.push_back(coord);
 }
 
 std::optional<uint32_t> ChunkManager::GetTreeSlotForChunk(ChunkCoord coord) const {
     auto it = m_LoadedChunks.find(coord);
     if (it == m_LoadedChunks.end() || !it->second.isGenerated) return std::nullopt;
     return it->second.treeSlot;
-}
-
-void ChunkManager::UnloadAll(entt::registry &registry, VulkanEngine *engine,
-                             TerrainRenderer *terrainRenderer, TreeRenderer *treeRenderer) {
-    std::vector<ChunkCoord> coords;
-    coords.reserve(m_LoadedChunks.size());
-    for (auto &[coord, chunk] : m_LoadedChunks)
-        coords.push_back(coord);
-
-    for (auto &coord : coords)
-        UnloadChunk(coord, registry, engine, terrainRenderer, treeRenderer);
-
-    m_LoadedChunks.clear();
-    m_PendingGpuGeneration.clear();
 }

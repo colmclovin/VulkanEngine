@@ -2,6 +2,8 @@
 #ifndef ORE_GLSL
 #define ORE_GLSL
 
+#include "noise.glsl"   // hashSeed / simplexNoise2D
+
 // Ore type IDs — must match your OreDatabase's ItemId order for whichever ores you register
 const int ORE_NONE = -1;
 const int ORE_COPPER = 0;

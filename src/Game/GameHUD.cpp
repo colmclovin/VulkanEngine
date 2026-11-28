@@ -44,10 +44,10 @@ std::optional<glm::vec2> GameHUD::DrawMinimap(entt::registry &registry, Camera3D
     const bool hovered = ImGui::IsItemHovered();
     const glm::vec2 center = GetMinimapCenter();
 
+    // The map is rotated so the camera's forward is up (see minimap.comp)
     auto worldToScreen = [&](float wx, float wz) {
-        float u = (wx - center.x) / (m_MinimapRange * 2.0f) + 0.5f;
-        float v = (wz - center.y) / (m_MinimapRange * 2.0f) + 0.5f;
-        return ImVec2(imgMin.x + u * size, imgMin.y + v * size);
+        glm::vec2 uv = WorldToMapOffset(glm::vec2(wx, wz) - center) / (m_MinimapRange * 2.0f) + 0.5f;
+        return ImVec2(imgMin.x + uv.x * size, imgMin.y + uv.y * size);
     };
     auto outsideMap = [&](ImVec2 s, float padX = 0.0f, float padZ = 0.0f) {
         return s.x + padX < imgMin.x || s.y + padZ < imgMin.y || s.x - padX > imgMin.x + size || s.y - padZ > imgMin.y + size;
@@ -67,18 +67,20 @@ std::optional<glm::vec2> GameHUD::DrawMinimap(entt::registry &registry, Camera3D
         dl->AddCircleFilled(s, 3.0f, friendly ? IM_COL32(80, 255, 120, 255) : IM_COL32(255, 70, 70, 255));
     }
 
-    // Buildings (anything with bounds that isn't a unit or a pickup), once explored
+    // Buildings (anything with bounds that isn't a unit or a pickup), once explored.
+    // Drawn as their world-space footprint, which is a rotated rectangle on the map.
     auto placed = registry.view<TransformComponent, BoundsComponent>(entt::exclude<SelectableComponent, PickupComponent>);
-    float pxPerUnit = size / (m_MinimapRange * 2.0f);
+    const float minHalfWorld = 1.5f * (m_MinimapRange * 2.0f) / size; // keep tiny buildings at least ~3px wide
     for (auto e : placed) {
         glm::vec3 p = placed.get<TransformComponent>(e).Position;
         if (fog.GetState(p.x, p.z) == FogOfWar::Unexplored) continue;
         glm::vec3 he = placed.get<BoundsComponent>(e).halfExtents;
+        float hx = std::max(he.x, minHalfWorld), hz = std::max(he.z, minHalfWorld);
         ImVec2 s = worldToScreen(p.x, p.z);
-        float hx = std::max(he.x * pxPerUnit, 1.5f);
-        float hz = std::max(he.z * pxPerUnit, 1.5f);
-        if (outsideMap(s, hx, hz)) continue;
-        dl->AddRectFilled(ImVec2(s.x - hx, s.y - hz), ImVec2(s.x + hx, s.y + hz), IM_COL32(240, 170, 60, 255));
+        float reachPx = (hx + hz) * size / (m_MinimapRange * 2.0f);
+        if (outsideMap(s, reachPx, reachPx)) continue;
+        dl->AddQuadFilled(worldToScreen(p.x - hx, p.z - hz), worldToScreen(p.x + hx, p.z - hz),
+                          worldToScreen(p.x + hx, p.z + hz), worldToScreen(p.x - hx, p.z + hz), IM_COL32(240, 170, 60, 255));
     }
 
     // Active enemy nests the player can currently see. Tier 0 = pale red, tier 4 = deep red; bigger dot for higher tier
@@ -95,6 +97,18 @@ std::optional<glm::vec2> GameHUD::DrawMinimap(entt::registry &registry, Camera3D
     ImVec2 cs = worldToScreen(cam.x, cam.z);
     dl->AddRect(ImVec2(cs.x - 5, cs.y - 5), ImVec2(cs.x + 5, cs.y + 5), IM_COL32(255, 255, 255, 255));
 
+    // North marker on the map edge, so the world's fixed directions are still readable while the map turns
+    {
+        glm::vec2 north = WorldToMapOffset(glm::vec2(0.0f, -1.0f)); // unit direction on the map
+        float edge = size * 0.5f - 9.0f;
+        float t = edge / std::max(std::abs(north.x), std::abs(north.y)); // push out to the square's border
+        ImVec2 mid(imgMin.x + size * 0.5f, imgMin.y + size * 0.5f);
+        ImVec2 np(mid.x + north.x * t, mid.y + north.y * t);
+        dl->AddCircleFilled(np, 8.0f, IM_COL32(0, 0, 0, 170));
+        dl->AddText(ImVec2(np.x - ImGui::CalcTextSize("N").x * 0.5f, np.y - ImGui::GetTextLineHeight() * 0.5f),
+                    IM_COL32(255, 255, 255, 255), "N");
+    }
+
     // Input: left-drag pans the camera, wheel zooms, right-click issues a move order
     if (hovered && ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
         m_MinimapDragCenter = m_MinimapCenter; // lock before anything moves
@@ -108,7 +122,7 @@ std::optional<glm::vec2> GameHUD::DrawMinimap(entt::registry &registry, Camera3D
     // Clamp so dragging past the edge keeps the target on the map
     float u = glm::clamp((io.MousePos.x - imgMin.x) / size, 0.0f, 1.0f);
     float v = glm::clamp((io.MousePos.y - imgMin.y) / size, 0.0f, 1.0f);
-    glm::vec2 world = GetMinimapCenter() + glm::vec2(u - 0.5f, v - 0.5f) * (m_MinimapRange * 2.0f);
+    glm::vec2 world = GetMinimapCenter() + MapToWorldOffset(glm::vec2(u - 0.5f, v - 0.5f) * (m_MinimapRange * 2.0f));
 
     if (m_MinimapDragging) {
         if (camera.GetMode() != Camera3D::Mode::IsoRTS) camera.SetMode(Camera3D::Mode::IsoRTS);

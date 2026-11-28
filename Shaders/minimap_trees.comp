@@ -15,6 +15,7 @@ layout(push_constant) uniform PC {
     float fogInvSize;
     int cellsPerAxis;
     ivec2 startCell;
+    vec2 forward;   // world XZ direction that points "up" on the map (must match minimap.comp)
 } pc;
 
 // MUST match hashJitter in tree_generate.comp
@@ -51,7 +52,10 @@ void main() {
     float x = worldX + (hashJitter(vec2(worldX, worldZ), 2.0) - 0.5) * 8.0;
     float z = worldZ + (hashJitter(vec2(worldX, worldZ), 3.0) - 0.5) * 8.0;
 
-    vec2 uv = (vec2(x, z) - pc.center) / (pc.halfRange * 2.0) + 0.5;
+    // Inverse of minimap.comp's rotation: world offset -> (right, down) map coordinates
+    vec2 d = vec2(x, z) - pc.center;
+    vec2 right = vec2(-pc.forward.y, pc.forward.x);
+    vec2 uv = vec2(dot(d, right), -dot(d, pc.forward)) / (pc.halfRange * 2.0) + 0.5;
     if (uv.x < 0.0 || uv.y < 0.0 || uv.x >= 1.0 || uv.y >= 1.0) return;
 
     float f = textureLod(fogMap, (vec2(x, z) - pc.fogOrigin) * pc.fogInvSize, 0.0).r;

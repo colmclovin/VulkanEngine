@@ -1,10 +1,28 @@
 // FogOfWar.cpp
 #include "FogOfWar.h"
+#include <cstring>
 #include "../Components/Components.h"
 
+std::vector<std::pair<ChunkCoord, uint64_t>> FogOfWar::GetExploredMasks() const {
+    std::vector<std::pair<ChunkCoord, uint64_t>> out;
+    out.reserve(m_Chunks.size());
+    for (const auto &[coord, chunk] : m_Chunks) {
+        uint64_t mask = 0;
+        for (int i = 0; i < CELLS_PER_CHUNK * CELLS_PER_CHUNK; i++)
+            if (chunk.cells[i] != Unexplored) mask |= uint64_t(1) << i;
+        if (mask) out.emplace_back(coord, mask);
+    }
+    return out;
+}
+
+void FogOfWar::SetExploredMask(ChunkCoord coord, uint64_t mask) {
+    FogChunk &chunk = m_Chunks[coord];
+    for (int i = 0; i < CELLS_PER_CHUNK * CELLS_PER_CHUNK; i++)
+        chunk.cells[i] = (mask >> i) & 1 ? Explored : Unexplored;
+    m_Dirty = true;
+}
+
 void FogOfWar::Update(entt::registry& registry, uint8_t team) {
-
-
     size_t h = 1469598103u;
     {
         auto v = registry.view<TransformComponent, VisionComponent, TeamComponent>();

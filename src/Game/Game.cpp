@@ -35,7 +35,6 @@
 #include "RecipeDatabase.h"
 #include "FurnaceRecipeDatabase.h"
 #include "FuelDatabase.h"
-#include "BiomeDatabase.h"
 #include "UnitDatabase.h"
 #include "EntityFactory.h"
 
@@ -113,8 +112,6 @@ void Game::Run() {
             break;
 
         case GameState::Loading:
-            m_ChunkManager.ProcessCompletedChunks(*m_Registry, m_VulkanEngine.get(), m_RenderSystem->GetMeshRenderer(),
-                                                  m_World.placementGrid, m_World.removedTrees);
             RunLoadingScreen();
             if (m_ChunkManager.IsInitialLoadComplete())
                 m_State = GameState::Playing;
@@ -136,10 +133,8 @@ void Game::Init() {
     FuelDatabase::Init();
     PlaceableDatabase::Init();
     FurnaceRecipeDatabase::Init();
-    BiomeDatabase::Init();
 
     m_PlacementSystem = std::make_unique<PlacementSystem>();
-    m_ChunkManager.StartWorkerThread(m_Settings.terrain, m_Settings.terrain.seed);
 
     std::cout << "=== Initializing Engine ===" << std::endl;
     m_VulkanEngine = std::make_unique<VulkanEngine>();
@@ -186,7 +181,6 @@ void Game::Init() {
 
 void Game::Shutdown() {
     std::cout << "=== Shutting Down Game ===" << std::endl;
-    m_ChunkManager.StopWorkerThread();
     m_Settings.SaveToFile("settings.json");
 
     if (!m_Initialized) return;
@@ -414,15 +408,13 @@ void Game::MovePlayer(glm::vec3 direction, float deltaTime) {
     player.runSpeed = m_Settings.playerRunSpeed;
 
     // Move relative to the camera's facing, so "forward" is always "up the screen" on any 45° snap
-    float camYaw = glm::radians(m_Camera->GetIsoYaw());
-    glm::vec3 forward = glm::normalize(glm::vec3(-cos(camYaw), 0.0f, -sin(camYaw)));
+    glm::vec3 forward = m_Camera->GetForwardDirection();
     glm::vec3 right = glm::normalize(glm::cross(forward, glm::vec3(0, 1, 0)));
     float speed = m_Input.Down(GLFW_KEY_LEFT_SHIFT) ? player.runSpeed : player.moveSpeed;
     transform.Position += (forward * direction.z + right * direction.x) * speed * deltaTime;
 
-    float cellSize = ChunkManager::CHUNK_WORLD_SIZE / (ChunkManager::CHUNK_VERTEX_RESOLUTION - 1);
-    transform.Position.y = GpuNoiseMatch::SampleMeshHeight(transform.Position.x, transform.Position.z,
-                                                           (float)m_Settings.terrain.seed, cellSize);
+    transform.Position.y = GpuNoiseMatch::SampleSurfaceHeight(transform.Position.x, transform.Position.z,
+                                                              (float)m_Settings.terrain.seed);
 }
 
 void Game::HandleRTSInput(const MouseRay &ray) {
@@ -587,6 +579,8 @@ void Game::Update(float deltaTime) {
     glm::vec3 focus = (rtsMode || !hasPlayer) ? m_Camera->GetIsoTarget()
                                               : m_Registry->get<TransformComponent>(m_PlayerEntity).Position;
     m_HUD.SetMinimapFocus(glm::vec2(focus.x, focus.z));
+    glm::vec3 camForward = m_Camera->GetForwardDirection(); // map turns with the camera: screen-up = map-up
+    m_HUD.SetMinimapForward(glm::vec2(camForward.x, camForward.z));
 
     m_FogTimer += deltaTime;
     if (m_FogTimer >= FOG_UPDATE_INTERVAL) {
@@ -617,7 +611,7 @@ void Game::DrawHUD() {
     m_HUD.DrawHealthBars(*m_Registry, *m_Camera, GetAspect());
 
     if (auto target = m_HUD.DrawMinimap(*m_Registry, *m_Camera, m_World.fog, m_Nests, !m_SelectedUnits.empty())) {
-        float h = GpuNoiseMatch::SampleHeight(target->x, target->y, (float)m_Settings.terrain.seed);
+        float h = GpuNoiseMatch::SampleSurfaceHeight(target->x, target->y, (float)m_Settings.terrain.seed);
         IssueMoveCommand(glm::vec3(target->x, h, target->y));
     }
 
@@ -646,8 +640,7 @@ entt::entity Game::SpawnUnit(ItemId unitItem, glm::vec3 position, uint8_t team) 
 }
 
 void Game::ResetWorldState() {
-    m_ChunkManager.UnloadAll(*m_Registry, m_VulkanEngine.get(), m_RenderSystem->GetTerrainRenderer(),
-                             m_RenderSystem->GetTreeRenderer());
+    m_ChunkManager.UnloadAll(m_RenderSystem->GetTerrainRenderer(), m_RenderSystem->GetTreeRenderer());
 
     m_Registry->clear();
     m_World = WorldState{};
@@ -705,16 +698,13 @@ void Game::SaveCurrentGame() {
 // Kicks off the initial chunk load around the player and switches to the loading screen.
 void Game::BeginChunkLoad() {
     m_ChunkManager.BeginInitialLoad(m_Registry->get<TransformComponent>(m_PlayerEntity).Position,
-                                    m_Camera->GetForwardDirection(), m_Settings.terrain, m_Settings.terrain.seed);
+                                    m_Camera->GetForwardDirection());
     m_State = GameState::Loading;
 }
 
 void Game::UpdateChunkStreaming(const glm::vec3 &center) {
-    m_ChunkManager.Update(*m_Registry, center, m_Settings.terrain, m_VulkanEngine.get(),
-                          m_RenderSystem->GetMeshRenderer(), m_Settings.terrain.seed, m_World.depletionMap,
-                          m_World.placementGrid, m_RenderSystem->GetTerrainRenderer(), m_World.removedTrees,
-                          m_Camera->GetForwardDirection(),
-                          m_Camera->GetIsoDistance(), m_RenderSystem->GetTreeRenderer());
+    m_ChunkManager.Update(center, m_Camera->GetForwardDirection(), m_Camera->GetIsoDistance(),
+                          m_RenderSystem->GetTerrainRenderer(), m_RenderSystem->GetTreeRenderer());
 }
 
 void Game::RefreshSaveList() {

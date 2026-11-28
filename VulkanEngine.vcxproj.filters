@@ -158,15 +158,6 @@
     <ClCompile Include="src\Renderer\ShadowMapRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\Game\BiomeDatabase.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\BiomeMap.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\Game\OreDatabase.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\Game\OreDepositMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -233,12 +224,6 @@
     <ClCompile Include="src\World\DepletionMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="src\World\TerrainGenerator.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\World\ResourceMap.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="src\World\WorldGenerator.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -267,9 +252,6 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Rendering\TreeCuller.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="src\World\TreePlacement.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="src\Utils\GpuNoiseMatch.cpp">
@@ -481,15 +463,6 @@
     <ClInclude Include="src\Renderer\ShadowMapRenderer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\Game\BiomeDatabase.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\BiomeMap.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\Game\OreDatabase.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\Game\OreDepositMap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -574,9 +547,6 @@
     <ClInclude Include="src\World\FogOfWarMap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="src\World\ResourceMap.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="src\World\PlacementGrid.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -596,9 +566,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\World\DayNightCycle.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\World\TerrainGenerator.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\World\RemovedTreesMap.h">
@@ -644,9 +611,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\Rendering\TreeCuller.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="src\World\TreePlacement.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="src\World\TreeHealthMap.h">

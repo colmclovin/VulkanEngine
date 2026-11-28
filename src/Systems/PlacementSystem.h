@@ -5,7 +5,6 @@
 #include "../Game/ItemDatabase.h"
 #include "../Game/Camera3D.h"
 #include "../Utils/GameSettings.h"
-#include "../World/ResourceMap.h"
 #include "../World/PlacementGrid.h"
 
 class PlacementSystem {

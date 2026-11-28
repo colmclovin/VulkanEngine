@@ -2,6 +2,8 @@
 #include "../Components/Components.h"
 #include "../Utils/GameSettings.h"
 #include "../Components/InventoryComponent.h"
+#include <cstdio>
+#include <cstdlib>
 #include <fstream>
 #include <iostream>
 #include <JSON/json.hpp>
@@ -38,6 +40,16 @@ void SaveManager::SaveGame(const std::string &path, entt::registry &registry, en
         removedTreesJson.push_back({ { "chunkX", coord.x }, { "chunkZ", coord.z }, { "indices", indicesJson } });
     }
     j["removedTreesMap"] = removedTreesJson;
+
+    // Explored fog: one "chunkX,chunkZ,mask" string per chunk (64-bit hex mask, one bit per fog cell).
+    // A string per chunk keeps the pretty-printed save small compared to nested arrays.
+    json fogJson = json::array();
+    for (auto &[coord, mask] : world.fog.GetExploredMasks()) {
+        char buf[64];
+        std::snprintf(buf, sizeof(buf), "%d,%d,%016llx", coord.x, coord.z, (unsigned long long)mask);
+        fogJson.push_back(buf);
+    }
+    j["fog"] = fogJson;
 
     json entitiesJson = json::array();
     auto view = registry.view<TransformComponent>();
@@ -140,6 +152,22 @@ bool SaveManager::LoadGame(const std::string &path, entt::registry &registry, en
         ChunkCoord coord{ entry["chunkX"], entry["chunkZ"] };
         for (auto &idx : entry["indices"]) {
             world.removedTrees.MarkRemoved(coord, idx.get<int>());
+        }
+    }
+
+    if (j.contains("fog")) { // older saves have no fog; they just start unexplored
+        for (auto &entry : j["fog"]) {
+            const std::string text = entry.get<std::string>();
+            const char *p = text.c_str();
+            char *end = nullptr;
+            long cx = std::strtol(p, &end, 10);
+            if (*end != ',') continue;
+            long cz = std::strtol(end + 1, &end, 10);
+            if (*end != ',') continue;
+            const char *maskStart = end + 1;
+            unsigned long long mask = std::strtoull(maskStart, &end, 16);
+            if (end == maskStart) continue;
+            world.fog.SetExploredMask(ChunkCoord{ (int)cx, (int)cz }, mask);
         }
     }
 

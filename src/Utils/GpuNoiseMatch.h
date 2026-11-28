@@ -15,10 +15,21 @@ namespace GpuNoiseMatch {
     float GetBiomeHeightScale(int biomeId);
     float SampleRawHeightForBiome(float worldX, float worldZ, int biomeId, float seed);
     void SampleBiomeWeights(float worldX, float worldZ, float seed, float weights[6]);
-    float SampleHeight(float worldX, float worldZ, float seed);   // the real height-matching function
+    // Exact noise height at a point. The rendered terrain only matches this AT mesh vertices;
+    // between them the mesh is flat triangles, so use SampleSurfaceHeight to stand things on the ground.
+    float SampleHeight(float worldX, float worldZ, float seed);
     float SampleMeshHeight(float worldX, float worldZ, float seed, float cellSize);
     float SampleHeightFast(float worldX, float worldZ, float seed);
+
+    // Spacing between terrain mesh vertices: ChunkManager::CHUNK_WORLD_SIZE / (CHUNK_VERTEX_RESOLUTION - 1).
+    // ChunkManager static_asserts that these stay in sync.
+    constexpr float TERRAIN_MESH_CELL_SIZE = 32.0f / 15.0f;
+
+    // Height of the rendered terrain surface (interpolated across the mesh triangle) — use for placing units/players.
+    inline float SampleSurfaceHeight(float worldX, float worldZ, float seed) {
+        return SampleMeshHeight(worldX, worldZ, seed, TERRAIN_MESH_CELL_SIZE);
     }
+}
 
 // Match biome.glsl's constants exactly
 constexpr int BIOME_PLAINS = 0;

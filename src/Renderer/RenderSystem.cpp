@@ -21,7 +21,6 @@
 #include <glm/glm.hpp>
 #include "../Game/ChunkManager.h"
 #include "../Rendering/ModelLoader.h"
-#include "../World/TreePlacement.h"
 #include "../Rendering/FogTexture.h"
 #include "FogLayerRenderer.h"
 #include <algorithm>

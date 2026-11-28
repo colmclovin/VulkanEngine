@@ -3,7 +3,9 @@
 #include "FogTexture.h"
 #include "imgui_impl_vulkan.h"
 #include <stdexcept>
+#include <cmath>
 
+// Push constant layouts — must match minimap.comp and minimap_trees.comp
 struct MinimapPush {
     glm::vec2 center;
     float halfRange;
@@ -11,7 +13,21 @@ struct MinimapPush {
     glm::vec2 fogOrigin;
     float fogInvSize;
     float pad;
+    glm::vec2 forward;
 };
+
+struct MinimapTreePush {
+    glm::vec2 center;
+    float halfRange;
+    float seed;
+    glm::vec2 fogOrigin;
+    float fogInvSize;
+    int32_t cellsPerAxis;
+    int32_t startCellX;
+    int32_t startCellZ;
+    glm::vec2 forward;
+};
+static_assert(sizeof(MinimapPush) == 40 && sizeof(MinimapTreePush) == 48, "push constant layout changed");
 
 void Minimap::Init(VulkanEngine *engine, FogTexture *fogTex) {
 
@@ -144,7 +160,7 @@ void Minimap::Init(VulkanEngine *engine, FogTexture *fogTex) {
     vkDestroyShaderModule(dev, mod, nullptr);
 
 
-      VkPushConstantRange tpr{ VK_SHADER_STAGE_COMPUTE_BIT, 0, 40 };
+    VkPushConstantRange tpr{ VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(MinimapTreePush) };
     VkPipelineLayoutCreateInfo tpli{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
     tpli.setLayoutCount = 1;
     tpli.pSetLayouts = &m_SetLayout;
@@ -168,7 +184,7 @@ void Minimap::Init(VulkanEngine *engine, FogTexture *fogTex) {
 
 } // end of Init
 
-void Minimap::Record(VkCommandBuffer cmd, glm::vec2 center, float halfRange, float seed) {
+void Minimap::Record(VkCommandBuffer cmd, glm::vec2 center, float halfRange, float seed, glm::vec2 forward) {
     // Wait for last frame's ImGui read before overwriting
     VkMemoryBarrier mb{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
     mb.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
@@ -182,6 +198,7 @@ void Minimap::Record(VkCommandBuffer cmd, glm::vec2 center, float halfRange, flo
     push.seed = seed;
     push.fogOrigin = m_FogTex->GetOrigin();
     push.fogInvSize = m_FogTex->GetInvWorldSize();
+    push.forward = forward;
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_Pipeline);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_PipeLayout, 0, 1, &m_Set, 0, nullptr);
@@ -195,25 +212,18 @@ void Minimap::Record(VkCommandBuffer cmd, glm::vec2 center, float halfRange, flo
     vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
                          0, 1, &wb, 0, nullptr, 0, nullptr);
 
-   struct TreePush {
-        glm::vec2 center;
-        float halfRange;
-        float seed;
-        glm::vec2 fogOrigin;
-        float fogInvSize;
-        int32_t cellsPerAxis;
-        int32_t startCellX;
-        int32_t startCellZ;
-    } tp{};
-
+    MinimapTreePush tp{};
     tp.center = center;
     tp.halfRange = halfRange;
     tp.seed = seed;
     tp.fogOrigin = m_FogTex->GetOrigin();
     tp.fogInvSize = m_FogTex->GetInvWorldSize();
-    tp.startCellX = (int32_t)std::floor((center.x - halfRange) / 8.0f);
-    tp.startCellZ = (int32_t)std::floor((center.y - halfRange) / 8.0f);
-    tp.cellsPerAxis = (int32_t)std::ceil(halfRange * 2.0f / 8.0f) + 2;
+    tp.forward = forward;
+    // The rotated map square covers a larger axis-aligned world box (up to sqrt(2)x at 45 degrees)
+    float worldHalfExtent = halfRange * (std::abs(forward.x) + std::abs(forward.y));
+    tp.startCellX = (int32_t)std::floor((center.x - worldHalfExtent) / 8.0f);
+    tp.startCellZ = (int32_t)std::floor((center.y - worldHalfExtent) / 8.0f);
+    tp.cellsPerAxis = (int32_t)std::ceil(worldHalfExtent * 2.0f / 8.0f) + 2;
 
     vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_TreePipeline);
     vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_COMPUTE, m_TreePipeLayout, 0, 1, &m_Set, 0, nullptr);
